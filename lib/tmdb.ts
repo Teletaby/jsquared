@@ -1,6 +1,50 @@
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
+interface AuthorDetails {
+  name: string;
+  username: string;
+  avatar_path: string | null;
+  rating: number | null;
+}
+
+export interface Review {
+  author: string;
+  author_details: AuthorDetails;
+  content: string;
+  created_at: string;
+  id: string;
+  updated_at: string;
+  url: string;
+}
+
+export interface ReviewsResponse {
+  page: number;
+  results: Review[];
+  total_pages: number;
+  total_results: number;
+}
+
+export interface CastMember {
+  adult: boolean;
+  gender: number | null;
+  id: number;
+  known_for_department: string;
+  name: string;
+  original_name: string;
+  popularity: number;
+  profile_path: string | null;
+  character: string;
+  credit_id: string;
+  order: number;
+}
+
+export interface CastDetails {
+  id: number;
+  cast: CastMember[];
+  crew: any[]; // You can define a CrewMember interface if needed
+}
+
 // This log will appear in your terminal when the server starts or when a server component fetches data.
 // It's the best way to confirm if your .env.local file is being read.
 console.log('TMDB_API_KEY loaded by server:', TMDB_API_KEY ? `${TMDB_API_KEY.substring(0, 4)}...` : 'NOT FOUND');
@@ -54,13 +98,15 @@ export const discoverTvShows = (params: Record<string, string | number> = {}) =>
 
 // --- Functions for fetching detailed media information ---
 
-export const getMovieDetails = (id: number) => fetchFromTMDB(`movie/${id}`, { append_to_response: 'external_ids' });
+export const getMovieDetails = (id: number) => fetchFromTMDB(`movie/${id}`, { append_to_response: 'external_ids,reviews' });
 
-export const getTvShowDetails = (id: number) => fetchFromTMDB(`tv/${id}`, { append_to_response: 'external_ids' });
+export const getTvShowDetails = (id: number) => fetchFromTMDB(`tv/${id}`, { append_to_response: 'external_ids,reviews' });
 
 export const getMovieVideos = (id: number) => fetchFromTMDB(`movie/${id}/videos`);
 
 export const getTvShowVideos = (id: number) => fetchFromTMDB(`tv/${id}/videos`);
+
+export const getCastDetails = (mediaType: 'movie' | 'tv', id: number) => fetchFromTMDB(`${mediaType}/${id}/credits`);
 
 export const searchMulti = async (query: string, with_genres: string | undefined, page: number = 1) => {
   const params: Record<string, string | number> = { page };

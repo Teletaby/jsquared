@@ -2,21 +2,32 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send } from 'lucide-react';
-import LoadingSpinner from './LoadingSpinner'; // Import LoadingSpinner
+
 
 interface Message {
   text: string;
   sender: 'user' | 'bot';
 }
 
-const predefinedQA: { [key: string]: string } = {
-  "what is this website": "J-Squared Cinema is a movie discovery platform where you can find your next favorite movie or TV show.",
-  "how does the search work": "You can search for movies by title in the search bar at the top, or use the filter menu to discover movies by genre, rating, and more.",
-  "can i watch movies here": "This site is for discovery. While we provide trailers, we don't host the full movies for streaming.",
-  "who made this": "This website was created by a developer using the Gemini Code Assist.",
-  "recommend a movie": "I recommend checking out the 'Popular Movies' section on the homepage. You might find something you like!",
-  "hello": "Hello! How can I assist you with J-Squared Cinema today?"
-};
+const TypingIndicator = () => (
+  <div className="flex items-center space-x-1 p-1">
+    <span className="dot animate-bounce" style={{ animationDelay: '0s' }}>.</span>
+    <span className="dot animate-bounce" style={{ animationDelay: '0.2s' }}>.</span>
+    <span className="dot animate-bounce" style={{ animationDelay: '0.4s' }}>.</span>
+    <style jsx>{`
+      @keyframes bounce {
+        0%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-3px); }
+      }
+      .dot {
+        animation-duration: 1s;
+        animation-iteration-count: infinite;
+        font-size: 1.2em;
+        line-height: 1;
+      }
+    `}</style>
+  </div>
+);
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,7 +36,7 @@ const Chatbot = () => {
     { text: "Hello! How can I help you with movies or J-Squared Cinema today?", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
-  const [isUnderMaintenance, setIsUnderMaintenance] = useState(true); // Default to true (chatbot under maintenance)
+  const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
   const chatEndRef = useRef<null | HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,30 +47,53 @@ const Chatbot = () => {
     if (isOpen) {
       setShowChatbot(true);
     } else {
-      const timer = setTimeout(() => setShowChatbot(false), 300); // Allow exit animation to complete
+      const timer = setTimeout(() => setShowChatbot(false), 300);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputValue.trim() === '') return;
 
     const userMessage: Message = { text: inputValue, sender: 'user' };
     setMessages(prev => [...prev, userMessage]);
-    
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse: Message = { text: getBotResponse(inputValue), sender: 'bot' };
-      setMessages(prev => [...prev, botResponse]);
-    }, 500);
-
     setInputValue('');
-  };
+    setIsLoading(true);
 
-  const getBotResponse = (input: string): string => {
-    const lowerInput = input.toLowerCase().trim();
-    const match = Object.keys(predefinedQA).find(key => lowerInput.includes(key));
-    return match ? predefinedQA[match] : "I'm sorry, I can only answer questions about J-Squared Cinema and basic movie recommendations. Please try asking something else!";
+    try {
+      // Prepare messages for the API (exclude the initial bot message if it's static)
+      const messagesForApi = messages.slice(1).map(msg => ({
+        text: msg.text,
+        sender: msg.sender,
+      }));
+      // Add the current user message to the API messages
+      messagesForApi.push({ text: inputValue, sender: 'user' });
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: messagesForApi, // Send full conversation history
+          currentMessage: inputValue, // Send the current message
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const botResponse: Message = { text: data.response, sender: 'bot' };
+      setMessages(prev => [...prev, botResponse]);
+    } catch (error) {
+      console.error("Error fetching from Gemini API:", error);
+      const errorMessage: Message = { text: "I'm sorry, I encountered an error and cannot respond right now. Please try again later.", sender: 'bot' };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,7 +101,7 @@ const Chatbot = () => {
       {!isOpen && (
         <button 
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 right-4 bg-accent p-4 rounded-full shadow-lg hover:bg-red-700 transition-colors z-50 animate-pulse-once"
+          className="fixed bottom-4 right-4 bg-accent p-4 rounded-full shadow-lg hover:bg-accent-darker transition-colors z-50 animate-pulse-once"
         >
           <Bot className="text-white" />
         </button>
@@ -86,12 +120,6 @@ const Chatbot = () => {
             </button>
           </div>
           <div className="flex-grow p-4 overflow-y-auto bg-background relative">
-            {isUnderMaintenance && (
-              <div className="absolute inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center rounded-b-lg text-white text-center text-lg font-bold p-4">
-                <LoadingSpinner />
-                <p className="mt-4">Chatbot Under Maintenance. <br /> Please check back later!</p>
-              </div>
-            )}
             {messages.map((msg, index) => (
               <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
                 <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-accent' : 'bg-gray-700'}`}>
@@ -99,19 +127,26 @@ const Chatbot = () => {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="flex justify-start mb-2">
+                <div className="p-2 rounded-lg bg-gray-700">
+                  <TypingIndicator />
+                </div>
+              </div>
+            )}
             <div ref={chatEndRef} />
           </div>
           <div className="p-2 border-t border-gray-700 flex">
             <input
               type="text"
-              placeholder={isUnderMaintenance ? "Chatbot Under Maintenance..." : "Type your message..."}
+              placeholder={isLoading ? "Gemini is thinking..." : "Type your message..."}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               className="w-full bg-gray-800 text-white p-2 rounded-l-md focus:outline-none"
-              disabled={isUnderMaintenance}
+              disabled={isLoading}
             />
-            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isUnderMaintenance}>
+            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isLoading}>
               <Send className="text-white" />
             </button>
           </div>

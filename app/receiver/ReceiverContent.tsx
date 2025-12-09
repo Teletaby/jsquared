@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 const ReceiverContent = () => {
   const [roomId, setRoomId] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const iframeRef = useRef<HTMLIFrameElement>(null); // Ref for the iframe
   const searchParams = useSearchParams();
   const videoSrc = searchParams.get('videoSrc');
 
@@ -28,9 +29,31 @@ const ReceiverContent = () => {
     socket.emit('join-room', newRoomId);
 
     socket.on('remote-control', (action) => {
-      // Remote control functionality for iframes requires postMessage API
-      // and a compatible embedded player. This is currently not implemented.
-      console.warn("Remote control actions are not supported for embedded iframes directly.");
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        const targetOrigin = '*'; // Consider specifying vidking.net origin for security
+        switch (action.type) {
+          case 'play':
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), targetOrigin);
+            break;
+          case 'pause':
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo' }), targetOrigin);
+            break;
+          case 'seek':
+            // Seek commands often require a time in seconds
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [action.payload, true] }), targetOrigin);
+            break;
+          case 'volume':
+            // Volume typically takes a value between 0 and 100 for some players
+            // Adjust payload from 0-1 to 0-100 if necessary for vidking
+            iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [action.payload * 100] }), targetOrigin);
+            break;
+          default:
+            console.warn("Unknown remote control action:", action.type);
+            break;
+        }
+      } else {
+        console.warn("Attempted to send remote control action, but iframe not ready or contentWindow not accessible.");
+      }
       console.log("Received remote control action:", action);
     });
 
@@ -44,11 +67,12 @@ const ReceiverContent = () => {
       <h1 className="text-4xl font-bold mb-4">Watch on TV</h1>
       {videoSrc ? (
         <iframe
+          ref={iframeRef} // Assign the ref here
           src={videoSrc}
           width="100%"
           height="600"
           frameBorder="0"
-          allow="autoplay; fullscreen"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" // Ensure fullscreen and other permissions
           title="Video Player"
           className="w-full max-w-4xl"
         ></iframe>

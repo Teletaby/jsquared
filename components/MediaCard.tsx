@@ -78,7 +78,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
             <div className="text-center">
               <button
                 onClick={handleTrailerClick}
-                className="bg-red-600 text-white py-2 px-4 rounded-full hover:bg-red-700 transition-colors duration-300 text-sm"
+                className="bg-accent text-white py-2 px-4 rounded-full hover:bg-accent-darker transition-colors duration-300 text-sm"
               >
                 Watch Trailer
               </button>
@@ -98,7 +98,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
           <div className="mt-2">
             <button
               onClick={handleTrailerClick}
-              className="bg-red-600 text-white py-1 px-3 rounded-full hover:bg-red-700 transition-colors duration-300 text-xs w-full"
+              className="bg-accent text-white py-1 px-3 rounded-full hover:bg-accent-darker transition-colors duration-300 text-xs w-full"
             >
               Trailer
             </button>

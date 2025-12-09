@@ -29,7 +29,7 @@ const SearchInput = () => {
       />
       <button
         type="submit"
-        className="p-2 bg-red-600 rounded-md hover:bg-red-700 transition-colors text-white"
+        className="p-2 bg-accent rounded-md hover:bg-accent-darker transition-colors text-white"
       >
         <SearchIcon size={20} />
       </button>

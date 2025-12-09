@@ -29,7 +29,11 @@ export async function GET(
       const trailer = videos.results.find((vid: any) => vid.type === 'Trailer' && vid.site === 'YouTube');
       if (trailer) {
         return NextResponse.json({ trailerKey: trailer.key });
+      } else {
+        console.log(`No YouTube 'Trailer' type video found for media ID ${id}. All videos found:`, videos.results);
       }
+    } else {
+      console.log(`No video results found for media ID ${id}.`);
     }
     return NextResponse.json({ message: 'No trailer found' }, { status: 404 });
   } catch (error) {

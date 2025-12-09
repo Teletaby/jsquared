@@ -80,7 +80,7 @@ const SearchFilters = () => {
       <div className="mt-6 text-center">
         <button 
           onClick={handleSearch}
-          className="bg-accent text-white font-bold py-2 px-8 rounded-full hover:bg-red-700 transition-colors duration-300"
+          className="bg-accent text-white font-bold py-2 px-8 rounded-full hover:bg-accent-darker transition-colors duration-300"
         >
           Search
         </button>

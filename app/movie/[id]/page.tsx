@@ -1,6 +1,6 @@
 "use client";
 
-import { getMovieDetails } from '@/lib/tmdb';
+import { getMovieDetails, ReviewsResponse } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useEffect, useState, useRef } from 'react';
@@ -23,6 +23,7 @@ interface MediaDetails {
   release_date?: string; // For movies
   genres: { id: number; name: string }[];
   external_ids?: { imdb_id: string | null };
+  reviews?: ReviewsResponse; // Added reviews property
 }
 
 const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
@@ -178,9 +179,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           <h1 className="text-3xl sm:text-5xl font-bold mb-4">{mediaTitle}</h1>
           <button
             onClick={handleWatchOnTv}
-            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-base"
+            className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-lg text-base"
+            disabled
           >
-            Watch on TV
+            Under Maintenance
           </button>
           <p className="text-base sm:text-lg text-gray-300 mb-6">{movie.overview}</p>
           
@@ -192,7 +194,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             <span className="font-bold">Released: <span className="text-gray-300">{movie.release_date}</span></span>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-6"> {/* Added mb-6 for spacing */}
             <span className="font-bold mr-2">Genres:</span>
             {movie.genres?.map((genre) => (
               <span key={genre.id} className="bg-ui-elements px-3 py-1 rounded-full text-sm">
@@ -200,6 +202,43 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               </span>
             ))}
           </div>
+
+          {movie.reviews && movie.reviews.results.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold mb-4">Top Reviews</h2>
+              <div className="space-y-6">
+                {movie.reviews.results.slice(0, 3).map((review) => ( // Display top 3 reviews
+                  <div key={review.id} className="bg-ui-elements p-4 rounded-lg shadow">
+                    <div className="flex items-center mb-2">
+                      {review.author_details.avatar_path ? (
+                        <Image
+                          src={review.author_details.avatar_path.startsWith('/https')
+                            ? review.author_details.avatar_path.substring(1)
+                            : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`}
+                          alt={review.author_details.username}
+                          width={45}
+                          height={45}
+                          className="rounded-full mr-3"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3">
+                          <span className="text-white text-sm">{review.author_details.username.charAt(0).toUpperCase()}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-bold text-lg">{review.author_details.username}</p>
+                        {review.author_details.rating && (
+                          <p className="text-sm text-yellow-400">Rating: {review.author_details.rating}/10</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-gray-300 italic">"{review.content.substring(0, 300)}{review.content.length > 300 ? '...' : ''}"</p>
+                    <a href={review.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm mt-2 block hover:underline">Read Full Review</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

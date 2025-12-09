@@ -12,6 +12,7 @@ const config: Config = {
         background: '#121212',
         'ui-elements': '#1A1A1A',
         'accent': '#E50914',
+        'accent-darker': '#CC0712',
       },
       fontFamily: {
         heading: ['var(--font-bebas-neue)'],
