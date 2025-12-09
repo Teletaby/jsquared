@@ -89,7 +89,7 @@ export const searchMulti = async (query: string, with_genres: string | undefined
     // Original search behavior when no genres are specified
     let endpoint = 'search/multi';
     params.query = query;
-    params.include_adult = false; // Only for multi/movie/tv search
+    params.include_adult = 'false'; // Only for multi/movie/tv search
 
     return fetchFromTMDB(endpoint, params);
   }

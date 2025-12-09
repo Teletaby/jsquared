@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import TrailerPopup from './TrailerPopup';
 
-interface Media {
+export interface Media {
   id: number;
   title: string;
   overview?: string;
