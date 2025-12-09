@@ -1,0 +1,209 @@
+"use client";
+
+import { getMovieDetails } from '@/lib/tmdb';
+import Image from 'next/image';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface MovieDetailPageProps {
+  params: {
+    id: string;
+  };
+}
+
+// A more specific type for your movie/tv show data
+interface MediaDetails {
+  id: number;
+  title?: string; // For movies
+  overview: string;
+  poster_path: string;
+  vote_average: number;
+  runtime?: number; // For movies
+  release_date?: string; // For movies
+  genres: { id: number; name: string }[];
+  external_ids?: { imdb_id: string | null };
+}
+
+const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
+  const [movie, setMovie] = useState<MediaDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const hasPlayedOnceRef = useRef(false);
+  const router = useRouter();
+  
+  const { id } = params;
+  const tmdbId = parseInt(id);
+
+  // Effect to reset player state when content changes
+  useEffect(() => {
+    hasPlayedOnceRef.current = false;
+    setIsPaused(false);
+  }, [tmdbId]);
+
+  // Effect for handling player events from the iframe
+  useEffect(() => {
+    const handlePlayerMessage = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'PLAYER_EVENT') {
+          if (message.data.event === 'play') {
+            setIsPaused(false);
+            hasPlayedOnceRef.current = true; // Mark that playback has successfully started
+          } else if (message.data.event === 'pause') {
+            // Only show the PAUSED overlay if the video has played at least once.
+            // This prevents the overlay from showing if autoplay is blocked on load.
+            if (hasPlayedOnceRef.current) {
+              setIsPaused(true);
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore errors from non-player messages
+      }
+    };
+
+    window.addEventListener("message", handlePlayerMessage);
+
+    return () => {
+      window.removeEventListener("message", handlePlayerMessage);
+    };
+  }, []); // This effect should only run once to set up the listener
+
+  // Effect for fetching data
+  useEffect(() => {
+    const fetchData = async () => {
+      // Reset states for a new fetch
+      setLoading(true);
+      setError(null);
+      setMovie(null);
+
+      try {
+        const data: MediaDetails | null = await getMovieDetails(tmdbId);
+
+        if (data && data.id) {
+          setMovie(data);
+        } else {
+          // This handles cases where the API returns a 200 OK but no data, or a handled error (like 404)
+          setError('Could not find details for this movie. It may not exist or there was an API error.');
+        }
+      } catch (e) {
+        console.error("Failed to fetch movie details:", e);
+        setError('An unexpected error occurred while fetching data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [tmdbId]); // Depend on tmdbId
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-8 text-center">
+        <h2 className="text-2xl text-red-500 font-bold mb-4">Failed to Load Details</h2>
+        <p className="text-gray-400">{error}</p>
+      </div>
+    );
+  }
+
+  if (!movie) {
+    return null; // Or a "Not Found" component
+  }
+
+  const imdbId = movie.external_ids?.imdb_id;
+
+  // Centralize title logic to handle optional properties and provide a fallback.
+  const mediaTitle = movie.title || 'Untitled Movie';
+
+  // Construct embed URL based on media type
+  // Directly use tmdbId for Vidking Player as per their documentation
+  const embedUrl = `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoplay=1`;
+
+  const posterUrl = movie.poster_path 
+    ? `https://image.tmdb.org/t/p/w780${movie.poster_path}`
+    : '/placeholder.png';
+  
+  const handleWatchOnTv = () => {
+    if (embedUrl) {
+      router.push(`/receiver?videoSrc=${encodeURIComponent(embedUrl)}`);
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <div className="relative bg-black rounded-lg overflow-hidden shadow-lg mb-8">
+        {embedUrl ? (
+          <iframe
+            src={embedUrl}
+            width="100%"
+            height="600"
+            frameBorder="0"
+            allow="autoplay; fullscreen"
+            title={mediaTitle}
+            className="responsive-iframe"
+          ></iframe>
+        ) : (
+          <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4">
+            <div>
+              <h2 className="text-2xl text-red-500 font-bold mb-4">Video Not Available</h2>
+              <p className="text-gray-400">We couldn't find a playable source for this title.</p>
+            </div>
+          </div>
+        )}
+        {/* Show PAUSED overlay only if the video has played and is now paused */}
+        {isPaused && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex justify-center items-center filter grayscale-[100%] pointer-events-none">
+            <h2 className="text-white text-4xl font-bold">PAUSED</h2>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-1">
+          <Image 
+            src={posterUrl} 
+            alt={mediaTitle}
+            width={780}
+            height={1170}
+            className="rounded-lg shadow-lg w-full"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <h1 className="text-5xl font-bold mb-4">{mediaTitle}</h1>
+          <button
+            onClick={handleWatchOnTv}
+            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Watch on TV
+          </button>
+          <p className="text-lg text-gray-300 mb-6">{movie.overview}</p>
+          
+          <div className="flex flex-wrap gap-4 text-lg mb-6">
+            <span className="font-bold">Rating: <span className="text-yellow-400">{movie.vote_average.toFixed(1)}</span></span>
+            <span>|</span>
+            <span className="font-bold">Runtime: <span className="text-gray-300">{movie.runtime} mins</span></span>
+            <span>|</span>
+            <span className="font-bold">Released: <span className="text-gray-300">{movie.release_date}</span></span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="font-bold mr-2">Genres:</span>
+            {movie.genres?.map((genre) => (
+              <span key={genre.id} className="bg-ui-elements px-3 py-1 rounded-full text-sm">
+                {genre.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default MovieDetailPage;

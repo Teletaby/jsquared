@@ -1,0 +1,18 @@
+export const GENRE_MAP = {
+  horror: 27,
+  action: 28,
+  comedy: 35,
+  romance: 10749,
+  'science fiction': 878,
+  thriller: 53,
+  drama: 18,
+  animation: 16,
+  family: 10751,
+  fantasy: 14,
+  history: 36,
+  music: 10402,
+  mystery: 9648,
+  'tv movie': 10770,
+  war: 10752,
+  western: 37,
+};

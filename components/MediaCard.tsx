@@ -1,0 +1,95 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import TrailerPopup from './TrailerPopup';
+
+interface Media {
+  id: number;
+  title: string;
+  overview?: string;
+  poster_path?: string;
+  vote_average?: number;
+  media_type?: 'movie' | 'tv';
+  name?: string;
+}
+
+interface MediaCardProps {
+  media: Media;
+  onClick?: () => void;
+}
+
+const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
+  const router = useRouter();
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
+
+  const title = media.name || media.title;
+  const imageUrl = media.poster_path
+    ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
+    : 'https://via.placeholder.com/500x750.png?text=No+Image';
+  
+  const mediaTypeForPath = media.media_type === 'tv' || !!media.name ? 'tv' : 'movie';
+
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick();
+    } else {
+      router.push(`/${mediaTypeForPath}/${media.id}`);
+    }
+  };
+
+  const handleTrailerClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(`/api/trailer/${media.id}?mediaType=${mediaTypeForPath}`);
+      const data = await response.json();
+      if (data.trailerKey) {
+        setTrailerKey(data.trailerKey);
+        setShowTrailer(true);
+      } else {
+        // Handle no trailer found
+        console.log('No trailer found for this media.');
+        // Optionally, show a notification to the user
+      }
+    } catch (error) {
+      console.error('Error fetching trailer:', error);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="bg-ui-elements rounded-lg overflow-hidden shadow-lg group cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <div className="relative">
+          <img src={imageUrl} alt={title} className="w-full" />
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <div>
+              <h3 className="text-white text-lg font-bold">{title}</h3>
+              {media.vote_average && (
+                <p className="text-yellow-400 text-sm font-semibold">
+                  Rating: {media.vote_average.toFixed(1)} / 10
+                </p>
+              )}
+            </div>
+            <div className="text-center">
+              <button
+                onClick={handleTrailerClick}
+                className="bg-red-600 text-white py-2 px-4 rounded-full hover:bg-red-700 transition-colors duration-300"
+              >
+                Watch Trailer
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {showTrailer && trailerKey && (
+        <TrailerPopup trailerKey={trailerKey} onClose={() => setShowTrailer(false)} />
+      )}
+    </>
+  );
+};
+
+export default MediaCard;
