@@ -1,6 +1,6 @@
 "use client";
 
-import { getMovieDetails, ReviewsResponse } from '@/lib/tmdb';
+import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useEffect, useState, useRef } from 'react';
@@ -24,6 +24,7 @@ interface MediaDetails {
   genres: { id: number; name: string }[];
   external_ids?: { imdb_id: string | null };
   reviews?: ReviewsResponse; // Added reviews property
+  cast?: CastMember[];
 }
 
 const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
@@ -33,6 +34,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [isPaused, setIsPaused] = useState(false);
   const hasPlayedOnceRef = useRef(false);
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'overview' | 'cast'>('overview');
   
   const { id } = params;
   const tmdbId = parseInt(id);
@@ -82,9 +84,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
       try {
         const data: MediaDetails | null = await getMovieDetails(tmdbId);
+        const castData = await getCastDetails('movie', tmdbId);
 
         if (data && data.id) {
-          setMovie(data);
+          setMovie({ ...data, cast: castData?.cast || [] });
         } else {
           // This handles cases where the API returns a 200 OK but no data, or a handled error (like 404)
           setError('Could not find details for this movie. It may not exist or there was an API error.');
@@ -179,66 +182,123 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           <h1 className="text-3xl sm:text-5xl font-bold mb-4">{mediaTitle}</h1>
           <button
             onClick={handleWatchOnTv}
-            className="mb-4 px-4 py-2 bg-gray-500 text-white rounded-lg text-base"
             disabled
+            className="mb-4 bg-accent text-white font-bold py-2 px-4 rounded-full opacity-50 cursor-not-allowed whitespace-nowrap text-sm sm:text-base w-full sm:w-auto"
           >
-            Under Maintenance
+            Watch on TV
           </button>
-          <p className="text-base sm:text-lg text-gray-300 mb-6">{movie.overview}</p>
-          
-          <div className="flex flex-wrap gap-4 text-base sm:text-lg mb-6">
-            <span className="font-bold">Rating: <span className="text-yellow-400">{movie.vote_average.toFixed(1)}</span></span>
-            <span>|</span>
-            <span className="font-bold">Runtime: <span className="text-gray-300">{movie.runtime} mins</span></span>
-            <span>|</span>
-            <span className="font-bold">Released: <span className="text-gray-300">{movie.release_date}</span></span>
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-2 px-4 rounded-full text-sm sm:text-base ${
+                activeTab === 'overview'
+                  ? 'bg-accent text-white font-bold'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Overview & Reviews
+            </button>
+            <button
+              onClick={() => setActiveTab('cast')}
+              className={`py-2 px-4 rounded-full text-sm sm:text-base ${
+                activeTab === 'cast'
+                  ? 'bg-accent text-white font-bold'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Cast
+            </button>
           </div>
-
-          <div className="flex flex-wrap gap-2 mb-6"> {/* Added mb-6 for spacing */}
-            <span className="font-bold mr-2">Genres:</span>
-            {movie.genres?.map((genre) => (
-              <span key={genre.id} className="bg-ui-elements px-3 py-1 rounded-full text-sm">
-                {genre.name}
-              </span>
-            ))}
-          </div>
-
-          {movie.reviews && movie.reviews.results.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-2xl font-bold mb-4">Top Reviews</h2>
-              <div className="space-y-6">
-                {movie.reviews.results.slice(0, 3).map((review) => ( // Display top 3 reviews
-                  <div key={review.id} className="bg-ui-elements p-4 rounded-lg shadow">
-                    <div className="flex items-center mb-2">
-                      {review.author_details.avatar_path ? (
-                        <Image
-                          src={review.author_details.avatar_path.startsWith('/https')
-                            ? review.author_details.avatar_path.substring(1)
-                            : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`}
-                          alt={review.author_details.username}
-                          width={45}
-                          height={45}
-                          className="rounded-full mr-3"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3">
-                          <span className="text-white text-sm">{review.author_details.username.charAt(0).toUpperCase()}</span>
+          {activeTab === 'overview' && (
+            <>
+                        {activeTab === 'overview' && (
+                          <>
+                            <p className="text-base sm:text-lg text-gray-300 mb-6">{movie.overview}</p>
+                            
+                            <div className="flex flex-wrap gap-4 text-base sm:text-lg mb-6">
+                              <span className="font-bold">Rating: <span className="text-yellow-400">{movie.vote_average.toFixed(1)}</span></span>
+                              <span>|</span>
+                              <span className="font-bold">Runtime: <span className="text-gray-300">{movie.runtime} mins</span></span>
+                              <span>|</span>
+                              <span className="font-bold">Released: <span className="text-gray-300">{movie.release_date}</span></span>
+                            </div>
+              
+                            <div className="flex flex-wrap gap-2 mb-6"> {/* Added mb-6 for spacing */}
+                              <span className="font-bold mr-2">Genres:</span>
+                              {movie.genres?.map((genre) => (
+                                <span key={genre.id} className="bg-ui-elements px-3 py-1 rounded-full text-sm">
+                                  {genre.name}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        )}              {movie.reviews && movie.reviews.results.length > 0 && (
+                <div className="mt-8">
+                  <h2 className="text-2xl font-bold mb-4">Reviews</h2>
+                  <div className="space-y-6">
+                    {movie.reviews.results.map((review) => ( // Display all reviews
+                      <div key={review.id} className="bg-ui-elements p-4 rounded-lg shadow">
+                        <div className="flex items-center mb-2">
+                          {review.author_details.avatar_path ? (
+                            <Image
+                              src={review.author_details.avatar_path.startsWith('/https')
+                                ? review.author_details.avatar_path.substring(1)
+                                : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`}
+                              alt={review.author_details.username}
+                              width={45}
+                              height={45}
+                              className="rounded-full mr-3"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center mr-3">
+                              <span className="text-white text-sm">{review.author_details.username.charAt(0).toUpperCase()}</span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-bold text-lg">{review.author_details.username}</p>
+                            {review.author_details.rating && (
+                              <p className="text-sm text-yellow-400">Rating: {review.author_details.rating}/10</p>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-bold text-lg">{review.author_details.username}</p>
-                        {review.author_details.rating && (
-                          <p className="text-sm text-yellow-400">Rating: {review.author_details.rating}/10</p>
-                        )}
+                        <p className="text-gray-300 italic">"{review.content.substring(0, 300)}{review.content.length > 300 ? '...' : ''}"</p>
+                        <a href={review.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm mt-2 block hover:underline">Read Full Review</a>
                       </div>
-                    </div>
-                    <p className="text-gray-300 italic">"{review.content.substring(0, 300)}{review.content.length > 300 ? '...' : ''}"</p>
-                    <a href={review.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-sm mt-2 block hover:underline">Read Full Review</a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'cast' && movie.cast && movie.cast.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-2xl font-bold mb-4">Cast</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {movie.cast.slice(0, 10).map((member) => ( // Display top 10 cast members
+                  <div key={member.id} className="text-center">
+                    {member.profile_path ? (
+                      <Image
+                        src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
+                        alt={member.name}
+                        width={185}
+                        height={278}
+                        className="rounded-lg shadow-lg mx-auto mb-2"
+                      />
+                    ) : (
+                      <div className="w-[185px] h-[278px] bg-ui-elements rounded-lg mx-auto mb-2 flex items-center justify-center">
+                        <span className="text-white text-sm">No Image</span>
+                      </div>
+                    )}
+                    <p className="font-bold text-sm">{member.name}</p>
+                    <p className="text-gray-400 text-xs">{member.character}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
+
+
         </div>
       </div>
     </div>
