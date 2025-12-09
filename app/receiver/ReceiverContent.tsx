@@ -8,7 +8,6 @@ import { useSearchParams } from 'next/navigation';
 const ReceiverContent = () => {
   const [roomId, setRoomId] = useState('');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const videoRef = useRef<HTMLVideoElement>(null);
   const searchParams = useSearchParams();
   const videoSrc = searchParams.get('videoSrc');
 
@@ -29,22 +28,10 @@ const ReceiverContent = () => {
     socket.emit('join-room', newRoomId);
 
     socket.on('remote-control', (action) => {
-      if (videoRef.current) {
-        switch (action.type) {
-          case 'play':
-            videoRef.current.play();
-            break;
-          case 'pause':
-            videoRef.current.pause();
-            break;
-          case 'seek':
-            videoRef.current.currentTime = action.payload;
-            break;
-          case 'volume':
-            videoRef.current.volume = action.payload;
-            break;
-        }
-      }
+      // Remote control functionality for iframes requires postMessage API
+      // and a compatible embedded player. This is currently not implemented.
+      console.warn("Remote control actions are not supported for embedded iframes directly.");
+      console.log("Received remote control action:", action);
     });
 
     return () => {
@@ -56,7 +43,15 @@ const ReceiverContent = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
       <h1 className="text-4xl font-bold mb-4">Watch on TV</h1>
       {videoSrc ? (
-        <video ref={videoRef} src={videoSrc} controls className="w-full max-w-4xl" />
+        <iframe
+          src={videoSrc}
+          width="100%"
+          height="600"
+          frameBorder="0"
+          allow="autoplay; fullscreen"
+          title="Video Player"
+          className="w-full max-w-4xl"
+        ></iframe>
       ) : (
         <p>No video source provided.</p>
       )}

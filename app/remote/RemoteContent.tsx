@@ -59,11 +59,11 @@ const RemoteContent = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-      <h1 className="text-4xl font-bold mb-8">Remote Control</h1>
+      <h1 className="text-3xl sm:text-4xl font-bold mb-8">Remote Control</h1>
       <div className="space-y-6 w-full max-w-md">
         <button
           onClick={handlePlayPause}
-          className="w-full py-4 text-2xl font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="w-full py-4 text-xl sm:text-2xl font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         >
           {isPlaying ? 'Pause' : 'Play'}
         </button>

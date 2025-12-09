@@ -85,7 +85,7 @@ const SearchPage = async ({ searchParams }: SearchPageProps) => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-white mb-6">{pageTitle}</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">{pageTitle}</h1>
       {results.length > 0 ? (
         <MovieList movies={results} />
       ) : (

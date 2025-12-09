@@ -175,16 +175,16 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           />
         </div>
         <div className="md:col-span-2">
-          <h1 className="text-5xl font-bold mb-4">{mediaTitle}</h1>
+          <h1 className="text-3xl sm:text-5xl font-bold mb-4">{mediaTitle}</h1>
           <button
             onClick={handleWatchOnTv}
-            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-base"
           >
             Watch on TV
           </button>
-          <p className="text-lg text-gray-300 mb-6">{movie.overview}</p>
+          <p className="text-base sm:text-lg text-gray-300 mb-6">{movie.overview}</p>
           
-          <div className="flex flex-wrap gap-4 text-lg mb-6">
+          <div className="flex flex-wrap gap-4 text-base sm:text-lg mb-6">
             <span className="font-bold">Rating: <span className="text-yellow-400">{movie.vote_average.toFixed(1)}</span></span>
             <span>|</span>
             <span className="font-bold">Runtime: <span className="text-gray-300">{movie.runtime} mins</span></span>

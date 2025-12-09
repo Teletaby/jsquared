@@ -60,12 +60,13 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
   return (
     <>
       <div
-        className="bg-ui-elements rounded-lg overflow-hidden shadow-lg group cursor-pointer"
+        className="bg-ui-elements rounded-lg overflow-hidden shadow-lg group cursor-pointer flex flex-col h-full"
         onClick={handleCardClick}
       >
-        <div className="relative">
-          <img src={imageUrl} alt={title} className="w-full" />
-          <div className="absolute inset-0 bg-black bg-opacity-60 flex flex-col justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="relative w-full flex-shrink-0">
+          <img src={imageUrl} alt={title} className="w-full h-auto object-cover" />
+          {/* Overlay for larger screens on hover */}
+          <div className="absolute inset-0 bg-black bg-opacity-60 flex-col justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex">
             <div>
               <h3 className="text-white text-lg font-bold">{title}</h3>
               {media.vote_average && (
@@ -77,11 +78,30 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
             <div className="text-center">
               <button
                 onClick={handleTrailerClick}
-                className="bg-red-600 text-white py-2 px-4 rounded-full hover:bg-red-700 transition-colors duration-300"
+                className="bg-red-600 text-white py-2 px-4 rounded-full hover:bg-red-700 transition-colors duration-300 text-sm"
               >
                 Watch Trailer
               </button>
             </div>
+          </div>
+        </div>
+        {/* Always visible content for smaller screens */}
+        <div className="p-3 flex flex-col justify-between flex-grow md:hidden">
+          <div>
+            <h3 className="text-white text-base font-bold truncate">{title}</h3>
+            {media.vote_average && (
+              <p className="text-yellow-400 text-xs font-semibold">
+                Rating: {media.vote_average.toFixed(1)} / 10
+              </p>
+            )}
+          </div>
+          <div className="mt-2">
+            <button
+              onClick={handleTrailerClick}
+              className="bg-red-600 text-white py-1 px-3 rounded-full hover:bg-red-700 transition-colors duration-300 text-xs w-full"
+            >
+              Trailer
+            </button>
           </div>
         </div>
       </div>

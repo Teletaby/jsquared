@@ -207,22 +207,37 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           />
         </div>
         <div className="md:col-span-2">
-          <div className="flex items-center gap-4 mb-4">
-            <h1 className="text-5xl font-bold">{mediaTitle}</h1>
+          <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
             <button
               onClick={() => setShowEpisodeSelector(true)}
-              className="bg-accent text-white font-bold py-2 px-6 rounded-full hover:bg-red-700 transition-colors duration-300 whitespace-nowrap"
+              className="bg-accent text-white font-bold py-2 px-4 rounded-full hover:bg-red-700 transition-colors duration-300 whitespace-nowrap text-sm sm:text-base w-full sm:w-auto"
             >
               Select Episode (S{currentSeason} E{currentEpisode})
             </button>
             <button
               onClick={handleWatchOnTv}
-              className="bg-blue-600 text-white font-bold py-2 px-6 rounded-full hover:bg-blue-700 transition-colors duration-300 whitespace-nowrap"
+              className="bg-blue-600 text-white font-bold py-2 px-4 rounded-full hover:bg-blue-700 transition-colors duration-300 whitespace-nowrap text-sm sm:text-base w-full sm:w-auto"
             >
               Watch on TV
             </button>
           </div>
-          <p className="text-lg text-gray-300 mb-6">{tvShow.overview}</p>
+          <p className="text-base sm:text-lg text-gray-300 mb-6">{tvShow.overview}</p>
+          
+          <div className="flex flex-wrap gap-4 text-base sm:text-lg mb-6">
+            <span className="font-bold">Rating: <span className="text-yellow-400">{tvShow.vote_average.toFixed(1)}</span></span>
+            {tvShow.episode_run_time && tvShow.episode_run_time.length > 0 && (
+              <>
+                <span>|</span>
+                <span className="font-bold">Avg. Episode Runtime: <span className="text-gray-300">{tvShow.episode_run_time[0]} mins</span></span>
+              </>
+            )}
+            {tvShow.first_air_date && (
+              <>
+                <span>|</span>
+                <span className="font-bold">First Air Date: <span className="text-gray-300">{tvShow.first_air_date}</span></span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

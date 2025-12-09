@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send } from 'lucide-react';
+import LoadingSpinner from './LoadingSpinner'; // Import LoadingSpinner
 
 interface Message {
   text: string;
@@ -24,6 +25,7 @@ const Chatbot = () => {
     { text: "Hello! How can I help you with movies or J-Squared Cinema today?", sender: 'bot' }
   ]);
   const [inputValue, setInputValue] = useState('');
+  const [isUnderMaintenance, setIsUnderMaintenance] = useState(true); // Default to true (chatbot under maintenance)
   const chatEndRef = useRef<null | HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,9 +86,12 @@ const Chatbot = () => {
             </button>
           </div>
           <div className="flex-grow p-4 overflow-y-auto bg-background relative">
-            <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center rounded-b-lg text-white text-center text-lg font-bold p-4">
-              Chatbot Under Maintenance. <br /> Please check back later!
-            </div>
+            {isUnderMaintenance && (
+              <div className="absolute inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center rounded-b-lg text-white text-center text-lg font-bold p-4">
+                <LoadingSpinner />
+                <p className="mt-4">Chatbot Under Maintenance. <br /> Please check back later!</p>
+              </div>
+            )}
             {messages.map((msg, index) => (
               <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
                 <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-accent' : 'bg-gray-700'}`}>
@@ -99,14 +104,14 @@ const Chatbot = () => {
           <div className="p-2 border-t border-gray-700 flex">
             <input
               type="text"
-              placeholder="Chatbot Under Maintenance..."
+              placeholder={isUnderMaintenance ? "Chatbot Under Maintenance..." : "Type your message..."}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="w-full bg-gray-800 text-white p-2 rounded-l-md focus:outline-none cursor-not-allowed"
-              disabled
+              className="w-full bg-gray-800 text-white p-2 rounded-l-md focus:outline-none"
+              disabled={isUnderMaintenance}
             />
-            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md cursor-not-allowed" disabled>
+            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isUnderMaintenance}>
               <Send className="text-white" />
             </button>
           </div>

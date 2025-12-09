@@ -8,7 +8,7 @@ interface MediaFetcherListProps {
 const MediaFetcherList = ({ title, items }: MediaFetcherListProps) => {
   return (
     <div className="my-8">
-      <h2 className="text-3xl mb-4 text-white">{title}</h2>
+      <h2 className="text-2xl sm:text-3xl mb-4 text-white">{title}</h2>
       {items && items.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           {items.map((item: any) => (

@@ -21,7 +21,7 @@ const MoviesPage = async () => {
 
   return (
     <main className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold text-white mb-6">Movies</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Movies</h1>
       <Suspense fallback={<ListSkeleton title="Popular Movies" />}>
         <MediaListWithTrailer title="Popular Movies" items={popularMovies?.results?.slice(0, 12) || []} />
       </Suspense>
