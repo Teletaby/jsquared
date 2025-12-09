@@ -76,7 +76,7 @@ const SearchPage = async ({ searchParams }: SearchPageProps) => {
   }
 
   const genreNames = with_genres?.split(',').map(id => 
-    Object.keys(GENRE_MAP).find(key => GENRE_MAP[key] === parseInt(id))
+    Object.keys(GENRE_MAP).find(key => GENRE_MAP[key as keyof typeof GENRE_MAP] === parseInt(id))
   ).filter(Boolean).join(', ') || '';
 
   const pageTitle = query 
