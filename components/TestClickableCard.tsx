@@ -1,10 +1,10 @@
 "use client";
 
 import React from 'react';
-import MediaCard from './MediaCard';
+import MediaCard, { Media } from './MediaCard';
 
 const TestClickableCard: React.FC = () => {
-  const dummyMedia = {
+  const dummyMedia: Media = {
     id: 12345,
     title: 'Test Movie',
     overview: 'This is a test movie overview.',
