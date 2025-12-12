@@ -111,8 +111,8 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
 
   return (
     <>
-      {/* Carousel */}
-    <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] h-[300px] md:h-[400px] overflow-hidden mb-8">
+      {/* Carousel - positioned below navbar */}
+    <div className="relative w-screen left-1/2 -translate-x-1/2 h-[70vh] max-h-[500px] overflow-hidden mb-8 mt-0">
       {/* Carousel Items */}
       {items.map((item, index) => {
         const itemMediaType = item.media_type === 'tv' || !!item.name ? 'tv' : 'movie';
@@ -139,7 +139,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#121212] to-transparent" />
 
             {/* Content */}
-            <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-12 md:pl-24 lg:pl-32">
+            <div className="absolute inset-0 flex flex-col justify-center p-8 pb-24 md:p-12 md:pb-28 md:pl-24 lg:pl-32">
               <div className="max-w-2xl">
                 {/* Title */}
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-lg">
