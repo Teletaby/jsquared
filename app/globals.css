@@ -20,3 +20,9 @@ h1, h2, h3, h4, h5, h6 {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.bg-signin {
+  background-color: #0c0a18;
+  background-image: radial-gradient(circle at 80% 20%, #1a2049, transparent 40%),
+    radial-gradient(circle at 20% 80%, #2a3a8a, transparent 40%);
+}

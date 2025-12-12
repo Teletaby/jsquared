@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { Play } from 'lucide-react';
 import TrailerPopup from './TrailerPopup';
+import WatchlistButton from './WatchlistButton';
 
 export interface Media {
   id: number;
@@ -17,9 +19,10 @@ export interface Media {
 interface MediaCardProps {
   media: Media;
   onClick?: () => void;
+  initialIsInWatchlist?: boolean;
 }
 
-const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
+const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchlist }) => {
   const router = useRouter();
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -75,13 +78,23 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
                 </p>
               )}
             </div>
-            <div className="text-center">
+            <div className="text-center flex gap-2 justify-center items-center">
               <button
                 onClick={handleTrailerClick}
-                className="bg-accent text-white py-2 px-4 rounded-full hover:bg-accent-darker transition-colors duration-300 text-sm"
+                className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
               >
-                Watch Trailer
+                <Play size={14} />
+                <span className="text-xs font-semibold">Watch Trailer</span>
               </button>
+              <WatchlistButton
+                mediaId={media.id}
+                mediaType={mediaTypeForPath as 'movie' | 'tv'}
+                title={title}
+                posterPath={media.poster_path || ''}
+                rating={media.vote_average}
+                hideTooltip={true}
+                initialIsInWatchlist={initialIsInWatchlist}
+              />
             </div>
           </div>
         </div>
@@ -95,13 +108,23 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick }) => {
               </p>
             )}
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex gap-2 items-center">
             <button
               onClick={handleTrailerClick}
-              className="bg-accent text-white py-1 px-3 rounded-full hover:bg-accent-darker transition-colors duration-300 text-xs w-full"
+              className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
             >
-              Trailer
+              <Play size={14} />
+              <span className="text-xs font-semibold">Watch Trailer</span>
             </button>
+            <WatchlistButton
+              mediaId={media.id}
+              mediaType={mediaTypeForPath as 'movie' | 'tv'}
+              title={title}
+              posterPath={media.poster_path || ''}
+              rating={media.vote_average}
+              hideTooltip={true}
+              initialIsInWatchlist={initialIsInWatchlist}
+            />
           </div>
         </div>
       </div>

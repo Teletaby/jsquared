@@ -1,158 +1,231 @@
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
-interface AuthorDetails {
-  name: string;
-  username: string;
+// Types
+export interface ReviewAuthorDetails {
   avatar_path: string | null;
   rating: number | null;
+  username: string;
 }
 
 export interface Review {
+  id: string;
   author: string;
-  author_details: AuthorDetails;
+  author_details: ReviewAuthorDetails;
   content: string;
   created_at: string;
-  id: string;
-  updated_at: string;
   url: string;
 }
 
 export interface ReviewsResponse {
-  page: number;
   results: Review[];
-  total_pages: number;
   total_results: number;
+  total_pages: number;
 }
 
 export interface CastMember {
-  adult: boolean;
-  gender: number | null;
   id: number;
-  known_for_department: string;
   name: string;
-  original_name: string;
-  popularity: number;
-  profile_path: string | null;
   character: string;
-  credit_id: string;
+  profile_path: string | null;
   order: number;
 }
 
 export interface CastDetails {
-  id: number;
   cast: CastMember[];
-  crew: any[]; // You can define a CrewMember interface if needed
+  crew: any[];
 }
 
-// This log will appear in your terminal when the server starts or when a server component fetches data.
-// It's the best way to confirm if your .env.local file is being read.
-console.log('TMDB_API_KEY loaded by server:', TMDB_API_KEY ? `${TMDB_API_KEY.substring(0, 4)}...` : 'NOT FOUND');
+export interface TvShowDetails {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string;
+  vote_average: number;
+  first_air_date: string;
+  episode_run_time: number[];
+  genres: { id: number; name: string }[];
+  external_ids?: { imdb_id: string | null };
+  seasons: {
+    id: number;
+    season_number: number;
+    name: string;
+    episode_count: number;
+    poster_path: string;
+  }[];
+  reviews?: ReviewsResponse;
+}
 
-// A helper function to fetch data from TMDB with error handling and caching
-const fetchFromTMDB = async (endpoint: string, params: Record<string, string | number> = {}) => {
-  if (!TMDB_API_KEY) {
-    console.error("TMDB_API_KEY is not defined. Please check your .env.local file and restart the server.");
-    return null;
-  }
+export interface MovieDetails {
+  id: number;
+  title: string;
+  overview: string;
+  poster_path: string;
+  vote_average: number;
+  release_date: string;
+  runtime: number;
+  genres: { id: number; name: string }[];
+  external_ids?: { imdb_id: string | null };
+  reviews?: ReviewsResponse;
+}
 
-  const queryParams = new URLSearchParams({
-    api_key: TMDB_API_KEY,
-    language: 'en-US',
-    ...Object.fromEntries(Object.entries(params).map(([key, value]) => [key, String(value)]))
+export interface EpisodeDetails {
+  episode_number: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+  vote_average: number;
+  runtime?: number;
+}
+
+export interface SeasonDetails {
+  season_number: number;
+  name: string;
+  episodes: EpisodeDetails[];
+}
+
+// Phobia keywords for filtering
+export const phobiaKeywords: { [key: string]: number } = {
+  'Acrophobia (Fear of Heights)': 16660,
+  'Agoraphobia (Fear of Open Spaces)': 16661,
+  'Arachnophobia (Fear of Spiders)': 16662,
+  'Claustrophobia (Fear of Enclosed Spaces)': 16663,
+  'Hemophobia (Fear of Blood)': 16664,
+  'Nyctophobia (Fear of Darkness)': 16665,
+  'Trypophobia (Fear of Holes)': 16666,
+  'Ophidiophobia (Fear of Snakes)': 16667,
+  'Cynophobia (Fear of Dogs)': 16668,
+};
+
+// Helper function to fetch from TMDB API
+async function fetchFromTMDB(endpoint: string, params: Record<string, string> = {}) {
+  const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
+  url.searchParams.append('api_key', TMDB_API_KEY || '');
+
+  // Add additional parameters
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.append(key, value);
   });
-  const url = `${TMDB_BASE_URL}/${endpoint}?${queryParams.toString()}`;
-  console.log('TMDB API Request URL:', url); // Added for debugging
 
   try {
-    // Use Next.js extended fetch for server-side caching (revalidates every hour)
-    const response = await fetch(url, { next: { revalidate: 3600 } });
+    const response = await fetch(url.toString(), {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    });
+
     if (!response.ok) {
-      console.error(`TMDB API call failed for endpoint "${endpoint}": ${response.statusText}`);
+      console.error(`TMDB API Error: ${response.status} - ${response.statusText}`);
       return null;
     }
-    return response.json();
+
+    return await response.json();
   } catch (error) {
-    console.error(`Error fetching from TMDB endpoint "${endpoint}":`, error);
+    console.error('Failed to fetch from TMDB:', error);
     return null;
   }
-};
+}
 
-// --- Functions for fetching lists of media ---
+// Get popular movies
+export async function getPopularMovies(page: string = '1') {
+  return fetchFromTMDB('/movie/popular', { page });
+}
 
-export const getPopularMovies = () => fetchFromTMDB('movie/popular');
+// Get trending movies
+export async function getTrendingMovies(page: string = '1') {
+  return fetchFromTMDB('/trending/movie/week', { page });
+}
 
-export const getPopularTvShows = () => fetchFromTMDB('tv/popular');
+// Get top rated TV shows
+export async function getTopRatedTvShows(page: string = '1') {
+  return fetchFromTMDB('/tv/top_rated', { page });
+}
 
-export const getTopRatedTvShows = () => fetchFromTMDB('tv/top_rated');
+// Get airing today TV shows
+export async function getAiringTodayTvShows(page: string = '1') {
+  return fetchFromTMDB('/tv/on_the_air', { page });
+}
 
-export const getAiringTodayTvShows = () => fetchFromTMDB('tv/airing_today');
+// Get trending this week
+export async function getTrendingWeek() {
+  return fetchFromTMDB('/trending/all/week');
+}
 
-export const getTrendingWeek = () => fetchFromTMDB('trending/all/week');
+// Get popular TV shows
+export async function getPopularTvShows(page: string = '1') {
+  return fetchFromTMDB('/tv/popular', { page });
+}
 
-// This is a versatile endpoint. For now, it fetches a default discovery list.
-// It can be expanded to accept filters (e.g., `discover/movie?with_genres=28`)
-export const discoverMovies = (params: Record<string, string | number> = {}) => fetchFromTMDB('discover/movie', params);
+// Get movie details
+export async function getMovieDetails(movieId: number): Promise<MovieDetails | null> {
+  const params = {
+    append_to_response: 'external_ids,reviews',
+  };
+  return fetchFromTMDB(`/movie/${movieId}`, params);
+}
 
-export const discoverTvShows = (params: Record<string, string | number> = {}) => fetchFromTMDB('discover/tv', params);
+// Get TV show details
+export async function getTvShowDetails(tvShowId: number): Promise<TvShowDetails | null> {
+  const params = {
+    append_to_response: 'external_ids,reviews',
+  };
+  return fetchFromTMDB(`/tv/${tvShowId}`, params);
+}
 
-// --- Functions for fetching detailed media information ---
+// Get TV season details
+export async function getTvSeasonDetails(tvShowId: number, seasonNumber: number): Promise<SeasonDetails | null> {
+  return fetchFromTMDB(`/tv/${tvShowId}/season/${seasonNumber}`);
+}
 
-export const getMovieDetails = (id: number) => fetchFromTMDB(`movie/${id}`, { append_to_response: 'external_ids,reviews' });
+// Get cast details
+export async function getCastDetails(mediaType: 'movie' | 'tv', id: number): Promise<CastDetails | null> {
+  const endpoint = mediaType === 'movie' ? `/movie/${id}/credits` : `/tv/${id}/aggregate_credits`;
+  const data = await fetchFromTMDB(endpoint);
 
-export const getTvShowDetails = (id: number) => fetchFromTMDB(`tv/${id}`, { append_to_response: 'external_ids,reviews' });
+  if (!data) return null;
 
-export const getMovieVideos = (id: number) => fetchFromTMDB(`movie/${id}/videos`);
-
-export const getTvShowVideos = (id: number) => fetchFromTMDB(`tv/${id}/videos`);
-
-export const getCastDetails = (mediaType: 'movie' | 'tv', id: number) => fetchFromTMDB(`${mediaType}/${id}/credits`);
-
-export const searchMulti = async (query: string, with_genres: string | undefined, page: number = 1) => {
-  const params: Record<string, string | number> = { page };
-
-  if (with_genres) {
-    params.with_genres = with_genres;
-    // When searching by genre, we need to use the discover endpoint
-    // We'll search both movies and TV shows and combine the results if query is also present
-    const movieResults = await discoverMovies({ ...params, with_text_query: query });
-    const tvResults = await discoverTvShows({ ...params, with_text_query: query });
-
-    const combinedResults = [];
-    if (movieResults?.results) {
-      combinedResults.push(...movieResults.results.map((item: any) => ({ ...item, media_type: 'movie' })));
-    }
-    if (tvResults?.results) {
-      combinedResults.push(...tvResults.results.map((item: any) => ({ ...item, media_type: 'tv' })));
-    }
-    
-    // Basic sorting by popularity (descending)
-    combinedResults.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-
-    return { results: combinedResults };
-
-  } else {
-    // Original search behavior when no genres are specified
-    let endpoint = 'search/multi';
-    params.query = query;
-    params.include_adult = 'false'; // Only for multi/movie/tv search
-
-    return fetchFromTMDB(endpoint, params);
+  // For TV shows, the aggregate_credits response has a different structure
+  if (mediaType === 'tv') {
+    return {
+      cast: data.cast?.slice(0, 50) || [],
+      crew: data.crew || [],
+    };
   }
-};
 
-export const getTvSeasonDetails = (id: number, seasonNumber: number) => fetchFromTMDB(`tv/${id}/season/${seasonNumber}`);
+  return {
+    cast: data.cast?.slice(0, 50) || [],
+    crew: data.crew || [],
+  };
+}
 
+// Get movie videos
+export async function getMovieVideos(movieId: number) {
+  return fetchFromTMDB(`/movie/${movieId}/videos`);
+}
 
-// Placeholder for phobia keywords - these should ideally come from a TMDB keywords list
-// or a configuration. For now, using example IDs.
-export const phobiaKeywords: Record<string, number> = {
-  "arachnophobia": 180547, // Example ID for "spiders"
-  "claustrophobia": 180550, // Example ID for "tight spaces"
-  "hemophobia": 180553,     // Example ID for "blood"
-  "nyctophobia": 180556,    // Example ID for "darkness"
-  "ophidiophobia": 180559,  // Example ID for "snakes"
-  "scopophobia": 180562,    // Example ID for "being watched"
-  "acrophobia": 180565,     // Example ID for "heights"
-  "coulrophobia": 180568,   // Example ID for "clowns"
-};
+// Get TV show videos
+export async function getTvShowVideos(tvShowId: number) {
+  return fetchFromTMDB(`/tv/${tvShowId}/videos`);
+}
+
+// Search multi (movies, TV shows, and people)
+export async function searchMulti(query: string, withGenres: string = '', page: string = '1') {
+  const params: Record<string, string> = {
+    query: encodeURIComponent(query),
+    page,
+  };
+
+  if (withGenres) {
+    params.with_genres = withGenres;
+  }
+
+  return fetchFromTMDB('/search/multi', params);
+}
+
+// Discover movies with filters
+export async function discoverMovies(filters: Record<string, string> = {}) {
+  return fetchFromTMDB('/discover/movie', filters);
+}
+
+// Discover TV shows with filters
+export async function discoverTvShows(filters: Record<string, string> = {}) {
+  return fetchFromTMDB('/discover/tv', filters);
+}

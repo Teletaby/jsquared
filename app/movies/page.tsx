@@ -1,4 +1,5 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
+import Header from '@/components/Header';
 import { Suspense } from 'react';
 import { getPopularMovies, discoverMovies } from '@/lib/tmdb';
 import { GENRE_MAP } from '@/lib/genreMap';
@@ -20,18 +21,21 @@ const MoviesPage = async () => {
   const comedyMovies = await discoverMovies({ with_genres: GENRE_MAP['comedy'], page: '1' });
 
   return (
-    <main className="container mx-auto p-4">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Movies</h1>
-      <Suspense fallback={<ListSkeleton title="Popular Movies" />}>
-        <MediaListWithTrailer title="Popular Movies" items={popularMovies?.results?.slice(0, 12) || []} />
-      </Suspense>
-      <Suspense fallback={<ListSkeleton title="Action" />}>
-        <MediaListWithTrailer title="Action" items={actionMovies?.results?.slice(0, 12) || []} />
-      </Suspense>
-      <Suspense fallback={<ListSkeleton title="Comedy" />}>
-        <MediaListWithTrailer title="Comedy" items={comedyMovies?.results?.slice(0, 12) || []} />
-      </Suspense>
-    </main>
+    <>
+      <Header />
+      <main className="container mx-auto p-4 pt-24">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Movies</h1>
+        <Suspense fallback={<ListSkeleton title="Popular Movies" />}>
+          <MediaListWithTrailer title="Popular Movies" items={popularMovies?.results?.slice(0, 12) || []} />
+        </Suspense>
+        <Suspense fallback={<ListSkeleton title="Action" />}>
+          <MediaListWithTrailer title="Action" items={actionMovies?.results?.slice(0, 12) || []} />
+        </Suspense>
+        <Suspense fallback={<ListSkeleton title="Comedy" />}>
+          <MediaListWithTrailer title="Comedy" items={comedyMovies?.results?.slice(0, 12) || []} />
+        </Suspense>
+      </main>
+    </>
   );
 };
 

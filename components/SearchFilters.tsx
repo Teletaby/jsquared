@@ -32,7 +32,7 @@ const SearchFilters = () => {
   };
 
   return (
-    <div className="bg-ui-elements p-6 rounded-lg shadow-lg my-8">
+    <div className="backdrop-blur-2xl bg-white/20 border border-white/20 p-6 rounded-lg shadow-lg my-8">
       <h2 className="text-2xl mb-4">Find Your Perfect Movie</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Time to Kill */}

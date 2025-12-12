@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PlayCircle, PauseCircle, Volume2, VolumeX, Maximize } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the useAuth hook
 
 interface ThemedVideoPlayerProps {
   src: string; // The URL of the video file (e.g., .mp4, .webm)
@@ -9,6 +10,12 @@ interface ThemedVideoPlayerProps {
   autoplay?: boolean; // Whether the video should start playing automatically
   initialTime?: number; // Optional: Start playback from a specific time in seconds
   title?: string; // Optional: A descriptive title for accessibility
+  mediaId: number; // Required for watch history
+  mediaType: 'movie' | 'tv'; // Required for watch history
+  posterPath?: string; // Optional: Poster path for watch history
+  seasonNumber?: number; // Optional: Season number for TV shows
+  episodeNumber?: number; // Optional: Episode number for TV shows
+  onTimeUpdate?: (time: number) => void; // Optional: Callback when playback time updates
 }
 
 const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
@@ -17,11 +24,23 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   autoplay = true,
   initialTime = 0,
   title = 'Video Player',
+  mediaId,
+  mediaType,
+  posterPath = '',
+  seasonNumber,
+  episodeNumber,
+  onTimeUpdate,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); // Ref for the video container
+  const lastUpdateTimeRef = useRef<number>(0); // Ref for tracking last watch history update
+  const embedLoadedRef = useRef<boolean>(false); // Track if embed has loaded
+  const iframeRef = useRef<HTMLIFrameElement>(null); // Ref for the iframe
+
+  // Memoize src to prevent unnecessary iframe reloads
+  const stableSrc = useMemo(() => src, [src]);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -29,6 +48,11 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true); // Controls visibility
   const [isHovering, setIsHovering] = useState(false); // Track mouse hover
+  const [embedProgress, setEmbedProgress] = useState(0);
+  const [embedCurrentTime, setEmbedCurrentTime] = useState(0);
+  const [embedDuration, setEmbedDuration] = useState(0);
+  const { user } = useAuth(); // Get current user for watch history
+
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
     const video = videoRef.current;
@@ -54,6 +78,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
+      onTimeUpdate?.(videoRef.current.currentTime);
     }
   };
 
@@ -162,6 +187,11 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Autoplay when the component mounts or src changes
   useEffect(() => {
+    // Skip all video logic for embed URLs
+    if (src.includes('vidking') || src.includes('embed')) {
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
 
@@ -206,6 +236,28 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       // You might want to display an error message to the user
     };
 
+    // Handle page visibility changes - when returning to tab, sync player state
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden, don't do anything special - video continues in background
+        return;
+      }
+      // Page is now visible
+      // For embed players, immediately clear loading if it has loaded
+      if (src.includes('vidking') || src.includes('embed')) {
+        if (embedLoadedRef.current) {
+          setIsLoading(false);
+        }
+        return;
+      }
+      // For direct video players
+      const video = videoRef.current;
+      if (video && !video.paused) {
+        setIsPlaying(true);
+        setIsLoading(false);
+      }
+    };
+
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('canplaythrough', handleCanPlayThrough);
     video.addEventListener('waiting', handleWaiting);
@@ -213,6 +265,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     video.addEventListener('play', handlePlay); // Listen for actual play event
     video.addEventListener('pause', handlePause);
     video.addEventListener('error', handleError);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Clean up event listeners
     return () => {
@@ -223,8 +276,146 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('error', handleError);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [src, autoplay, initialTime, volume]); // Added autoplay, initialTime, volume to dependencies
+
+  const isEmbedPlayer = src.includes('vidking') || src.includes('embed');
+
+  const sendWatchHistoryUpdate = useCallback(async (
+    currentProgress: number,
+    currentPlayedTime: number,
+    currentTotalDuration: number,
+    currentMediaType: 'movie' | 'tv' // Add mediaType here
+  ) => {
+    const now = Date.now();
+    
+    // Only send if at least 30 seconds have passed since last update to reduce API calls
+    if (now - lastUpdateTimeRef.current < 30000) {
+      return;
+    }
+
+    if (user && mediaId && currentMediaType) { // Use currentMediaType here
+      try {
+        lastUpdateTimeRef.current = now;
+        console.log('Sending watch history update:', { 
+          mediaId, 
+          mediaType: currentMediaType, 
+          progress: currentProgress, 
+          currentPlayedTime, 
+          currentTotalDuration,
+          seasonNumber,
+          episodeNumber
+        });
+        
+        const response = await fetch('/api/watch-history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mediaId,
+            mediaType: currentMediaType, // Use currentMediaType
+            title,
+            posterPath,
+            progress: currentProgress,
+            currentTime: Math.floor(currentPlayedTime),
+            totalDuration: Math.floor(currentTotalDuration),
+            seasonNumber: seasonNumber || undefined,
+            episodeNumber: episodeNumber || undefined,
+            finished: false,
+          }),
+        });
+        
+        if (!response.ok) {
+          console.error('Watch history API error:', response.status, response.statusText);
+        } else {
+          console.log('Watch history saved successfully');
+        }
+      } catch (error) {
+        console.error('Failed to update watch history:', error);
+      }
+    }
+  }, [user, mediaId, title, posterPath, seasonNumber, episodeNumber]); // Dependencies for useCallback
+
+
+  // Effect for handling messages from embed players
+  useEffect(() => {
+          const handleMessage = (event: MessageEvent) => {
+            console.log("Message received from embed player:", event); // Log the raw event
+            if (typeof event.data === 'string') {
+              try {
+                const message = JSON.parse(event.data);
+                console.log("Parsed message from embed player:", message); // Log the parsed message
+                if (message.type === 'PLAYER_EVENT' && message.data) {
+                  const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration } = message.data;
+                  console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration });
+                  console.log("Matching condition for embed player:", { currentMediaId: mediaId, eventId: id, currentMediaType: mediaType, eventMediaType: eventMediaType, match: String(id) === String(mediaId) && eventMediaType === mediaType });
+                  if (String(id) === String(mediaId) && eventMediaType === mediaType) {
+                    setEmbedProgress(progress);
+                    setEmbedCurrentTime(eventCurrentTime);
+                    setEmbedDuration(eventDuration);
+
+                    if (playerEvent === 'timeupdate' || playerEvent === 'seeked' || playerEvent === 'play') {
+                      sendWatchHistoryUpdate(progress, eventCurrentTime, eventDuration, eventMediaType);
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error("Error parsing message from embed player:", e);
+              }
+            }
+          };
+
+    if (isEmbedPlayer) {
+      window.addEventListener("message", handleMessage);
+    }
+
+    return () => {
+      if (isEmbedPlayer) {
+        window.removeEventListener("message", handleMessage);
+      }
+    };
+  }, [isEmbedPlayer, mediaId, mediaType, sendWatchHistoryUpdate]);
+
+
+  // Watch history tracking for direct video - uses internal player states
+  useEffect(() => {
+    if (isEmbedPlayer) return; // This useEffect is only for direct players
+
+    let intervalId: NodeJS.Timeout | undefined;
+
+    if (isPlaying && user) {
+      intervalId = setInterval(() => {
+        const calculatedProgress = (duration > 0 ? (currentTime / duration) * 100 : 0);
+        console.log("Direct player update:", { isPlaying, currentTime, duration, calculatedProgress });
+        sendWatchHistoryUpdate(
+          calculatedProgress,
+          currentTime,
+          duration,
+          mediaType // Pass mediaType
+        );
+      }, 10000); // Check and send update every 10 seconds
+    } else if (intervalId) {
+      clearInterval(intervalId);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+      // Send a final update for direct player on cleanup
+      if (!isEmbedPlayer && user && mediaId) {
+        sendWatchHistoryUpdate(
+          (duration > 0 ? (currentTime / duration) * 100 : 0),
+          currentTime,
+          duration,
+          mediaType // Pass mediaType
+        );
+      }
+    };
+  }, [isEmbedPlayer, isPlaying, user, mediaId, mediaType, currentTime, duration, sendWatchHistoryUpdate]);
+
 
   // Manage controls visibility when paused
   useEffect(() => {
@@ -243,97 +434,44 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   return (
     <div // Added aspect-video to ensure 16:9 ratio
       ref={containerRef}
-      className="relative w-full aspect-video bg-black group"
+      className="relative w-full h-[600px] bg-black group"
       onMouseEnter={() => { setIsHovering(true); setShowControls(true); }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black text-white text-lg z-10">
-          <p>Loading video...</p>
-          {/* You can add a spinner here if you have one */}
-        </div>
+      {src.includes('vidking') || src.includes('embed') ? (
+        // For embed URLs, use an iframe with vidking controls
+        <iframe
+          key={`iframe-${mediaId}-${mediaType}`}
+          ref={iframeRef}
+          src={stableSrc}
+          className="w-full h-full"
+          allowFullScreen
+          allow="autoplay"
+          title={title}
+          onLoad={() => {
+            setIsLoading(false);
+            embedLoadedRef.current = true;
+          }}
+        />
+      ) : (
+        // For direct video files, use the video element
+        <video
+          ref={videoRef}
+          src={src}
+          poster={poster}
+          onClick={togglePlayPause}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          className="w-full h-full object-contain"
+          muted
+          title={title}
+        >
+          Your browser does not support the video tag.
+        </video>
       )}
-      <video
-        ref={videoRef}
-        src={src} // Changed from videoSrc
-        poster={poster}
-        onClick={togglePlayPause}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onPlay={() => setIsPlaying(true)} // Keep these for immediate state updates
-        onPause={() => setIsPlaying(false)} // Keep these for immediate state updates
-        className="w-full h-full object-contain" // Use object-contain to avoid cropping
-        muted // Start muted for reliable autoplay
-        title={title} // Pass the title prop
-        // No 'controls' attribute here, as we're building custom controls
-      >
-        Your browser does not support the video tag.
-      </video>
 
-      {/* Custom Controls Overlay */}
-      {/* Only show controls if explicitly requested, or if paused and not loading */}
-      {(showControls || (!isPlaying && !isLoading)) && (
-        <div className="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-black/70 to-transparent transition-opacity duration-300">
-          {/* Top overlay for potential title/info */}
-          <div className="flex justify-end">
-            {/* Could add title here */}
-          </div>
-
-
-          {/* Center Play/Pause Button */}
-          <div className="flex-grow flex items-center justify-center">
-            <button
-              onClick={togglePlayPause}
-              className="text-white text-opacity-75 hover:text-opacity-100 transition-opacity duration-200"
-            >
-              {/* Show large play button if playing (PauseCircle), or if paused and not loading,
-                  and only if hovering when paused */}
-              {isPlaying ? <PauseCircle size={80} /> : (!isLoading && isHovering ? <PlayCircle size={80} /> : null)}
-            </button>
-          </div>
-
-          {/* Bottom Controls Bar */}
-          <div className="flex items-center gap-4 bg-ui-elements/80 p-2 rounded-lg">
-            <button onClick={togglePlayPause} className="text-accent hover:text-white">
-              {isPlaying ? <PauseCircle size={24} /> : <PlayCircle size={24} />}
-            </button>
-
-            <div className="text-white text-sm">{formatTime(currentTime)}</div>
-            <input
-              type="range"
-              min="0"
-              max={duration}
-              value={currentTime}
-              onChange={handleProgressChange}
-              className="flex-grow h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-accent"
-              style={{
-                background: `linear-gradient(to right, var(--color-accent) ${((currentTime / duration) * 100) || 0}%, #4b5563 ${((currentTime / duration) * 100) || 0}%)`
-              }}
-            />
-            <div className="text-white text-sm">{formatTime(duration)}</div>
-
-            <button onClick={handleToggleMute} className="text-accent hover:text-white">
-              {isMuted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-accent"
-              style={{
-                background: `linear-gradient(to right, var(--color-accent) ${((isMuted ? 0 : volume) * 100)}%, #4b5563 ${((isMuted ? 0 : volume) * 100)}%)`
-              }}
-            />
-
-            <button onClick={handleToggleFullscreen} className="text-accent hover:text-white">
-              <Maximize size={24} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send } from 'lucide-react';
+import { Bot, X, Send, Loader } from 'lucide-react';
 
 
 interface Message {
@@ -37,7 +37,28 @@ const Chatbot = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
+  const [isChatbotUnderMaintenance, setIsChatbotUnderMaintenance] = useState(false);
   const chatEndRef = useRef<null | HTMLDivElement>(null);
+
+  // Fetch chatbot maintenance status
+  useEffect(() => {
+    const fetchMaintenanceStatus = async () => {
+      try {
+        const res = await fetch('/api/admin/maintenance');
+        if (res.ok) {
+          const data = await res.json();
+          setIsChatbotUnderMaintenance(data.isChatbotMaintenanceMode || false);
+        }
+      } catch (error) {
+        console.error('Error fetching chatbot maintenance status:', error);
+      }
+    };
+
+    fetchMaintenanceStatus();
+    // Poll for maintenance status every 30 seconds
+    const interval = setInterval(fetchMaintenanceStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -54,6 +75,14 @@ const Chatbot = () => {
 
   const handleSendMessage = async () => {
     if (inputValue.trim() === '') return;
+
+    // Check if chatbot is under maintenance
+    if (isChatbotUnderMaintenance) {
+      const maintenanceMessage: Message = { text: "The chatbot is currently under maintenance. Please try again later.", sender: 'bot' };
+      setMessages(prev => [...prev, maintenanceMessage]);
+      setInputValue('');
+      return;
+    }
 
     const userMessage: Message = { text: inputValue, sender: 'user' };
     setMessages(prev => [...prev, userMessage]);
@@ -120,33 +149,43 @@ const Chatbot = () => {
             </button>
           </div>
           <div className="flex-grow p-4 overflow-y-auto bg-background relative">
-            {messages.map((msg, index) => (
-              <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
-                <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-accent' : 'bg-gray-700'}`}>
-                  <p className="text-sm text-white">{msg.text}</p>
-                </div>
+            {isChatbotUnderMaintenance ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 rounded-b-lg">
+                <Loader className="text-accent mb-4 animate-spin" size={48} />
+                <p className="text-white text-center font-semibold">Chatbot is under maintenance</p>
+                <p className="text-gray-400 text-sm text-center mt-2">We'll be back shortly</p>
               </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start mb-2">
-                <div className="p-2 rounded-lg bg-gray-700">
-                  <TypingIndicator />
-                </div>
-              </div>
+            ) : (
+              <>
+                {messages.map((msg, index) => (
+                  <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-2`}>
+                    <div className={`p-2 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-accent' : 'bg-gray-700'}`}>
+                      <p className="text-sm text-white">{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start mb-2">
+                    <div className="p-2 rounded-lg bg-gray-700">
+                      <TypingIndicator />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </>
             )}
-            <div ref={chatEndRef} />
           </div>
           <div className="p-2 border-t border-gray-700 flex">
             <input
               type="text"
-              placeholder={isLoading ? "Gemini is thinking..." : "Type your message..."}
+              placeholder={isChatbotUnderMaintenance ? "Chatbot is under maintenance..." : isLoading ? "Gemini is thinking..." : "Type your message..."}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               className="w-full bg-gray-800 text-white p-2 rounded-l-md focus:outline-none"
-              disabled={isLoading}
+              disabled={isLoading || isChatbotUnderMaintenance}
             />
-            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isLoading}>
+            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isLoading || isChatbotUnderMaintenance}>
               <Send className="text-white" />
             </button>
           </div>

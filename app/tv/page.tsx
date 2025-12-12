@@ -1,4 +1,5 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
+import Header from '@/components/Header';
 import { Suspense } from 'react';
 import { getPopularTvShows, getTopRatedTvShows, getAiringTodayTvShows } from '@/lib/tmdb';
 
@@ -19,19 +20,22 @@ const TvShowsPage = async () => {
   const airingTodayTvShows = await getAiringTodayTvShows();
 
   return (
-    <main className="container mx-auto p-4">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">TV Shows</h1>
-      <Suspense fallback={<ListSkeleton title="Popular TV Shows" />}>
-        <MediaListWithTrailer title="Popular TV Shows" items={popularTvShows?.results?.slice(0, 12) || []} />
-      </Suspense>
-      <Suspense fallback={<ListSkeleton title="Top Rated TV Shows" />}>
-        <MediaListWithTrailer title="Top Rated TV Shows" items={topRatedTvShows?.results?.slice(0, 12) || []} />
-      </Suspense>
-      <Suspense fallback={<ListSkeleton title="Airing Today TV Shows" />}>
-        <MediaListWithTrailer title="Airing Today TV Shows" items={airingTodayTvShows?.results?.slice(0, 12) || []} />
-      </Suspense>
-      {/* Add more TV show categories as needed */}
-    </main>
+    <>
+      <Header />
+      <main className="container mx-auto p-4 pt-24">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">TV Shows</h1>
+        <Suspense fallback={<ListSkeleton title="Popular TV Shows" />}>
+          <MediaListWithTrailer title="Popular TV Shows" items={popularTvShows?.results?.slice(0, 12) || []} />
+        </Suspense>
+        <Suspense fallback={<ListSkeleton title="Top Rated TV Shows" />}>
+          <MediaListWithTrailer title="Top Rated TV Shows" items={topRatedTvShows?.results?.slice(0, 12) || []} />
+        </Suspense>
+        <Suspense fallback={<ListSkeleton title="Airing Today TV Shows" />}>
+          <MediaListWithTrailer title="Airing Today TV Shows" items={airingTodayTvShows?.results?.slice(0, 12) || []} />
+        </Suspense>
+        {/* Add more TV show categories as needed */}
+      </main>
+    </>
   );
 };
 

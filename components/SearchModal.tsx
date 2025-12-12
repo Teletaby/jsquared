@@ -79,7 +79,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-gray-900 p-6 text-left align-middle shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl backdrop-blur-lg bg-white/10 border border-white/20 p-6 text-left align-middle shadow-xl transition-all">
                 <Dialog.Title as="h3" className="text-xl sm:text-2xl font-bold leading-6 text-white flex justify-between items-center">
                   Advanced Search
                   <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-800 transition-colors">
@@ -90,7 +90,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                 <div className="mt-6 relative">
                   <input
                     type="text"
-                    placeholder="e.g., The Matrix, Breaking Bad..."
+                    placeholder="Search for movies or TV shows..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={(e) => {
@@ -111,9 +111,9 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                       {Object.entries(GENRE_MAP).map(([genreName, genreId]) => (
                         <button
                           key={genreId}
-                          onClick={() => handleGenreChange(genreId)}
+                          onClick={() => handleGenreChange(Number(genreId))}
                           className={`p-2 rounded-md transition-colors text-sm
-                            ${selectedGenres.includes(genreId) ? 'bg-blue-500 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+                            ${selectedGenres.includes(Number(genreId)) ? 'bg-blue-500 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
                         >
                           {genreName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                         </button>

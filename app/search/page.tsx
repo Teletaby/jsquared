@@ -1,6 +1,7 @@
 import { searchMulti, discoverMovies, discoverTvShows } from '@/lib/tmdb';
 import MovieList from '@/components/MovieList';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import Header from '@/components/Header';
 import { GENRE_MAP } from '@/lib/genreMap';
 
 interface SearchPageProps {
@@ -31,14 +32,14 @@ const SearchPage = async ({ searchParams }: SearchPageProps) => {
   try {
     let rawResults: any[] = [];
     if (query) {
-      const searchData = await searchMulti(query, with_genres, 1);
+      const searchData = await searchMulti(query, with_genres, '1');
       if (searchData?.results) {
         rawResults = searchData.results;
       }
     } else if (with_genres) {
       const [movieResults, tvResults] = await Promise.all([
-        discoverMovies({ with_genres, 'vote_average.gte': minRating }),
-        discoverTvShows({ with_genres, 'vote_average.gte': minRating }),
+        discoverMovies({ with_genres, 'vote_average.gte': minRating.toString() }),
+        discoverTvShows({ with_genres, 'vote_average.gte': minRating.toString() }),
       ]);
       
       const movies = movieResults?.results?.map((m: any) => ({ ...m, media_type: 'movie' })) || [];
@@ -76,7 +77,7 @@ const SearchPage = async ({ searchParams }: SearchPageProps) => {
   }
 
   const genreNames = with_genres?.split(',').map(id => 
-    Object.keys(GENRE_MAP).find(key => GENRE_MAP[key as keyof typeof GENRE_MAP] === parseInt(id))
+    Object.keys(GENRE_MAP).find(key => GENRE_MAP[key as keyof typeof GENRE_MAP] === id)
   ).filter(Boolean).join(', ') || '';
 
   const pageTitle = query 
@@ -84,14 +85,17 @@ const SearchPage = async ({ searchParams }: SearchPageProps) => {
     : `Results for: ${genreNames}`;
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">{pageTitle}</h1>
-      {results.length > 0 ? (
-        <MovieList movies={results} />
-      ) : (
-        <p className="text-white text-center">No results found for your query and filters.</p>
-      )}
-    </div>
+    <>
+      <Header />
+      <div className="container mx-auto p-4 pt-24">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">{pageTitle}</h1>
+        {results.length > 0 ? (
+          <MovieList movies={results} />
+        ) : (
+          <p className="text-white text-center">No results found for your query and filters.</p>
+        )}
+      </div>
+    </>
   );
 };
 

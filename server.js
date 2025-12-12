@@ -1,3 +1,10 @@
+console.log('Server script started.');
+
+process.on('uncaughtException', (err) => {
+  console.error('Unhandled exception caught:', err);
+  process.exit(1);
+});
+
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
@@ -7,12 +14,17 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
+console.log('Attempting to prepare Next.js app...');
 app.prepare().then(() => {
+  console.log('Next.js app prepared successfully. Starting HTTP server...');
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   }).listen(process.env.PORT || 3000, (err) => {
-    if (err) throw err;
+    if (err) {
+      console.error('Error starting server:', err);
+      throw err;
+    }
     console.log('> Ready on http://localhost:3000');
   });
 
@@ -39,4 +51,7 @@ app.prepare().then(() => {
       console.log('user disconnected');
     });
   });
+}).catch((ex) => {
+  console.error('Next.js app preparation failed:', ex.stack);
+  process.exit(1);
 });

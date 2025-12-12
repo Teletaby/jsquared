@@ -2,11 +2,13 @@
 
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import { Menu, Transition } from '@headlessui/react';
 import { Bars3Icon } from '@heroicons/react/24/solid';
-import { Search } from 'lucide-react'; // Added Search icon
+import { Search, UserCircle2, Settings } from 'lucide-react'; // Added Settings icon
 import SearchModal from './SearchModal';
+import { useAuth } from '@/lib/hooks/useAuth'; // Import the useAuth hook
 
 const navItems = [
   { name: 'Movies', href: '/movies' },
@@ -15,14 +17,31 @@ const navItems = [
 
 const Header = () => {
   const pathname = usePathname();
+  const router = useRouter(); // Initialize useRouter
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { user, loading, logout } = useAuth(); // Use the auth hook
+
+  const handleAuthClick = () => {
+    if (user) {
+      router.push('/dashboard'); // Navigate to dashboard
+    } else {
+      router.push('/signin'); // Direct to signin
+    }
+  };
 
   return (
     <>
-      <header className="bg-gray-900 text-white shadow-md top-0 z-60" style={{ position: 'relative' }}>
-        <div className="container mx-auto flex justify-between items-center p-4">
-          <Link href="/" className="text-2xl font-bold text-blue-500 tracking-wider">
-            J-Squared Cinema
+      <header className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-2xl text-white shadow-2xl border-b border-white/20">
+        <div className="flex justify-between items-center p-4 px-8 max-w-full">
+          <Link href="/" className="flex items-center gap-3 text-2xl font-bold text-blue-500 tracking-wider hover:opacity-80 transition-opacity">
+            <Image
+              src="/jsquare.png"
+              alt="J-Squared Cinema Logo"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
+            <span>J-Squared Cinema</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -32,7 +51,80 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
-            <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
+            {!loading && (
+              <>
+                {user ? (
+                  <Menu as="div" className="relative inline-block text-left">
+                    <div>
+                      <Menu.Button className="inline-flex w-full justify-center rounded-full p-2 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 overflow-hidden backdrop-blur transition-colors duration-200">
+                        {user.image ? (
+                          <Image
+                            src={user.image}
+                            alt={user.name || 'User'}
+                            width={32}
+                            height={32}
+                            className="rounded-full object-cover"
+                          />
+                        ) : (
+                          <UserCircle2 size={32} aria-hidden="true" />
+                        )}
+                      </Menu.Button>
+                    </div>
+                    <Transition
+                      as={Fragment}
+                      enter="transition ease-out duration-100"
+                      enterFrom="transform opacity-0 scale-95"
+                      enterTo="transform opacity-100 scale-100"
+                      leave="transition ease-in duration-75"
+                      leaveFrom="transform opacity-100 scale-100"
+                      leaveTo="transform opacity-0 scale-95"
+                    >
+                      <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
+                        <div className="px-1 py-1 ">
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link href="/dashboard"
+                                className={`${
+                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                              >
+                                Dashboard
+                              </Link>
+                            )}
+                          </Menu.Item>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                onClick={logout}
+                                className={`${
+                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                              >
+                                Logout
+                              </button>
+                            )}
+                          </Menu.Item>
+                        </div>
+                      </Menu.Items>
+                    </Transition>
+                  </Menu>
+                ) : (
+                  <button
+                    onClick={handleAuthClick}
+                    className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"
+                    aria-label="Sign In / Sign Up"
+                  >
+                    <UserCircle2 size={24} />
+                  </button>
+                )}
+                {user?.role === 'admin' && (
+                  <Link href="/admin" className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Admin Panel">
+                    <Settings size={24} />
+                  </Link>
+                )}
+                <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
+              </>
+            )}
           </nav>
 
           {/* Mobile Menu Button and Dropdown */}
@@ -69,6 +161,64 @@ const Header = () => {
                         )}
                       </Menu.Item>
                     ))}
+                    {user?.role === 'admin' && (
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            href="/admin"
+                            className={`${
+                              active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                          >
+                            <Settings size={24} className="mr-2" />
+                            Admin Panel
+                          </Link>
+                        )}
+                      </Menu.Item>
+                    )}
+                    {user ? (
+                      <>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link href="/dashboard"
+                              className={`${
+                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                            >
+                              <UserCircle2 size={24} className="mr-2" />
+                              Dashboard
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={logout}
+                              className={`${
+                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                            >
+                              <UserCircle2 size={24} className="mr-2" />
+                              Logout
+                            </button>
+                          )}
+                        </Menu.Item>
+                      </>
+                    ) : (
+                      <Menu.Item>
+                        {({ active }) => (
+                          <button
+                            onClick={handleAuthClick}
+                            className={`${
+                              active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                          >
+                            <UserCircle2 size={24} className="mr-2" />
+                            Sign In / Sign Up
+                          </button>
+                        )}
+                      </Menu.Item>
+                    )}
                     <Menu.Item>
                       {({ active }) => (
                         <button
@@ -77,7 +227,8 @@ const Header = () => {
                             active ? 'bg-blue-500 text-white' : 'text-gray-200'
                           } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
                         >
-                          <Search size={24} />
+                          <Search size={24} className="mr-2" />
+                          Search
                         </button>
                       )}
                     </Menu.Item>
