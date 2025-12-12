@@ -38,6 +38,10 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const lastUpdateTimeRef = useRef<number>(0); // Ref for tracking last watch history update
   const embedLoadedRef = useRef<boolean>(false); // Track if embed has loaded
   const iframeRef = useRef<HTMLIFrameElement>(null); // Ref for the iframe
+  const initialTimeSetRef = useRef<boolean>(false); // Track if initial time has been set
+  const lastTrackedTimeRef = useRef<number>(0); // Track last time we recorded for playtime
+  const embedPlayerIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined); // Track embed player interval
+  const latestEmbedDataRef = useRef<{ progress: number; currentTime: number; duration: number } | null>(null); // Store latest embed data
 
   // Memoize src to prevent unnecessary iframe reloads
   const stableSrc = useMemo(() => src, [src]);
@@ -286,12 +290,14 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     currentProgress: number,
     currentPlayedTime: number,
     currentTotalDuration: number,
-    currentMediaType: 'movie' | 'tv' // Add mediaType here
+    currentMediaType: 'movie' | 'tv', // Add mediaType here
+    totalPlayedSeconds: number = 0 // Add this parameter with default
   ) => {
     const now = Date.now();
     
-    // Only send if at least 30 seconds have passed since last update to reduce API calls
-    if (now - lastUpdateTimeRef.current < 30000) {
+    // Only send if at least 10 seconds have passed since last update to reduce API calls
+    if (now - lastUpdateTimeRef.current < 10000) {
+      console.log('Throttled - skipping update. Time since last:', now - lastUpdateTimeRef.current);
       return;
     }
 
@@ -304,6 +310,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           progress: currentProgress, 
           currentPlayedTime, 
           currentTotalDuration,
+          totalPlayedSeconds,
           seasonNumber,
           episodeNumber
         });
@@ -321,6 +328,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             progress: currentProgress,
             currentTime: Math.floor(currentPlayedTime),
             totalDuration: Math.floor(currentTotalDuration),
+            totalPlayedSeconds: Math.floor(totalPlayedSeconds),
             seasonNumber: seasonNumber || undefined,
             episodeNumber: episodeNumber || undefined,
             finished: false,
@@ -330,53 +338,100 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
         if (!response.ok) {
           console.error('Watch history API error:', response.status, response.statusText);
         } else {
-          console.log('Watch history saved successfully');
+          const data = await response.json();
+          console.log('Watch history saved successfully:', data);
         }
       } catch (error) {
         console.error('Failed to update watch history:', error);
       }
+    } else {
+      console.log('Skipping watch history update - missing user/mediaId', { user: !!user, mediaId, currentMediaType });
     }
   }, [user, mediaId, title, posterPath, seasonNumber, episodeNumber]); // Dependencies for useCallback
 
 
-  // Effect for handling messages from embed players
+  // Effect for handling embed players - send initial progress on load
   useEffect(() => {
-          const handleMessage = (event: MessageEvent) => {
-            console.log("Message received from embed player:", event); // Log the raw event
-            if (typeof event.data === 'string') {
-              try {
-                const message = JSON.parse(event.data);
-                console.log("Parsed message from embed player:", message); // Log the parsed message
-                if (message.type === 'PLAYER_EVENT' && message.data) {
-                  const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration } = message.data;
-                  console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration });
-                  console.log("Matching condition for embed player:", { currentMediaId: mediaId, eventId: id, currentMediaType: mediaType, eventMediaType: eventMediaType, match: String(id) === String(mediaId) && eventMediaType === mediaType });
-                  if (String(id) === String(mediaId) && eventMediaType === mediaType) {
-                    setEmbedProgress(progress);
-                    setEmbedCurrentTime(eventCurrentTime);
-                    setEmbedDuration(eventDuration);
+    if (!isEmbedPlayer) return;
 
-                    if (playerEvent === 'timeupdate' || playerEvent === 'seeked' || playerEvent === 'play') {
-                      sendWatchHistoryUpdate(progress, eventCurrentTime, eventDuration, eventMediaType);
-                    }
+    const handleMessage = (event: MessageEvent) => {
+      console.log("Message received from embed player:", event.data);
+      
+      if (typeof event.data === 'string') {
+        try {
+          const message = JSON.parse(event.data);
+          console.log("Parsed message from embed player:", message);
+          
+          if (message.type === 'PLAYER_EVENT' && message.data) {
+            const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration } = message.data;
+            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration });
+            
+            // Check if this message is for our media
+            if (String(id) === String(mediaId) && eventMediaType === mediaType) {
+              setEmbedProgress(progress);
+              setEmbedCurrentTime(eventCurrentTime);
+              setEmbedDuration(eventDuration);
+              
+              // Store the latest data
+              latestEmbedDataRef.current = {
+                progress,
+                currentTime: eventCurrentTime,
+                duration: eventDuration
+              };
+              
+              // For embed players, send immediately to database without throttle
+              if (user && mediaId && eventMediaType) {
+                console.log('Immediately saving embed player progress to database');
+                fetch('/api/watch-history', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    mediaId,
+                    mediaType: eventMediaType,
+                    title,
+                    posterPath,
+                    progress: progress,
+                    currentTime: Math.floor(eventCurrentTime),
+                    totalDuration: Math.floor(eventDuration),
+                    totalPlayedSeconds: 0,
+                    seasonNumber: seasonNumber || undefined,
+                    episodeNumber: episodeNumber || undefined,
+                    finished: false,
+                  }),
+                }).then(response => {
+                  if (!response.ok) {
+                    console.error('Watch history API error:', response.status);
+                  } else {
+                    console.log('Embed player progress saved to database');
                   }
-                }
-              } catch (e) {
-                console.error("Error parsing message from embed player:", e);
+                }).catch(error => {
+                  console.error('Failed to save embed player progress:', error);
+                });
               }
             }
-          };
+          }
+        } catch (e) {
+          console.error("Error parsing message from embed player:", e);
+        }
+      }
+    };
 
     if (isEmbedPlayer) {
       window.addEventListener("message", handleMessage);
+      console.log("Added message listener for embed player");
     }
 
     return () => {
       if (isEmbedPlayer) {
         window.removeEventListener("message", handleMessage);
       }
+      if (embedPlayerIntervalRef.current) {
+        clearInterval(embedPlayerIntervalRef.current);
+      }
     };
-  }, [isEmbedPlayer, mediaId, mediaType, sendWatchHistoryUpdate]);
+  }, [isEmbedPlayer, mediaId, mediaType, user, title, posterPath, seasonNumber, episodeNumber]);
 
 
   // Watch history tracking for direct video - uses internal player states
@@ -384,16 +439,38 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     if (isEmbedPlayer) return; // This useEffect is only for direct players
 
     let intervalId: NodeJS.Timeout | undefined;
+    let totalPlayedSeconds = 0;
 
     if (isPlaying && user) {
       intervalId = setInterval(() => {
         const calculatedProgress = (duration > 0 ? (currentTime / duration) * 100 : 0);
-        console.log("Direct player update:", { isPlaying, currentTime, duration, calculatedProgress });
+        
+        // Track actual playtime - only count seconds that were actually played
+        // If this is the first time, set the reference point
+        if (!initialTimeSetRef.current && initialTime > 0) {
+          initialTimeSetRef.current = true;
+          lastTrackedTimeRef.current = currentTime;
+        } else if (initialTimeSetRef.current) {
+          // Calculate the delta and only add if it makes sense (within 1 second of real time)
+          const timeDelta = currentTime - lastTrackedTimeRef.current;
+          if (timeDelta > 0 && timeDelta < 5) { // 5 second threshold to avoid big jumps
+            totalPlayedSeconds += timeDelta;
+          }
+          lastTrackedTimeRef.current = currentTime;
+        } else {
+          // No initial time was set, just track regularly
+          if (currentTime > 0) {
+            totalPlayedSeconds += 10; // Increment by 10 seconds (the interval duration)
+          }
+        }
+        
+        console.log("Direct player update:", { isPlaying, currentTime, duration, calculatedProgress, totalPlayedSeconds });
         sendWatchHistoryUpdate(
           calculatedProgress,
           currentTime,
           duration,
-          mediaType // Pass mediaType
+          mediaType, // Pass mediaType
+          totalPlayedSeconds
         );
       }, 10000); // Check and send update every 10 seconds
     } else if (intervalId) {

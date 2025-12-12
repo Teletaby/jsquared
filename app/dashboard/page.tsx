@@ -22,6 +22,7 @@ interface WatchHistoryItem {
   progress: number;
   currentTime: number;
   totalDuration: number;
+  totalPlayedSeconds?: number;
   lastWatchedAt: string;
 }
 
@@ -103,7 +104,7 @@ const DashboardPage = () => {
         if (response.ok) {
           const data: WatchHistoryItem[] = await response.json();
           const totalItems = data.length;
-          const totalSeconds = data.reduce((sum, item) => sum + (item.currentTime || 0), 0);
+          const totalSeconds = data.reduce((sum, item) => sum + (item.totalPlayedSeconds || 0), 0);
           const totalHours = Math.floor(totalSeconds / 3600);
           const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
           const totalHoursWatched = totalHours + (totalMinutes / 60);

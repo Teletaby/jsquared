@@ -28,7 +28,7 @@ type WatchlistStatusMap = {
 
 export default function HeroCarousel({ items }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [isWatchButtonHovered, setIsWatchButtonHovered] = useState(false);
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
   const { data: session } = useSession();
@@ -106,96 +106,11 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   };
 
   const handleMoreInfo = () => {
-    setShowInfoModal(true);
+    router.push(`/${mediaType}/${currentItem.id}?view=info`);
   };
 
   return (
     <>
-      {/* Info Modal */}
-      {showInfoModal && currentItem && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#1a1a1a] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10">
-            {/* Modal Header */}
-            <div className="sticky top-0 flex justify-between items-center p-6 bg-[#242424] border-b border-white/10">
-              <h2 className="text-2xl font-bold text-white">
-                {currentItem.title || currentItem.name}
-              </h2>
-              <button
-                onClick={() => setShowInfoModal(false)}
-                className="text-white hover:text-red-500 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              {/* Poster and Basic Info */}
-              <div className="flex gap-6">
-                {currentItem.poster_path && (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w342${currentItem.poster_path}`}
-                    alt={currentItem.title || currentItem.name}
-                    className="w-48 h-72 object-cover rounded-lg shadow-lg flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1">
-                  {/* Rating */}
-                  {currentItem.vote_average && (
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="text-yellow-400 text-xl">⭐</span>
-                      <span className="text-white font-semibold text-lg">
-                        {currentItem.vote_average.toFixed(1)}/10
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Type */}
-                  <div className="mb-4">
-                    <span className="inline-block bg-red-700 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                      {mediaType === 'tv' ? 'TV Series' : 'Movie'}
-                    </span>
-                  </div>
-
-                  {/* Description */}
-                  {currentItem.overview && (
-                    <p className="text-gray-300 text-base leading-relaxed">
-                      {currentItem.overview}
-                    </p>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={() => {
-                        setShowInfoModal(false);
-                        handlePlay();
-                      }}
-                      className="flex items-center gap-2 bg-red-700 text-white px-6 py-2 rounded-lg font-semibold hover:bg-red-800 transition-all duration-300"
-                    >
-                      <Play size={18} fill="currentColor" />
-                      <span>Watch Now</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowInfoModal(false);
-                        router.push(`/${mediaType}/${currentItem.id}?view=info`);
-                      }}
-                      className="flex items-center gap-2 bg-white/20 text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/30 transition-all duration-300"
-                    >
-                      <Info size={18} />
-                      <span>View Full Details</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Carousel */}
     <div className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] h-[300px] md:h-[400px] overflow-hidden mb-8">
       {/* Carousel Items */}
@@ -254,7 +169,13 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                 <div className="flex gap-3">
                   <button
                     onClick={handlePlay}
-                    className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-lg font-semibold hover:bg-red-700 hover:text-white transition-all duration-300 hover:scale-105"
+                    onMouseEnter={() => setIsWatchButtonHovered(true)}
+                    onMouseLeave={() => setIsWatchButtonHovered(false)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-300 hover:scale-105 ${
+                      isWatchButtonHovered 
+                        ? 'bg-red-700 text-white' 
+                        : 'bg-white text-black'
+                    }`}
                   >
                     <Play size={20} fill="currentColor" />
                     <span>Watch Now</span>
@@ -264,6 +185,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                     className="flex items-center gap-2 bg-white/30 text-white p-3 rounded-lg font-semibold hover:bg-white/50 transition-all duration-300 backdrop-blur-md border border-white/30"
                   >
                     <Info size={20} />
+                    <span>More Info</span>
                   </button>
                   <WatchlistButton
                       mediaId={item.id}

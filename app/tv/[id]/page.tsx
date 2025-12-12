@@ -8,6 +8,7 @@ import Header from '@/components/Header';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
+import { formatDuration } from '@/lib/utils';
 import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
@@ -318,7 +319,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   <span>First Air: {new Date(tvShow.first_air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                 )}
                 {tvShow.episode_run_time && tvShow.episode_run_time.length > 0 && (
-                  <span>Episode Avg: {tvShow.episode_run_time[0]}m</span>
+                  <span>Episode Avg: {formatDuration(tvShow.episode_run_time[0])}</span>
                 )}
               </div>
             </div>

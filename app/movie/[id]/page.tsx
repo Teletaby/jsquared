@@ -1,11 +1,12 @@
 "use client";
 
-import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails } from '@/lib/tmdb';
+import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails, getMovieVideos } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { formatDuration } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -46,6 +47,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
   // const [isPaused, setIsPaused] = useState(false); // Removed, handled by ThemedVideoPlayer
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const router = useRouter();
@@ -108,10 +110,18 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       setLoading(true);
       setError(null);
       setMovie(null);
+      setTrailerKey(null);
 
       try {
         const data: MediaDetails | null = await getMovieDetails(tmdbId);
         const castData = await getCastDetails('movie', tmdbId);
+        
+        // Fetch trailer videos
+        const videosData = await getMovieVideos(tmdbId);
+        const trailerVideo = videosData?.results?.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
+        if (trailerVideo) {
+          setTrailerKey(trailerVideo.key);
+        }
 
         if (data && data.id) {
           setMovie({ ...data, cast: castData?.cast || [] });
@@ -155,8 +165,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         const response = await fetch('/api/watch-history');
         if (response.ok) {
           const data = await response.json();
+          console.log('All watch history:', data);
           const movieHistory = data.find((item: any) => item.mediaId === tmdbId && item.mediaType === 'movie');
+          console.log('Movie history for ID', tmdbId, ':', movieHistory);
           if (movieHistory) {
+            console.log('Setting savedProgress to:', movieHistory.currentTime, 'progress:', movieHistory.progress);
             setSavedProgress(Math.floor(movieHistory.currentTime));
             setCurrentPlaybackTime(movieHistory.currentTime);
           }
@@ -175,7 +188,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     () => {
       const baseUrl = `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoplay=1`;
       // Add progress parameter if we have saved progress
-      return savedProgress > 0 ? `${baseUrl}&progress=${savedProgress}` : baseUrl;
+      const finalUrl = savedProgress > 0 ? `${baseUrl}&progress=${savedProgress}` : baseUrl;
+      console.log('Embed URL:', finalUrl, 'savedProgress:', savedProgress);
+      return finalUrl;
     },
     [tmdbId, savedProgress]
   );
@@ -220,95 +235,110 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
       <Header />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16">
-        {view === 'info' && (
-          <div className="space-y-8">
-            {/* Hero Section with Poster and Title */}
-            <div className="flex flex-col lg:flex-row gap-8 items-start">
-              {/* Poster */}
-              <div className="flex-shrink-0 w-full lg:w-auto">
-                <div className="sticky top-24 group max-w-xs mx-auto lg:mx-0">
-                  <div className="relative overflow-hidden rounded" style={{ backgroundColor: '#1A1A1A' }}>
-                    <Image
-                      src={posterUrl}
-                      alt={mediaTitle}
-                      width={180}
-                      height={270}
-                      className="w-full h-auto group-hover:brightness-110 transition-all duration-500"
-                    />
-                  </div>
+      {view === 'info' && (
+        <>
+          {/* Hero Section with Trailer Background */}
+          <div className="relative h-screen flex flex-col justify-center overflow-hidden mt-16">
+            {/* Trailer Video Background - Full viewport width, scaled to cover */}
+            {trailerKey && (
+              <>
+                <div className="absolute top-0 left-0 w-screen h-full overflow-hidden">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
+                    frameBorder="0"
+                    allow="autoplay; encrypted-media"
+                    className="absolute top-1/2 left-1/2 min-w-full min-h-full"
+                    style={{ 
+                      pointerEvents: 'none', 
+                      transform: 'translate(-50%, -50%) scale(1.5)',
+                      width: '177.78vh',
+                      height: '100vh'
+                    }}
+                  ></iframe>
                 </div>
-              </div>
+                
+                {/* Fade Overlay */}
+                <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
+              </>
+            )}
 
-              {/* Title and Quick Info */}
-              <div className="flex-1 space-y-6">
-                {/* Title Section */}
-                <div>
-                  <h1 className="text-5xl lg:text-6xl font-bold mb-3 text-white">
-                    {mediaTitle}
-                  </h1>
-                  {movie.tagline && (
-                    <p className="text-lg text-gray-400 font-light">"{movie.tagline}"</p>
-                  )}
-                </div>
+            {/* Content Overlay */}
+            <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
+              <div className="max-w-2xl">
+                {/* Title */}
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3 drop-shadow-2xl">
+                  {mediaTitle}
+                </h1>
 
-                {/* Quick Stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-4 rounded">
-                    <p className="text-xs text-gray-500 font-semibold mb-2">RATING</p>
-                    <p className="text-2xl font-bold text-white">{movie.vote_average.toFixed(1)}</p>
+                {/* Quick Stats - Single Row */}
+                <div className="flex flex-wrap gap-4 mb-4 text-sm md:text-base">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs text-gray-400 uppercase">RATING</span>
+                    <span className="text-lg md:text-2xl font-bold text-white">{movie.vote_average.toFixed(1)}</span>
                   </div>
                   
                   {movie.runtime && (
-                    <div style={{ backgroundColor: '#1A1A1A' }} className="p-4 rounded">
-                      <p className="text-xs text-gray-500 font-semibold mb-2">DURATION</p>
-                      <p className="text-2xl font-bold text-white">{movie.runtime}m</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-gray-400 uppercase">DURATION</span>
+                      <span className="text-lg md:text-2xl font-bold text-white">{formatDuration(movie.runtime)}</span>
                     </div>
                   )}
 
                   {movie.release_date && (
-                    <div style={{ backgroundColor: '#1A1A1A' }} className="p-4 rounded">
-                      <p className="text-xs text-gray-500 font-semibold mb-2">RELEASED</p>
-                      <p className="text-lg font-bold text-white">{new Date(movie.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-gray-400 uppercase">RELEASED</span>
+                      <span className="text-sm md:text-lg font-bold text-white">{new Date(movie.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                     </div>
                   )}
 
                   {movie.status && (
-                    <div style={{ backgroundColor: '#1A1A1A' }} className="p-4 rounded">
-                      <p className="text-xs text-gray-500 font-semibold mb-2">STATUS</p>
-                      <p className="text-lg font-bold text-white">{movie.status}</p>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-gray-400 uppercase">STATUS</span>
+                      <span className="text-sm md:text-lg font-bold text-white">{movie.status}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Genres */}
                 {movie.genres && movie.genres.length > 0 && (
-                  <div>
-                    <h3 className="text-xs text-gray-500 font-bold tracking-widest mb-3">GENRES</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {movie.genres.map((genre) => (
-                        <span
-                          key={genre.id}
-                          style={{ backgroundColor: '#1A1A1A' }}
-                          className="border border-gray-600 text-gray-300 px-4 py-2 rounded text-sm font-medium hover:border-white transition-all duration-300"
-                        >
-                          {genre.name}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {movie.genres.map((genre) => (
+                      <span
+                        key={genre.id}
+                        className="text-xs md:text-sm text-gray-300 font-medium"
+                      >
+                        {genre.name}
+                      </span>
+                    ))}
                   </div>
                 )}
 
+                {/* Tagline */}
+                {movie.tagline && (
+                  <p className="text-sm md:text-lg text-gray-300 mb-3 font-light drop-shadow-lg italic">"{movie.tagline}"</p>
+                )}
+
+                {/* Description */}
+                {movie.overview && (
+                  <p className="text-gray-300 text-xs md:text-sm leading-relaxed mb-4 max-w-xl drop-shadow-lg line-clamp-3">{movie.overview}</p>
+                )}
+
                 {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                <div className="flex flex-wrap gap-3 items-center">
                   <button
                     onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
                     style={{ backgroundColor: '#E50914' }}
-                    className="flex-1 text-white font-bold py-3 px-8 rounded transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2 group text-base"
+                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg"
                   >
-                    <span className="text-lg">▶</span> Watch Now
+                    <span>▶</span> Play
                   </button>
-                  <div className="flex-1">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base"
+                  >
+                    More Info
+                  </button>
+                  <div>
                     <WatchlistButton
                       mediaId={tmdbId}
                       mediaType={mediaType}
@@ -321,18 +351,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Overview Section */}
-            <div style={{ backgroundColor: '#1A1A1A' }} className="rounded p-8">
-              <h2 className="text-2xl font-bold mb-4 text-white">SYNOPSIS</h2>
-              <p className="text-gray-400 text-base leading-relaxed">{movie.overview}</p>
-            </div>
-
+          {/* Details Section Below Hero */}
+          <div className="max-w-7xl mx-auto px-6 py-16 space-y-12">
             {/* Financial Info - Side by side */}
             {(movie.budget || movie.revenue) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {movie.budget ? (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded">
+                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded-lg">
                     <p className="text-xs text-gray-500 mb-3 font-bold">PRODUCTION BUDGET</p>
                     <p className="text-3xl font-bold text-white">
                       ${(movie.budget / 1000000).toFixed(1)}M
@@ -340,7 +367,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   </div>
                 ) : null}
                 {movie.revenue ? (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded">
+                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded-lg">
                     <p className="text-xs text-gray-500 mb-3 font-bold">BOX OFFICE REVENUE</p>
                     <p className="text-3xl font-bold text-white">
                       ${(movie.revenue / 1000000).toFixed(1)}M
@@ -354,17 +381,17 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             {(movie.production_companies || movie.production_countries || movie.spoken_languages) && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {movie.production_companies && movie.production_companies.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded">
+                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded-lg">
                     <h3 className="text-sm text-gray-300 mb-4 font-bold">PRODUCTION COMPANIES</h3>
                     <div className="space-y-3">
-                      {movie.production_companies.slice(0, 4).map((company) => (
-                        <p key={company.id} className="text-sm text-gray-400">{company.name}</p>
+                      {movie.production_companies.slice(0, 4).map((company, index) => (
+                        <p key={`company-${company.id || index}`} className="text-sm text-gray-400">{company.name}</p>
                       ))}
                     </div>
                   </div>
                 )}
                 {movie.production_countries && movie.production_countries.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded">
+                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded-lg">
                     <h3 className="text-sm text-gray-300 mb-4 font-bold">COUNTRIES</h3>
                     <div className="space-y-3">
                       {movie.production_countries.map((country) => (
@@ -374,7 +401,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   </div>
                 )}
                 {movie.spoken_languages && movie.spoken_languages.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded">
+                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 rounded-lg">
                     <h3 className="text-sm text-gray-300 mb-4 font-bold">LANGUAGES</h3>
                     <div className="space-y-3">
                       {movie.spoken_languages.slice(0, 4).map((lang) => (
@@ -387,7 +414,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             )}
 
             {/* Tabs */}
-            <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t p-2">
+            <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t-lg p-2">
               <button
                 onClick={() => setActiveTab('overview')}
                 style={{ backgroundColor: activeTab === 'overview' ? '#E50914' : 'transparent' }}
@@ -486,11 +513,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               </div>
             )}
           </div>
-        )}
+        </>
+      )}
         
-        {/* Player for watch view - Rendered separately to prevent reload on tab changes */}
-        {view !== 'info' && (
-          <div className="space-y-8">
+      {/* Player for watch view - Rendered separately to prevent reload on tab changes */}
+      {view !== 'info' && (
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16 space-y-8">
             {/* Video Player */}
             {videoSrc ? (
               <ThemedVideoPlayer
@@ -545,9 +573,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={handleWatchOnTv}
-                    style={{ backgroundColor: '#E50914' }}
-                    className="text-white font-bold py-3 px-6 rounded transition-all duration-300 hover:brightness-110"
+                    disabled
+                    style={{ backgroundColor: '#1A1A1A' }}
+                    className="text-gray-500 font-bold py-3 px-6 rounded opacity-50 cursor-not-allowed border border-gray-700"
                   >
                     Watch on TV
                   </button>
@@ -571,7 +599,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                       <span>Release: {new Date(movie.release_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                     )}
                     {movie.runtime && (
-                      <span>Duration: {movie.runtime}m</span>
+                      <span>Duration: {formatDuration(movie.runtime)}</span>
                     )}
                   </div>
                 </div>
@@ -701,8 +729,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           </div>
         )}
       </div>
-    </div>
   );
 };
+
 
 export default MovieDetailPage;

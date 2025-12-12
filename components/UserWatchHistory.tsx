@@ -16,6 +16,7 @@ interface WatchHistoryItem {
   progress: number;
   currentTime: number;
   totalDuration: number;
+  totalPlayedSeconds?: number;
   seasonNumber?: number;
   episodeNumber?: number;
   lastWatchedAt: string;
@@ -50,6 +51,7 @@ export default function UserWatchHistory() {
         const response = await fetch('/api/watch-history?limit=10');
         if (response.ok) {
           const data = await response.json();
+          console.log('Watch history data from API:', data);
           setWatchHistory(data);
         }
       } catch (error) {
@@ -158,7 +160,11 @@ export default function UserWatchHistory() {
                   {/* Progress Label */}
                   {item.progress !== undefined && (
                     <div className="absolute top-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white font-semibold">
-                      {item.progress.toFixed(0)}%
+                      {(() => {
+                        const progressValue = item.progress || 0;
+                        console.log(`Progress for ${item.title}:`, { progress: progressValue, currentTime: item.currentTime, totalDuration: item.totalDuration });
+                        return `${progressValue.toFixed(1)}%`;
+                      })()}
                     </div>
                   )}
 

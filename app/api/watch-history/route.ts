@@ -56,14 +56,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished } = await request.json();
-    console.log('Saving watch history:', { mediaId, mediaType, title, progress, seasonNumber, episodeNumber });
+    const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds } = await request.json();
+    console.log('Saving watch history:', { mediaId, mediaType, title, progress, currentTime, totalDuration, seasonNumber, episodeNumber, totalPlayedSeconds });
 
     // Calculate progress as percentage if not provided
     // For embed players where totalDuration might be 0, estimate based on typical video length
     let calculatedProgress = progress;
     
-    if (!calculatedProgress) {
+    if (calculatedProgress === undefined || calculatedProgress === null) {
       if (totalDuration && currentTime) {
         calculatedProgress = Math.round((currentTime / totalDuration) * 100);
       } else if (currentTime && !totalDuration) {
@@ -75,6 +75,18 @@ export async function POST(request: NextRequest) {
         if (calculatedProgress > 99) calculatedProgress = 99;
       } else {
         calculatedProgress = 0;
+      }
+    } else {
+      // If progress is provided (from embed player)
+      // Vidking sends progress as a decimal (0.2257 = 0.2257%), so keep decimals
+      // But if it's >= 1, treat it as already in 0-100 range and round it
+      if (calculatedProgress < 1) {
+        // Small decimal value (0-1), likely already a percentage but in decimal form
+        // Keep it as-is or round to 1 decimal place for display
+        calculatedProgress = Math.round(calculatedProgress * 10) / 10;
+      } else {
+        // Large value, likely in 0-100 range
+        calculatedProgress = Math.max(0, Math.min(100, Math.round(calculatedProgress)));
       }
     }
 
@@ -88,6 +100,7 @@ export async function POST(request: NextRequest) {
       progress: calculatedProgress,
       currentTime: currentTime || 0,
       totalDuration: totalDuration || 0,
+      totalPlayedSeconds: totalPlayedSeconds || 0,
       finished: finished || false,
       lastWatchedAt: new Date(),
     };

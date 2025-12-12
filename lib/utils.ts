@@ -37,3 +37,20 @@ export function formatTime(seconds: number): string {
 export function isContentFinished(progress: number): boolean {
   return progress >= 90; // 90% or more watched
 }
+
+/**
+ * Format duration from minutes to hours and minutes
+ * @param minutes Duration in minutes
+ * @returns Formatted string (e.g., "1h 44m" or "44m")
+ */
+export function formatDuration(minutes: number): string {
+  if (!minutes || minutes === 0) return '0m';
+  
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours > 0) {
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return `${mins}m`;
+}

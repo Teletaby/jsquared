@@ -20,6 +20,7 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('Missing email or password');
           return null;
         }
 
@@ -27,14 +28,18 @@ export const authOptions: NextAuthOptions = {
           await connectToDatabase();
 
           const user = await User.findOne({ email: credentials.email });
+          console.log('User found:', user ? user.email : 'NOT FOUND');
 
           if (!user || !user.password) {
+            console.log('User not found or no password set');
             return null;
           }
 
           const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+          console.log('Password valid:', isPasswordValid);
 
           if (!isPasswordValid) {
+            console.log('Password invalid');
             return null;
           }
 

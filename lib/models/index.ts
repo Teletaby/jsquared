@@ -72,6 +72,10 @@ const watchHistorySchema = new Schema(
       type: Number,
       default: 0,
     },
+    totalPlayedSeconds: {
+      type: Number,
+      default: 0,
+    },
     seasonNumber: {
       type: Number,
       sparse: true,
