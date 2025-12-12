@@ -35,7 +35,7 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
         setIsLoadingWatchlist(true);
         const mediaItems = movies.map(movie => ({
           mediaId: movie.id,
-          mediaType: movie.media_type === 'tv' || !!movie.name ? 'tv' : 'movie',
+          mediaType: (movie.media_type === 'tv' || !!movie.name ? 'tv' : 'movie') as 'tv' | 'movie',
         }));
         if (typeof checkMultipleWatchlistStatuses === 'function') { // Re-add the typeof check
           const statuses = await checkMultipleWatchlistStatuses(mediaItems);

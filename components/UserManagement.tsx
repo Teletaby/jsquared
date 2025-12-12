@@ -180,7 +180,7 @@ export default function UserManagement() {
                           disabled={updating === user._id}
                           className="text-green-500 hover:text-green-400 disabled:opacity-50"
                         >
-                          {updating === user._id ? <LoadingSpinner size={16} /> : <Check size={16} />}
+                          {updating === user._id ? <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div> : <Check size={16} />}
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
@@ -205,7 +205,7 @@ export default function UserManagement() {
                           disabled={deleting === user._id}
                           className="text-red-500 hover:text-red-400 disabled:opacity-50 transition-colors"
                         >
-                          {deleting === user._id ? <LoadingSpinner size={16} /> : <Trash2 size={16} />}
+                          {deleting === user._id ? <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div> : <Trash2 size={16} />}
                         </button>
                       </div>
                     )}

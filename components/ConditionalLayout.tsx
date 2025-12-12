@@ -78,7 +78,7 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
 
   // If in maintenance mode and not an admin, we've already redirected.
   // If admin, or not in maintenance, render children.
-  if (isMaintenanceMode && !session?.user?.role === 'admin' && !isMaintenancePage) {
+  if (isMaintenanceMode && session?.user?.role !== 'admin' && !isMaintenancePage) {
     return null; // Should have been redirected
   }
 

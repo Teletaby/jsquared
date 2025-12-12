@@ -20,7 +20,7 @@ const MediaFetcherList = ({ title, items }: MediaFetcherListProps) => {
       if (session?.user && items && items.length > 0) {
         const mediaItems = items.map(item => ({
           mediaId: item.id,
-          mediaType: item.media_type === 'tv' || !!item.name ? 'tv' : 'movie',
+          mediaType: (item.media_type === 'tv' || !!item.name ? 'tv' : 'movie') as 'tv' | 'movie',
         }));
         if (typeof checkMultipleWatchlistStatuses === 'function') { // Re-add the typeof check
           const statuses = await checkMultipleWatchlistStatuses(mediaItems);

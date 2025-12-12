@@ -142,7 +142,7 @@ export default function AdminPage() {
                       : 'bg-red-600 hover:bg-red-700'}
                     ${togglingMaintenance ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  {togglingMaintenance && <LoadingSpinner size={20} />}
+                  {togglingMaintenance && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                   {isMaintenanceMode ? 'Deactivate Maintenance Mode' : 'Activate Maintenance Mode'}
                 </button>
               </div>
@@ -162,7 +162,7 @@ export default function AdminPage() {
                       : 'bg-red-600 hover:bg-red-700'}
                     ${togglingChatbotMaintenance ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  {togglingChatbotMaintenance && <LoadingSpinner size={20} />}
+                  {togglingChatbotMaintenance && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                   {isChatbotMaintenanceMode ? 'Deactivate Chatbot Maintenance' : 'Activate Chatbot Maintenance'}
                 </button>
               </div>
