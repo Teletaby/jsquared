@@ -5,6 +5,9 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { Settings } from '@/lib/models';
 import { authOptions } from '@/lib/auth';
 
+// Ensure this route is not statically generated
+export const dynamic = 'force-dynamic';
+
 // Helper to ensure settings document exists
 async function ensureSettingsDocument() {
   await connectToDatabase();
