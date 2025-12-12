@@ -113,8 +113,15 @@ export async function POST(request: NextRequest) {
       updateData.episodeNumber = episodeNumber;
     }
 
+    // Build the query - for TV shows, include season and episode to track per-episode progress
+    const query: any = { userId: user._id, mediaId, mediaType };
+    if (mediaType === 'tv' && seasonNumber !== undefined && episodeNumber !== undefined) {
+      query.seasonNumber = seasonNumber;
+      query.episodeNumber = episodeNumber;
+    }
+
     const watchHistory = await WatchHistory.findOneAndUpdate(
-      { userId: user._id, mediaId, mediaType },
+      query,
       {
         $set: updateData,
       },

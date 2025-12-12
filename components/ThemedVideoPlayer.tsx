@@ -42,6 +42,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const lastTrackedTimeRef = useRef<number>(0); // Track last time we recorded for playtime
   const embedPlayerIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined); // Track embed player interval
   const latestEmbedDataRef = useRef<{ progress: number; currentTime: number; duration: number } | null>(null); // Store latest embed data
+  const userHasInteractedRef = useRef<boolean>(false); // Track if user has manually seeked
 
   // Memoize src to prevent unnecessary iframe reloads
   const stableSrc = useMemo(() => src, [src]);
@@ -79,26 +80,21 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   }, [isPlaying]);
 
   // Update current time
-  const handleTimeUpdate = () => {
+  const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
       onTimeUpdate?.(videoRef.current.currentTime);
     }
-  };
+  }, [onTimeUpdate]);
 
   // Set duration when metadata loads
-  const handleLoadedMetadata = () => {
+  const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
       setVolume(videoRef.current.volume); // Initialize volume from video element
       setIsMuted(videoRef.current.muted); // Initialize mute state
-
-      // Apply initialTime if provided and valid
-      if (initialTime > 0 && initialTime < videoRef.current.duration) {
-        videoRef.current.currentTime = initialTime;
-      }
     }
-  };
+  }, []);
 
   // Seek video
   const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,6 +102,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       const newTime = parseFloat(e.target.value);
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
+      userHasInteractedRef.current = true; // Mark that user has manually seeked
     }
   };
 
@@ -189,8 +186,27 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     return () => clearTimeout(timeout);
   }, [isPlaying, isHovering, showControls]);
 
+  // Reset player state when episode/movie changes (for embed players)
+  useEffect(() => {
+    if (src.includes('vidking') || src.includes('embed')) {
+      // Reset states for new content
+      setIsLoading(true);
+      embedLoadedRef.current = false;
+      setEmbedProgress(0);
+      setEmbedCurrentTime(0);
+      setEmbedDuration(0);
+      latestEmbedDataRef.current = null;
+      lastUpdateTimeRef.current = 0;
+      console.log('Reset player state for new content:', { mediaId, seasonNumber, episodeNumber });
+    }
+  }, [src, mediaId, seasonNumber, episodeNumber]);
+
   // Autoplay when the component mounts or src changes
   useEffect(() => {
+    // Reset interaction tracking for new video
+    userHasInteractedRef.current = false;
+    initialTimeSetRef.current = false;
+
     // Skip all video logic for embed URLs
     if (src.includes('vidking') || src.includes('embed')) {
       return;
@@ -269,6 +285,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     video.addEventListener('play', handlePlay); // Listen for actual play event
     video.addEventListener('pause', handlePause);
     video.addEventListener('error', handleError);
+    video.addEventListener('timeupdate', handleTimeUpdate);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Clean up event listeners
@@ -280,9 +297,30 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('error', handleError);
+      video.removeEventListener('timeupdate', handleTimeUpdate);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [src, autoplay, initialTime, volume]); // Added autoplay, initialTime, volume to dependencies
+  }, [src, autoplay, volume, handleLoadedMetadata, handleTimeUpdate]); // Added autoplay, initialTime, volume to dependencies
+
+  // Separate effect to apply initial time when metadata is loaded (only once per video)
+  // NOTE: Skip this for embed players - they handle progress via URL parameters
+  useEffect(() => {
+    // Skip for embed players - Vidking handles progress via URL parameter
+    if (src.includes('vidking') || src.includes('embed')) {
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video || userHasInteractedRef.current || initialTimeSetRef.current) {
+      return; // Don't apply if user has already interacted or if we already set it
+    }
+
+    if (video.duration > 0 && initialTime > 0 && initialTime < video.duration) {
+      video.currentTime = initialTime;
+      setCurrentTime(initialTime);
+      initialTimeSetRef.current = true; // Mark that we've set the initial time
+    }
+  }, [initialTime, src]);
 
   const isEmbedPlayer = src.includes('vidking') || src.includes('embed');
 
@@ -517,8 +555,9 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     >
       {src.includes('vidking') || src.includes('embed') ? (
         // For embed URLs, use an iframe with vidking controls
+        // Key includes season/episode for TV shows to force remount when episode changes
         <iframe
-          key={`iframe-${mediaId}-${mediaType}`}
+          key={`iframe-${mediaId}-${mediaType}-${seasonNumber || 0}-${episodeNumber || 0}`}
           ref={iframeRef}
           src={stableSrc}
           className="w-full h-full"

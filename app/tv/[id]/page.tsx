@@ -137,8 +137,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     checkStatus();
   }, [session, tvShow, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
 
-  // Fetch saved watch progress
+  // Fetch saved watch progress - reset when episode changes
   useEffect(() => {
+    // Reset progress when episode changes
+    setSavedProgress(0);
+    setCurrentPlaybackTime(0);
+    
     if (!session?.user) return;
 
     const fetchWatchProgress = async () => {
@@ -146,10 +150,19 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         const response = await fetch('/api/watch-history');
         if (response.ok) {
           const data = await response.json();
-          const tvHistory = data.find((item: any) => item.mediaId === tmdbId && item.mediaType === 'tv');
-          if (tvHistory) {
+          // Find history for this specific episode (matching season AND episode)
+          const tvHistory = data.find((item: any) => 
+            item.mediaId === tmdbId && 
+            item.mediaType === 'tv' &&
+            item.seasonNumber === currentSeason &&
+            item.episodeNumber === currentEpisode
+          );
+          if (tvHistory && tvHistory.currentTime > 0) {
+            console.log('Found episode-specific progress:', tvHistory.currentTime, 'for S', currentSeason, 'E', currentEpisode);
             setSavedProgress(Math.floor(tvHistory.currentTime));
             setCurrentPlaybackTime(tvHistory.currentTime);
+          } else {
+            console.log('No saved progress for S', currentSeason, 'E', currentEpisode);
           }
         }
       } catch (error) {
@@ -158,18 +171,27 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     };
 
     fetchWatchProgress();
-  }, [session, tmdbId]);
+  }, [session, tmdbId, currentSeason, currentEpisode]);
 
   // Construct embed URL with useMemo to prevent unnecessary changes
+  // NOTE: We intentionally don't use the progress parameter as it causes the player to get stuck
+  // Instead, we show the user their saved progress and let them manually seek if needed
   const embedUrl = useMemo(
-    () => {
-      const baseUrl = `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoplay=1&nextEpisode=true`;
-      // Add progress parameter if we have saved progress
-      return savedProgress > 0 ? `${baseUrl}&progress=${savedProgress}` : baseUrl;
-    },
-    [tmdbId, currentSeason, currentEpisode, savedProgress]
+    () => `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`,
+    [tmdbId, currentSeason, currentEpisode]
   );
   const videoSrc = embedUrl; // Use videoSrc for ThemedVideoPlayer
+
+  // Format saved progress for display
+  const formatProgressTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const posterUrl = useMemo(
     () => tvShow?.poster_path 
@@ -226,7 +248,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 src={videoSrc}
                 poster={posterUrl}
                 autoplay={true}
-                initialTime={savedProgress > 0 ? savedProgress : currentPlaybackTime}
+                initialTime={0}
                 title={mediaTitle}
                 mediaId={tmdbId}
                 mediaType={mediaType}

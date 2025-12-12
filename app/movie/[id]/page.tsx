@@ -156,8 +156,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     checkStatus();
   }, [session, movie, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
 
-  // Fetch saved watch progress
+  // Fetch saved watch progress - reset on new movie
   useEffect(() => {
+    // Reset progress when movie changes
+    setSavedProgress(0);
+    setCurrentPlaybackTime(0);
+    
     if (!session?.user) return;
 
     const fetchWatchProgress = async () => {
@@ -168,10 +172,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           console.log('All watch history:', data);
           const movieHistory = data.find((item: any) => item.mediaId === tmdbId && item.mediaType === 'movie');
           console.log('Movie history for ID', tmdbId, ':', movieHistory);
-          if (movieHistory) {
+          if (movieHistory && movieHistory.currentTime > 0) {
             console.log('Setting savedProgress to:', movieHistory.currentTime, 'progress:', movieHistory.progress);
             setSavedProgress(Math.floor(movieHistory.currentTime));
             setCurrentPlaybackTime(movieHistory.currentTime);
+          } else {
+            console.log('No saved progress found for movie', tmdbId);
           }
         }
       } catch (error) {
@@ -184,17 +190,24 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   // Construct embed URL with useMemo to prevent unnecessary changes
   // Directly use tmdbId for Vidking Player as per their documentation
+  // NOTE: We intentionally don't use the progress parameter as it causes the player to get stuck
+  // Instead, we show the user their saved progress and let them manually seek if needed
   const embedUrl = useMemo(
-    () => {
-      const baseUrl = `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoplay=1`;
-      // Add progress parameter if we have saved progress
-      const finalUrl = savedProgress > 0 ? `${baseUrl}&progress=${savedProgress}` : baseUrl;
-      console.log('Embed URL:', finalUrl, 'savedProgress:', savedProgress);
-      return finalUrl;
-    },
-    [tmdbId, savedProgress]
+    () => `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoPlay=true`,
+    [tmdbId]
   );
   const videoSrc = embedUrl;
+
+  // Format saved progress for display
+  const formatProgressTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const posterUrl = useMemo(
     () => movie?.poster_path 
@@ -525,7 +538,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 src={videoSrc}
                 poster={posterUrl}
                 autoplay={true}
-                initialTime={savedProgress > 0 ? savedProgress : currentPlaybackTime}
+                initialTime={0}
                 title={mediaTitle}
                 mediaId={tmdbId}
                 mediaType={mediaType}
