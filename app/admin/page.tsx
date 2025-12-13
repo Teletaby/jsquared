@@ -12,10 +12,17 @@ export default function AdminPage() {
   const router = useRouter();
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(null);
   const [isChatbotMaintenanceMode, setIsChatbotMaintenanceMode] = useState<boolean | null>(null);
+  const [isLoggingEnabled, setIsLoggingEnabled] = useState<boolean | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const [loadingLogging, setLoadingLogging] = useState(true);
+  const [loadingVisitorLogs, setLoadingVisitorLogs] = useState(true);
   const [errorMaintenance, setErrorMaintenance] = useState<string | null>(null);
   const [togglingMaintenance, setTogglingMaintenance] = useState(false);
   const [togglingChatbotMaintenance, setTogglingChatbotMaintenance] = useState(false);
+  const [togglingLogging, setTogglingLogging] = useState(false);
+  const [visitorLogs, setVisitorLogs] = useState<any[]>([]);
+  const [visitorLogsCount, setVisitorLogsCount] = useState(0);
+  const [clearingLogs, setClearingLogs] = useState(false);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -24,6 +31,8 @@ export default function AdminPage() {
       router.push('/');
     } else {
       fetchMaintenanceStatus();
+      fetchLoggingStatus();
+      fetchVisitorLogs();
     }
   }, [session, status, router]);
 
@@ -95,6 +104,92 @@ export default function AdminPage() {
       console.error('Failed to toggle chatbot maintenance mode:', error);
     } finally {
       setTogglingChatbotMaintenance(false);
+    }
+  };
+
+  const fetchLoggingStatus = async () => {
+    setLoadingLogging(true);
+    try {
+      const res = await fetch('/api/admin/logging');
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+      const data = await res.json();
+      setIsLoggingEnabled(data.isLoggingEnabled);
+    } catch (error: any) {
+      console.error('Failed to fetch logging status:', error);
+      setIsLoggingEnabled(true); // Default to enabled
+    } finally {
+      setLoadingLogging(false);
+    }
+  };
+
+  const toggleLogging = async () => {
+    if (isLoggingEnabled === null) return;
+
+    setTogglingLogging(true);
+    try {
+      const res = await fetch('/api/admin/logging', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isLoggingEnabled: !isLoggingEnabled }),
+      });
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+      const data = await res.json();
+      setIsLoggingEnabled(data.isLoggingEnabled);
+    } catch (error: any) {
+      console.error('Failed to toggle logging:', error);
+    } finally {
+      setTogglingLogging(false);
+    }
+  };
+
+  const fetchVisitorLogs = async () => {
+    setLoadingVisitorLogs(true);
+    try {
+      const res = await fetch('/api/admin/visitor-logs?limit=20&page=1');
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+      const data = await res.json();
+      setVisitorLogs(data.logs || []);
+      setVisitorLogsCount(data.pagination?.totalCount || 0);
+    } catch (error: any) {
+      console.error('Failed to fetch visitor logs:', error);
+      setVisitorLogs([]);
+      setVisitorLogsCount(0);
+    } finally {
+      setLoadingVisitorLogs(false);
+    }
+  };
+
+  const clearVisitorLogs = async () => {
+    if (!confirm('Are you sure you want to delete ALL visitor logs? This action cannot be undone.')) {
+      return;
+    }
+
+    setClearingLogs(true);
+    try {
+      const res = await fetch('/api/admin/visitor-logs/delete', {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+      const data = await res.json();
+      console.log('Logs cleared:', data);
+      setVisitorLogs([]);
+      setVisitorLogsCount(0);
+      alert(`Successfully deleted ${data.deletedCount} logs`);
+    } catch (error: any) {
+      console.error('Failed to clear visitor logs:', error);
+      alert('Failed to clear logs');
+    } finally {
+      setClearingLogs(false);
     }
   };
 
@@ -179,6 +274,115 @@ export default function AdminPage() {
         <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-lg">
           <h2 className="text-2xl font-semibold mb-4 text-white">System Status</h2>
           <p className="text-gray-400">Monitor application health and performance (coming soon).</p>
+        </section>
+
+        <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold mb-4 text-white">Logging & Analytics</h2>
+          <p className="text-gray-400 mb-6">Manage visitor log collection and analytics tracking.</p>
+
+          {loadingLogging ? (
+            <div className="flex items-center">
+              <LoadingSpinner />
+              <p className="text-gray-400 ml-2">Loading logging status...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-gray-300">
+                      Logging Status: <span className={`font-bold ${isLoggingEnabled ? 'text-green-500' : 'text-red-500'}`}>
+                        {isLoggingEnabled ? 'ENABLED' : 'DISABLED'}
+                      </span>
+                    </p>
+                    <p className="text-gray-400 text-sm mt-2">Tracks visitor IP, browser, ISP, timestamps, and page interactions</p>
+                  </div>
+                  <button
+                    onClick={toggleLogging}
+                    disabled={togglingLogging}
+                    className={`px-6 py-3 rounded-lg text-white font-semibold transition-colors duration-200 flex items-center gap-2
+                      ${isLoggingEnabled
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : 'bg-green-600 hover:bg-green-700'}
+                      ${togglingLogging ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {togglingLogging && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                    {isLoggingEnabled ? 'Disable Logging' : 'Enable Logging'}
+                  </button>
+                </div>
+
+                {/* Visitor Logs Display */}
+                <div className="border-t border-gray-700 pt-6 mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-white">Visitor Logs</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={fetchVisitorLogs}
+                        disabled={loadingVisitorLogs}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2"
+                      >
+                        {loadingVisitorLogs && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                        Refresh Logs
+                      </button>
+                      <button
+                        onClick={clearVisitorLogs}
+                        disabled={clearingLogs}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors duration-200 flex items-center gap-2"
+                      >
+                        {clearingLogs && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                        Clear All Logs
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingVisitorLogs ? (
+                    <div className="flex items-center">
+                      <LoadingSpinner />
+                      <p className="text-gray-400 ml-2">Loading visitor logs...</p>
+                    </div>
+                  ) : visitorLogs.length > 0 ? (
+                    <div className="overflow-x-auto bg-gray-900 rounded-lg">
+                      <table className="w-full text-sm text-gray-300">
+                        <thead className="bg-gray-700 border-b border-gray-600">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">IP Address</th>
+                            <th className="px-4 py-3 text-left font-semibold">Browser</th>
+                            <th className="px-4 py-3 text-left font-semibold">Operating System</th>
+                            <th className="px-4 py-3 text-left font-semibold">Page URL</th>
+                            <th className="px-4 py-3 text-left font-semibold">Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visitorLogs.map((log: any, index: number) => (
+                            <tr key={index} className="border-b border-gray-700 hover:bg-gray-800 transition-colors">
+                              <td className="px-4 py-3 font-mono text-gray-400">{log.ipAddress || 'N/A'}</td>
+                              <td className="px-4 py-3">{log.browser || 'Unknown'}</td>
+                              <td className="px-4 py-3">{log.os || 'Unknown'}</td>
+                              <td className="px-4 py-3 truncate max-w-xs">{log.url || 'N/A'}</td>
+                              <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
+                                {log.timestamp 
+                                  ? new Date(log.timestamp).toLocaleString()
+                                  : 'N/A'
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div className="px-4 py-3 bg-gray-900 border-t border-gray-700 text-gray-400 text-sm">
+                        Total Visitors: <span className="font-bold text-white">{visitorLogsCount}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-gray-900 rounded-lg">
+                      <p className="text-gray-400">No visitor logs found</p>
+                      <p className="text-gray-500 text-sm mt-2">Logs will appear here when visitors browse your site</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </>
