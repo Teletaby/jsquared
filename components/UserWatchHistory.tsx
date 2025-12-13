@@ -94,7 +94,29 @@ export default function UserWatchHistory() {
     return null;
   }
 
-  if (watchHistory.length === 0) {
+  // Group TV shows to only show the latest episode
+  const consolidatedHistory = watchHistory.reduce((acc: WatchHistoryItem[], item: WatchHistoryItem) => {
+    if (item.mediaType === 'tv') {
+      // Check if we already have this TV show in the accumulated list
+      const existingIndex = acc.findIndex(
+        (h) => h.mediaId === item.mediaId && h.mediaType === 'tv'
+      );
+      if (existingIndex >= 0) {
+        // Since API already sorts by lastWatchedAt descending, first occurrence is newest
+        // Skip this item, keep the one already in the list
+        return acc;
+      } else {
+        // Add new TV show (this is the first/most recent episode for this show)
+        acc.push(item);
+      }
+    } else {
+      // For movies, just add directly
+      acc.push(item);
+    }
+    return acc;
+  }, []);
+
+  if (consolidatedHistory.length === 0) {
     return (
       <div className="my-8 text-center text-gray-400">
         <p className="text-lg">No watch history yet.</p>
@@ -129,10 +151,16 @@ export default function UserWatchHistory() {
           className="flex gap-4 overflow-x-auto pb-4 scroll-smooth hide-scrollbar" // Added hide-scrollbar
           style={{ scrollBehavior: 'smooth' }}
         >
-          {watchHistory.map((item) => (
+          {consolidatedHistory.map((item) => {
+            // Build href - for TV shows, include season and episode; for movies, just use the ID
+            const href = item.mediaType === 'tv' && item.seasonNumber !== undefined && item.episodeNumber !== undefined
+              ? `/${item.mediaType}/${item.mediaId}?season=${item.seasonNumber}&episode=${item.episodeNumber}`
+              : `/${item.mediaType}/${item.mediaId}`;
+
+            return (
             <Link
               key={item._id}
-              href={`/${item.mediaType}/${item.mediaId}`}
+              href={href}
               className="flex-shrink-0 group relative overflow-hidden rounded-lg w-[200px] h-auto transition-transform duration-300 hover:scale-105"
             >
               <div className="relative w-full bg-gray-900 flex flex-col h-full rounded-lg shadow-lg">
@@ -203,7 +231,8 @@ export default function UserWatchHistory() {
                 </div>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
 
         {/* Right Arrow */}

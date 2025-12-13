@@ -401,11 +401,14 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           console.log("Parsed message from embed player:", message);
           
           if (message.type === 'PLAYER_EVENT' && message.data) {
-            const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration } = message.data;
-            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration });
+            const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration, season: embedSeason, episode: embedEpisode } = message.data;
+            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, embedEpisode });
             
             // Check if this message is for our media
             if (String(id) === String(mediaId) && eventMediaType === mediaType) {
+              // For TV shows, use the season/episode from the embed player message if available
+              const effectiveSeasonNumber = embedSeason ?? seasonNumber;
+              const effectiveEpisodeNumber = embedEpisode ?? episodeNumber;
               setEmbedProgress(progress);
               setEmbedCurrentTime(eventCurrentTime);
               setEmbedDuration(eventDuration);
@@ -419,7 +422,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
               
               // For embed players, send immediately to database without throttle
               if (user && mediaId && eventMediaType) {
-                console.log('Immediately saving embed player progress to database');
+                console.log('Immediately saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber);
                 fetch('/api/watch-history', {
                   method: 'POST',
                   headers: {
@@ -434,8 +437,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                     currentTime: Math.floor(eventCurrentTime),
                     totalDuration: Math.floor(eventDuration),
                     totalPlayedSeconds: 0,
-                    seasonNumber: seasonNumber || undefined,
-                    episodeNumber: episodeNumber || undefined,
+                    seasonNumber: effectiveSeasonNumber,
+                    episodeNumber: effectiveEpisodeNumber,
                     finished: false,
                   }),
                 }).then(response => {

@@ -132,6 +132,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(watchHistory);
   } catch (error) {
     console.error('Error updating watch history:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Full error details:', error instanceof Error ? error.message : String(error));
+    console.error('Stack:', error instanceof Error ? error.stack : 'No stack');
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 }

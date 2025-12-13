@@ -34,7 +34,13 @@ export default function WatchlistButton({
     setIsInWatchlist(initialIsInWatchlist ?? false);
   }, [initialIsInWatchlist]);
 
-  const handleToggleWatchlist = async () => {
+  const handleToggleWatchlist = async (e?: React.MouseEvent) => {
+    // Stop event propagation to prevent parent click handlers
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
     if (!session?.user) {
       // Redirect to sign in
       window.location.href = '/signin';

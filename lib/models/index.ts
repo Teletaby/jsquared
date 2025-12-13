@@ -146,7 +146,12 @@ const settingsSchema = new Schema(
 );
 
 // Create unique compound indexes
-watchHistorySchema.index({ userId: 1, mediaId: 1, mediaType: 1 }, { unique: true });
+// For TV shows, we need seasonNumber and episodeNumber to distinguish episodes
+// For movies, we only need userId, mediaId, and mediaType
+watchHistorySchema.index(
+  { userId: 1, mediaId: 1, mediaType: 1, seasonNumber: 1, episodeNumber: 1 },
+  { unique: true, sparse: true } // sparse allows null seasonNumber/episodeNumber for movies
+);
 watchlistSchema.index({ userId: 1, mediaId: 1, mediaType: 1 }, { unique: true });
 
 // Models
