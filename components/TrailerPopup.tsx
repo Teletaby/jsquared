@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
 interface TrailerPopupProps {
   trailerKey: string;
@@ -9,10 +10,10 @@ interface TrailerPopupProps {
 
 const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
+  useDisableScroll(isOpen);
 
   useEffect(() => {
     setIsOpen(true);
-    document.body.classList.add('overflow-hidden'); // Disable scrolling
 
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -22,7 +23,6 @@ const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
     window.addEventListener('keydown', handleEsc);
 
     return () => {
-      document.body.classList.remove('overflow-hidden'); // Re-enable scrolling
       window.removeEventListener('keydown', handleEsc);
     };
   }, []);
@@ -34,20 +34,20 @@ const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex justify-center items-center transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-50 flex justify-center items-center transition-opacity duration-300 p-4 pt-24 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
       onClick={handleClose}
     >
       <div
-        className={`relative bg-black p-4 rounded-lg shadow-xl w-full max-w-3xl transition-all duration-300 transform-gpu ${isOpen ? 'transform scale-100 opacity-100' : 'transform scale-95 opacity-0'}`}
+        className={`relative bg-black p-3 sm:p-4 rounded-lg shadow-xl w-full max-w-3xl transition-all duration-300 transform-gpu ${isOpen ? 'transform scale-100 opacity-100' : 'transform scale-95 opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={handleClose}
-          className="absolute -top-4 -right-4 bg-white text-black rounded-full p-2 hover:bg-gray-200 transition-colors z-10"
+          className="absolute -top-3 sm:-top-4 -right-3 sm:-right-4 bg-white text-black rounded-full p-1.5 sm:p-2 hover:bg-gray-200 transition-colors z-10"
           aria-label="Close trailer"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -58,7 +58,7 @@ const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             title="YouTube video player"
-            className="w-full h-full"
+            className="w-full h-full min-h-[200px] sm:min-h-[400px]"
           ></iframe>
         </div>
       </div>

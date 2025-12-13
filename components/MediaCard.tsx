@@ -14,6 +14,7 @@ export interface Media {
   vote_average?: number;
   media_type?: 'movie' | 'tv';
   name?: string;
+  isUpcoming?: boolean;
 }
 
 interface MediaCardProps {

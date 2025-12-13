@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { PlayCircle, PauseCircle, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the useAuth hook
+import { trackFrameLoad, getCachedMetrics, prefetchVidkingResources, clearExpiredCache } from '@/lib/videoPerformance';
 
 interface ThemedVideoPlayerProps {
   src: string; // The URL of the video file (e.g., .mp4, .webm)
@@ -57,6 +58,63 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const [embedCurrentTime, setEmbedCurrentTime] = useState(0);
   const [embedDuration, setEmbedDuration] = useState(0);
   const { user } = useAuth(); // Get current user for watch history
+  const [iframeReady, setIframeReady] = useState(false); // Track if iframe is ready
+  const iframePreloadRef = useRef<HTMLIFrameElement | null>(null); // For preloading iframe
+
+  // Preload iframe in the background for faster loading
+  useEffect(() => {
+    if (!stableSrc.includes('vidking')) return;
+    
+    // Clear expired cache entries
+    clearExpiredCache();
+    
+    // Prefetch vidking resources
+    prefetchVidkingResources();
+    
+    // Check if we have cached metrics
+    const cachedMetrics = getCachedMetrics(mediaId);
+    const isCached = cachedMetrics !== null;
+    
+    const startTime = Date.now();
+    
+    // Create a hidden preload iframe to warm up the embed
+    const preloadFrame = document.createElement('iframe');
+    preloadFrame.src = stableSrc;
+    preloadFrame.style.display = 'none';
+    preloadFrame.style.width = '1px';
+    preloadFrame.style.height = '1px';
+    preloadFrame.allow = 'autoplay';
+    
+    const onLoadComplete = () => {
+      const endTime = Date.now();
+      trackFrameLoad(mediaId, startTime, endTime, isCached);
+      console.log(`Preload frame loaded in ${endTime - startTime}ms (cached: ${isCached})`);
+    };
+    
+    preloadFrame.onload = onLoadComplete;
+    preloadFrame.onerror = onLoadComplete; // Track even if there's an error
+    
+    document.body.appendChild(preloadFrame);
+    iframePreloadRef.current = preloadFrame;
+    
+    // Clean up the preload iframe after 5 seconds
+    const timeoutId = setTimeout(() => {
+      if (iframePreloadRef.current && iframePreloadRef.current.parentNode) {
+        document.body.removeChild(iframePreloadRef.current);
+      }
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      if (iframePreloadRef.current && iframePreloadRef.current.parentNode) {
+        try {
+          document.body.removeChild(iframePreloadRef.current);
+        } catch (e) {
+          // Already removed
+        }
+      }
+    };
+  }, [stableSrc, mediaId]);
 
   // Function to toggle play/pause
   const togglePlayPause = useCallback(() => {
@@ -567,9 +625,19 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           allowFullScreen
           allow="autoplay"
           title={title}
+          loading="eager"
           onLoad={() => {
+            const cachedMetrics = getCachedMetrics(mediaId);
+            if (!cachedMetrics) {
+              // Track main frame load if not already cached
+              trackFrameLoad(mediaId, Date.now(), Date.now(), false);
+            }
             setIsLoading(false);
             embedLoadedRef.current = true;
+            setIframeReady(true);
+          }}
+          onError={() => {
+            setIsLoading(false);
           }}
         />
       ) : (
@@ -586,6 +654,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           className="w-full h-full object-contain"
           muted
           title={title}
+          preload="metadata"
         >
           Your browser does not support the video tag.
         </video>

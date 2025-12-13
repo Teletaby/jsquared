@@ -16,6 +16,8 @@ interface CarouselItem {
   overview?: string;
   vote_average?: number;
   media_type?: 'movie' | 'tv';
+  release_date?: string;
+  first_air_date?: string;
 }
 
 interface HeroCarouselProps {
@@ -167,19 +169,31 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
 
                 {/* Buttons */}
                 <div className="flex gap-3">
-                  <button
-                    onClick={handlePlay}
-                    onMouseEnter={() => setIsWatchButtonHovered(true)}
-                    onMouseLeave={() => setIsWatchButtonHovered(false)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-300 hover:scale-105 ${
-                      isWatchButtonHovered 
-                        ? 'bg-red-700 text-white' 
-                        : 'bg-white text-black'
-                    }`}
-                  >
-                    <Play size={20} fill="currentColor" />
-                    <span>Watch Now</span>
-                  </button>
+                  {(() => {
+                    const releaseDate = mediaType === 'movie' ? currentItem?.release_date : currentItem?.first_air_date;
+                    const isUnreleased = releaseDate ? new Date(releaseDate) > new Date() : false;
+                    
+                    return (
+                      <button
+                        onClick={handlePlay}
+                        disabled={isUnreleased}
+                        onMouseEnter={() => setIsWatchButtonHovered(!isUnreleased)}
+                        onMouseLeave={() => setIsWatchButtonHovered(false)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                          isUnreleased
+                            ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-60'
+                            : `hover:scale-105 ${
+                                isWatchButtonHovered 
+                                  ? 'bg-red-700 text-white' 
+                                  : 'bg-white text-black'
+                              }`
+                        }`}
+                      >
+                        <Play size={20} fill="currentColor" />
+                        <span>{isUnreleased ? 'Coming Soon' : 'Watch Now'}</span>
+                      </button>
+                    );
+                  })()}
                   <button
                     onClick={handleMoreInfo}
                     className="flex items-center gap-2 bg-white/30 text-white p-3 rounded-lg font-semibold hover:bg-white/50 transition-all duration-300 backdrop-blur-md border border-white/30"

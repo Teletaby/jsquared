@@ -5,12 +5,20 @@ import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { formatDuration } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
+import dynamic from 'next/dynamic';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
+
+// Lazy load the video player for better performance
+const ThemedVideoPlayer = dynamic(() => import('@/components/ThemedVideoPlayer'), {
+  loading: () => <div className="w-full h-[600px] bg-gray-900 flex items-center justify-center rounded-lg"><div className="text-gray-400">Loading player...</div></div>,
+  ssr: false,
+});
+
+import VideoInfoPopup from '@/components/VideoInfoPopup';
 
 interface MovieDetailPageProps {
   params: {
@@ -264,6 +272,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
+      {/* Preload vidking.net for faster video loading */}
+      <link rel="dns-prefetch" href="https://www.vidking.net" />
+      <link rel="preconnect" href="https://www.vidking.net" />
+      <link rel="preload" as="frame" href={embedUrl} />
+      
       <Header />
 
       {view === 'info' && (
@@ -282,8 +295,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             {/* Trailer Video Background - fades in on top of backdrop */}
             {trailerKey && (
               <div 
-                className="absolute top-0 left-0 w-screen h-full overflow-hidden transition-opacity duration-1000 ease-in-out"
-                style={{ opacity: trailerLoaded ? 1 : 0, visibility: trailerLoaded ? 'visible' : 'hidden' }}
+                className="absolute top-0 left-0 w-screen h-full overflow-hidden"
+                style={{ 
+                  opacity: trailerLoaded ? 1 : 0, 
+                  pointerEvents: trailerLoaded ? 'auto' : 'none',
+                  transition: 'opacity 1000ms ease-in-out'
+                }}
               >
                 <iframe
                   src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
@@ -337,7 +354,18 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   {movie.status && (
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-xs text-gray-400 uppercase">STATUS</span>
-                      <span className="text-sm md:text-lg font-bold text-white">{movie.status}</span>
+                      <span className="text-sm md:text-lg font-bold text-white">
+                        {(() => {
+                          if (movie.release_date) {
+                            const releaseDate = new Date(movie.release_date);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            releaseDate.setHours(0, 0, 0, 0);
+                            return releaseDate > today ? 'Unreleased' : 'Released';
+                          }
+                          return movie.status;
+                        })()}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -370,10 +398,17 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 <div className="flex flex-wrap gap-3 items-center">
                   <button
                     onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
-                    style={{ backgroundColor: '#E50914' }}
-                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg"
+                    disabled={movie.release_date ? new Date(movie.release_date) > new Date() : false}
+                    style={{ 
+                      backgroundColor: movie.release_date && new Date(movie.release_date) > new Date() ? '#666666' : '#E50914'
+                    }}
+                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg ${
+                      movie.release_date && new Date(movie.release_date) > new Date()
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'hover:brightness-110'
+                    }`}
                   >
-                    <span>▶</span> Play
+                    <span>▶</span> {movie.release_date && new Date(movie.release_date) > new Date() ? 'Coming Soon' : 'Play'}
                   </button>
                   <button
                     onClick={() => setActiveTab('overview')}
@@ -595,6 +630,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                       alt={mediaTitle}
                       width={200}
                       height={300}
+                      priority={true}
+                      loading="eager"
+                      placeholder="blur"
+                      blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
                       className="w-full h-auto group-hover:brightness-110 transition-all duration-500"
                     />
                   </div>
@@ -605,20 +644,23 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               <div className="md:col-span-3 space-y-6">
                 {/* Title and Quick Info */}
                 <div>
-                  <h1 className="text-4xl md:text-5xl font-bold mb-2 text-white">
-                    {mediaTitle}
-                  </h1>
+                  <div className="flex items-start sm:items-center gap-2 mb-2 flex-wrap">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
+                      {mediaTitle}
+                    </h1>
+                    <VideoInfoPopup title={mediaTitle} />
+                  </div>
                   {movie.tagline && (
-                    <p className="text-base text-gray-400 font-light">"{movie.tagline}"</p>
+                    <p className="text-sm sm:text-base text-gray-400 font-light">"{movie.tagline}"</p>
                   )}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   <button
                     disabled
                     style={{ backgroundColor: '#1A1A1A' }}
-                    className="text-gray-500 font-bold py-3 px-6 rounded opacity-50 cursor-not-allowed border border-gray-700"
+                    className="text-gray-500 font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm opacity-50 cursor-not-allowed border border-gray-700"
                   >
                     Watch on TV
                   </button>
@@ -634,7 +676,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
                 {/* Rating and Quick Info */}
                 <div className="text-gray-400">
-                  <div className="flex flex-wrap gap-4 text-base">
+                  <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-base">
                     {movie.vote_average && (
                       <span className="font-semibold">Rating: {movie.vote_average.toFixed(1)}</span>
                     )}
@@ -648,11 +690,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 </div>
 
                 {/* Tab Buttons */}
-                <div className="flex gap-3">
+                <div className="flex gap-2 sm:gap-3 flex-wrap">
                   <button
                     onClick={() => setActiveTab('overview')}
                     style={{ backgroundColor: activeTab === 'overview' ? '#E50914' : 'transparent' }}
-                    className={`font-bold py-3 px-6 rounded transition-all ${
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-sm sm:text-base transition-all ${
                       activeTab === 'overview'
                         ? 'text-white'
                         : 'text-gray-400 hover:text-white border border-gray-700'
@@ -663,7 +705,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   <button
                     onClick={() => setActiveTab('cast')}
                     style={{ backgroundColor: activeTab === 'cast' ? '#E50914' : 'transparent' }}
-                    className={`font-bold py-3 px-6 rounded transition-all ${
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-sm sm:text-base transition-all ${
                       activeTab === 'cast'
                         ? 'text-white'
                         : 'text-gray-400 hover:text-white border border-gray-700'

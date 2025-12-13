@@ -13,6 +13,7 @@ import { useAuth } from '@/lib/hooks/useAuth'; // Import the useAuth hook
 const navItems = [
   { name: 'Movies', href: '/movies' },
   { name: 'TV Shows', href: '/tv' },
+  { name: 'Upcoming', href: '/upcoming' },
 ];
 
 const Header = () => {
@@ -32,16 +33,17 @@ const Header = () => {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-2xl text-white shadow-2xl border-b border-white/20">
-        <div className="flex justify-between items-center p-4 px-8 max-w-full">
-          <Link href="/" className="flex items-center gap-3 text-2xl font-bold text-blue-500 tracking-wider hover:opacity-80 transition-opacity">
+        <div className="flex justify-between items-center p-3 sm:p-4 px-4 sm:px-8 max-w-full">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl font-bold text-blue-500 tracking-wider hover:opacity-80 transition-opacity">
             <Image
               src="/jsquare.png"
               alt="J-Squared Cinema Logo"
               width={32}
               height={32}
-              className="h-8 w-8"
+              className="h-7 w-7 sm:h-8 sm:w-8"
             />
-            <span>J-Squared Cinema</span>
+            <span className="hidden sm:inline">J-Squared Cinema</span>
+            <span className="sm:hidden">J²</span>
           </Link>
 
           {/* Desktop Navigation */}

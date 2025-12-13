@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
 interface Episode {
   episode_number: number;
@@ -29,6 +30,7 @@ export default function EpisodeSelector({
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  useDisableScroll(true); // Always disable scroll when this modal is mounted
 
   useEffect(() => {
     if (!tvShowId) return;
@@ -70,11 +72,11 @@ export default function EpisodeSelector({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div className="bg-neutral-900 p-5 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 pt-24">
+      <div className="bg-neutral-900 p-4 sm:p-5 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl text-white">{showTitle}</h2>
-          <button onClick={onClose} className="text-white text-2xl hover:text-gray-400 transition-colors">&times;</button>
+          <h2 className="text-xl sm:text-2xl text-white break-words">{showTitle}</h2>
+          <button onClick={onClose} className="text-white text-xl sm:text-2xl hover:text-gray-400 transition-colors flex-shrink-0">&times;</button>
         </div>
 
         {loading && <div className="text-center text-gray-400">Loading episodes...</div>}
@@ -101,10 +103,9 @@ export default function EpisodeSelector({
                       <li 
                         key={episode.episode_number} 
                         onClick={() => handleEpisodeClick(episode.episode_number)} 
-                        className="p-3 bg-neutral-800 rounded hover:bg-neutral-700 cursor-pointer text-gray-300 flex justify-between items-center transition-colors duration-200"
+                        className="p-2 sm:p-3 bg-neutral-800 rounded hover:bg-neutral-700 cursor-pointer text-gray-300 flex justify-between items-center transition-colors duration-200 text-xs sm:text-sm"
                       >
                         <span className="font-semibold">Episode {episode.episode_number}: {episode.name}</span>
-                        {/* Optional: Add episode overview or runtime here */}
                       </li>
                     ))}
                   </ul>

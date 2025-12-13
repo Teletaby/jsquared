@@ -12,6 +12,7 @@ import { formatDuration } from '@/lib/utils';
 import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
+import VideoInfoPopup from '@/components/VideoInfoPopup';
 
 
 interface TvDetailPageProps {
@@ -282,8 +283,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {/* Trailer Video Background - fades in on top of backdrop */}
             {trailerKey && (
               <div 
-                className="absolute top-0 left-0 w-screen h-full overflow-hidden transition-opacity duration-1000 ease-in-out"
-                style={{ opacity: trailerLoaded ? 1 : 0, visibility: trailerLoaded ? 'visible' : 'hidden' }}
+                className="absolute top-0 left-0 w-screen h-full overflow-hidden"
+                style={{ 
+                  opacity: trailerLoaded ? 1 : 0, 
+                  pointerEvents: trailerLoaded ? 'auto' : 'none',
+                  transition: 'opacity 1000ms ease-in-out'
+                }}
               >
                 <iframe
                   src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
@@ -340,6 +345,21 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                       <span className="text-sm md:text-lg font-bold text-white">{tvShow.seasons.length}</span>
                     </div>
                   )}
+
+                  {tvShow.first_air_date && (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-xs text-gray-400 uppercase">STATUS</span>
+                      <span className="text-sm md:text-lg font-bold text-white">
+                        {(() => {
+                          const firstAirDate = new Date(tvShow.first_air_date);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          firstAirDate.setHours(0, 0, 0, 0);
+                          return firstAirDate > today ? 'Unreleased' : 'Released';
+                        })()}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Genres */}
@@ -365,10 +385,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 <div className="flex flex-wrap gap-3 items-center">
                   <button
                     onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
-                    style={{ backgroundColor: '#E50914' }}
-                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 hover:brightness-110 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg"
+                    disabled={tvShow.first_air_date ? new Date(tvShow.first_air_date) > new Date() : false}
+                    style={{ 
+                      backgroundColor: tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? '#666666' : '#E50914'
+                    }}
+                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg ${
+                      tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date()
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'hover:brightness-110'
+                    }`}
                   >
-                    <span>▶</span> Watch
+                    <span>▶</span> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
                   </button>
                   <button
                     onClick={() => setActiveTab('overview')}
@@ -572,26 +599,29 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           <div className="md:col-span-3 space-y-6">
             {/* Title Section */}
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold mb-2 text-white">
-                {mediaTitle}
-              </h1>
+              <div className="flex items-start sm:items-center gap-2 mb-2 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
+                  {mediaTitle}
+                </h1>
+                <VideoInfoPopup title={mediaTitle} />
+              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {view !== 'info' ? (
                 <>
                   <button
                     onClick={() => setShowEpisodeSelector(true)}
                     style={{ backgroundColor: '#E50914' }}
-                    className="text-white font-bold py-3 px-6 rounded transition-all duration-300 hover:brightness-110"
+                    className="text-white font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded transition-all duration-300 hover:brightness-110"
                   >
                     Select Episode (S{currentSeason}E{currentEpisode})
                   </button>
                   <button
                     disabled
                     style={{ backgroundColor: '#1A1A1A' }}
-                    className="text-gray-500 font-bold py-3 px-6 rounded opacity-50 cursor-not-allowed border border-gray-700"
+                    className="text-gray-500 font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded opacity-50 cursor-not-allowed border border-gray-700"
                   >
                     Watch on TV
                   </button>
@@ -600,7 +630,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 <button
                   onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
                   style={{ backgroundColor: '#E50914' }}
-                  className="text-white font-bold py-3 px-6 rounded transition-all duration-300 hover:brightness-110"
+                  className="text-white font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded transition-all duration-300 hover:brightness-110"
                 >
                   Watch Now
                 </button>
@@ -617,7 +647,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
             {/* Rating and Quick Info */}
             <div className="text-gray-400">
-              <div className="flex flex-wrap gap-4 text-base">
+              <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-base">
                 {tvShow.vote_average && (
                   <span className="font-semibold">Rating: {tvShow.vote_average.toFixed(1)}</span>
                 )}

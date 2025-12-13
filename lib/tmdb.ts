@@ -154,6 +154,30 @@ export async function getPopularTvShows(page: string = '1') {
   return fetchFromTMDB('/tv/popular', { page });
 }
 
+// Get unreleased movies (with future release dates, sorted by popularity)
+export async function getUnreleasedMovies(page: string = '1') {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0]; // Get tomorrow's date in YYYY-MM-DD format
+  return fetchFromTMDB('/discover/movie', {
+    'primary_release_date.gte': tomorrowStr,
+    'sort_by': 'popularity.desc',
+    'page': page,
+  });
+}
+
+// Get unreleased TV shows (with future air dates, sorted by popularity)
+export async function getUnreleasedTvShows(page: string = '1') {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0]; // Get tomorrow's date in YYYY-MM-DD format
+  return fetchFromTMDB('/discover/tv', {
+    'first_air_date.gte': tomorrowStr,
+    'sort_by': 'popularity.desc',
+    'page': page,
+  });
+}
+
 // Get movie details
 export async function getMovieDetails(movieId: number): Promise<MovieDetails | null> {
   const params = {
