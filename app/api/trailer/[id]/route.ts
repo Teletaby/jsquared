@@ -26,11 +26,29 @@ export async function GET(
     }
 
     if (videos && videos.results && videos.results.length > 0) {
-      const trailer = videos.results.find((vid: any) => vid.type === 'Trailer' && vid.site === 'YouTube');
+      // First, try to find a YouTube Trailer type video
+      let trailer = videos.results.find((vid: any) => vid.type === 'Trailer' && vid.site === 'YouTube');
+      
+      // If no Trailer found, try other video types in order of preference
+      if (!trailer) {
+        // Try Teaser
+        trailer = videos.results.find((vid: any) => vid.type === 'Teaser' && vid.site === 'YouTube');
+      }
+      
+      if (!trailer) {
+        // Try Clip
+        trailer = videos.results.find((vid: any) => vid.type === 'Clip' && vid.site === 'YouTube');
+      }
+      
+      if (!trailer) {
+        // Last resort: any YouTube video
+        trailer = videos.results.find((vid: any) => vid.site === 'YouTube');
+      }
+      
       if (trailer) {
         return NextResponse.json({ trailerKey: trailer.key });
       } else {
-        console.log(`No YouTube 'Trailer' type video found for media ID ${id}. All videos found:`, videos.results);
+        console.log(`No suitable YouTube video found for media ID ${id}. All videos found:`, videos.results);
       }
     } else {
       console.log(`No video results found for media ID ${id}.`);

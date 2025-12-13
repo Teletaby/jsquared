@@ -48,6 +48,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [trailerLoaded, setTrailerLoaded] = useState(false);
   // const [isPaused, setIsPaused] = useState(false); // Removed, handled by ThemedVideoPlayer
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const router = useRouter();
@@ -111,14 +112,31 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       setError(null);
       setMovie(null);
       setTrailerKey(null);
+      setTrailerLoaded(false);
 
       try {
         const data: MediaDetails | null = await getMovieDetails(tmdbId);
         const castData = await getCastDetails('movie', tmdbId);
         
-        // Fetch trailer videos
+        // Fetch trailer videos with fallback mechanism
         const videosData = await getMovieVideos(tmdbId);
-        const trailerVideo = videosData?.results?.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
+        let trailerVideo = videosData?.results?.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
+        
+        // Fallback: try Teaser if no Trailer found
+        if (!trailerVideo) {
+          trailerVideo = videosData?.results?.find((video: any) => video.type === 'Teaser' && video.site === 'YouTube');
+        }
+        
+        // Fallback: try Clip if no Teaser found
+        if (!trailerVideo) {
+          trailerVideo = videosData?.results?.find((video: any) => video.type === 'Clip' && video.site === 'YouTube');
+        }
+        
+        // Last resort: any YouTube video
+        if (!trailerVideo) {
+          trailerVideo = videosData?.results?.find((video: any) => video.site === 'YouTube');
+        }
+        
         if (trailerVideo) {
           setTrailerKey(trailerVideo.key);
         }
@@ -252,28 +270,40 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         <>
           {/* Hero Section with Trailer Background */}
           <div className="relative h-screen flex flex-col justify-center overflow-hidden mt-16">
-            {/* Trailer Video Background - Full viewport width, scaled to cover */}
-            {trailerKey && (
-              <>
-                <div className="absolute top-0 left-0 w-screen h-full overflow-hidden">
-                  <iframe
-                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
-                    frameBorder="0"
-                    allow="autoplay; encrypted-media"
-                    className="absolute top-1/2 left-1/2 min-w-full min-h-full"
-                    style={{ 
-                      pointerEvents: 'none', 
-                      transform: 'translate(-50%, -50%) scale(1.5)',
-                      width: '177.78vh',
-                      height: '100vh'
-                    }}
-                  ></iframe>
-                </div>
-                
-                {/* Fade Overlay */}
-                <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
-              </>
+            {/* Backdrop Image - always shown first as base layer */}
+            {movie?.backdrop_path && (
+              <img
+                src={`https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`}
+                alt="backdrop"
+                className="absolute top-0 left-0 w-full h-full object-cover"
+              />
             )}
+
+            {/* Trailer Video Background - fades in on top of backdrop */}
+            {trailerKey && (
+              <div 
+                className="absolute top-0 left-0 w-screen h-full overflow-hidden transition-opacity duration-1000 ease-in-out"
+                style={{ opacity: trailerLoaded ? 1 : 0, visibility: trailerLoaded ? 'visible' : 'hidden' }}
+              >
+                <iframe
+                  src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
+                  frameBorder="0"
+                  allow="autoplay; encrypted-media"
+                  onLoad={() => setTrailerLoaded(true)}
+                  className="absolute top-1/2 left-1/2 min-w-full min-h-full"
+                  style={{ 
+                    pointerEvents: 'none', 
+                    transform: 'translate(-50%, -50%) scale(1.5)',
+                    width: '177.78vh',
+                    height: '100vh',
+                    border: 'none'
+                  }}
+                ></iframe>
+              </div>
+            )}
+
+            {/* Fade Overlay */}
+            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
 
             {/* Content Overlay */}
             <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">

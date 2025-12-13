@@ -38,7 +38,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
     if (onClick) {
       onClick();
     } else {
-      router.push(`/${mediaTypeForPath}/${media.id}`);
+      router.push(`/${mediaTypeForPath}/${media.id}?view=info`);
     }
   };
 
