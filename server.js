@@ -30,9 +30,13 @@ app.prepare().then(() => {
 
   const io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: process.env.NODE_ENV === 'production' 
+        ? process.env.NEXT_PUBLIC_APP_URL || ['https://*', 'http://localhost:3000']
+        : ['http://localhost:3000', 'http://localhost:3001'],
       methods: ['GET', 'POST'],
+      credentials: true,
     },
+    transports: ['websocket', 'polling'],
   });
 
   // Track room connections

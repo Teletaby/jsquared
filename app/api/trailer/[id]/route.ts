@@ -1,6 +1,43 @@
 import { NextResponse } from 'next/server';
 import { getMovieVideos, getTvShowVideos } from '@/lib/tmdb';
 
+// Function to check if a YouTube video is age-restricted
+async function isVideoAgeRestricted(videoId: string): Promise<boolean> {
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEY;
+    if (!apiKey) {
+      console.warn('YouTube API key not configured - skipping age restriction check');
+      return false;
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${apiKey}&part=contentDetails`
+    );
+
+    if (!response.ok) {
+      console.warn('Failed to check video age restriction:', response.statusText);
+      return false;
+    }
+
+    const data = await response.json();
+    if (data.items && data.items.length > 0) {
+      const contentDetails = data.items[0].contentDetails;
+      // Check if video has age-restricted rating (18+)
+      const rating = contentDetails?.contentRating?.ytRating;
+      const isRestricted = rating === 'ytAgeRestricted';
+      if (isRestricted) {
+        console.log(`Video ${videoId} is age-restricted`);
+      }
+      return isRestricted;
+    }
+  } catch (error) {
+    console.error('Error checking video age restriction:', error);
+    // Default to allowing the video if we can't check
+    return false;
+  }
+  return false;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -46,6 +83,16 @@ export async function GET(
       }
       
       if (trailer) {
+        // Check if the video is age-restricted
+        const isRestricted = await isVideoAgeRestricted(trailer.key);
+        if (isRestricted) {
+          // Return indication that video is age-restricted
+          return NextResponse.json({ 
+            trailerKey: null,
+            ageRestricted: true,
+            message: 'Trailer is age-restricted and cannot be embedded'
+          });
+        }
         return NextResponse.json({ trailerKey: trailer.key });
       } else {
         console.log(`No suitable YouTube video found for media ID ${id}. All videos found:`, videos.results);

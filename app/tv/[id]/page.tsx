@@ -13,6 +13,7 @@ import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the cu
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
+import MarkdownBoldText from '@/components/MarkdownBoldText';
 
 
 interface TvDetailPageProps {
@@ -65,7 +66,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLoaded, setTrailerLoaded] = useState(false);
-  // const [isPaused, setIsPaused] = useState(false); // Removed, handled by ThemedVideoPlayer
+  const [trailerError, setTrailerError] = useState(false);
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
   const [castInfo, setCastInfo] = useState<CastDetails | null>(null);
@@ -103,34 +104,28 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       setInitialIsInWatchlist(undefined); // Reset watchlist status
       setTrailerKey(null);
       setTrailerLoaded(false);
+      setTrailerError(false);
 
       try {
-        const [tvData, castData, videosData] = await Promise.all([
+        const [tvData, castData] = await Promise.all([
           getTvShowDetails(tmdbId),
           getCastDetails(mediaType, tmdbId), // Fetch cast details here
-          getTvShowVideos(tmdbId) // Fetch trailer videos
         ]);
 
-        // Extract trailer key with fallback mechanism
-        let trailerVideo = videosData?.results?.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
-        
-        // Fallback: try Teaser if no Trailer found
-        if (!trailerVideo) {
-          trailerVideo = videosData?.results?.find((video: any) => video.type === 'Teaser' && video.site === 'YouTube');
-        }
-        
-        // Fallback: try Clip if no Teaser found
-        if (!trailerVideo) {
-          trailerVideo = videosData?.results?.find((video: any) => video.type === 'Clip' && video.site === 'YouTube');
-        }
-        
-        // Last resort: any YouTube video
-        if (!trailerVideo) {
-          trailerVideo = videosData?.results?.find((video: any) => video.site === 'YouTube');
-        }
-        
-        if (trailerVideo) {
-          setTrailerKey(trailerVideo.key);
+        // Fetch trailer using the API endpoint that checks for age restrictions
+        try {
+          const trailerResponse = await fetch(`/api/trailer/${tmdbId}?mediaType=tv`);
+          if (trailerResponse.ok) {
+            const trailerData = await trailerResponse.json();
+            if (trailerData.trailerKey) {
+              setTrailerKey(trailerData.trailerKey);
+            } else if (trailerData.ageRestricted) {
+              console.log('Trailer is age-restricted, hiding trailer');
+              setTrailerError(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching trailer:', error);
         }
 
         if (tvData && tvData.id) {
@@ -281,7 +276,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             )}
 
             {/* Trailer Video Background - fades in on top of backdrop */}
-            {trailerKey && (
+            {trailerKey && !trailerError && (
               <div 
                 className="absolute top-0 left-0 w-screen h-full overflow-hidden"
                 style={{ 
@@ -290,11 +285,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   transition: 'opacity 1000ms ease-in-out'
                 }}
               >
-                <iframe
-                  src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
+                <iframe                  id="trailerPlayer"                  src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
                   frameBorder="0"
                   allow="autoplay; encrypted-media"
                   onLoad={() => setTrailerLoaded(true)}
+                  onError={() => setTrailerError(true)}
                   className="absolute top-1/2 left-1/2 min-w-full min-h-full"
                   style={{ 
                     pointerEvents: 'none', 
@@ -503,7 +498,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                               )}
                             </div>
                           </div>
-                          <p className="text-gray-400 leading-relaxed mb-3 text-sm">{review.content.substring(0, 400)}{review.content.length > 400 ? '...' : ''}</p>
+                          <p className="text-gray-400 leading-relaxed mb-3 text-sm">
+                            <MarkdownBoldText text={review.content.substring(0, 400)} />
+                            {review.content.length > 400 ? '...' : ''}
+                          </p>
                           <a href={review.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:brightness-110 text-sm font-semibold transition-all inline-flex items-center gap-1 group">
                             Read Full Review <span className="group-hover:translate-x-1 transition-transform">→</span>
                           </a>
@@ -727,7 +725,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                               )}
                             </div>
                           </div>
-                          <p className="text-gray-300 text-sm leading-relaxed">{review.content.substring(0, 300)}{review.content.length > 300 ? '...' : ''}</p>
+                          <p className="text-gray-300 text-sm leading-relaxed">
+                            <MarkdownBoldText text={review.content.substring(0, 300)} />
+                            {review.content.length > 300 ? '...' : ''}
+                          </p>
                         </div>
                       ))}
                     </div>

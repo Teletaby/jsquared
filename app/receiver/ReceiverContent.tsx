@@ -69,7 +69,13 @@ const ReceiverContent = () => {
     });
 
     // Initialize Socket.IO connection
-    const socket = io();
+    const socket = io({
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ['websocket', 'polling'],
+    });
     socketRef.current = socket;
     
     socket.on('connect', () => {
@@ -114,6 +120,16 @@ const ReceiverContent = () => {
       clearInterval(statusCheckInterval);
       setIsConnected(false);
       setRemoteConnected(false);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Receiver connection error:', error);
+      setIsConnected(false);
+    });
+
+    socket.on('error', (error) => {
+      console.error('Receiver socket error:', error);
+      setIsConnected(false);
     });
 
     // Also listen for user-left events

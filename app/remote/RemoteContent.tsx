@@ -35,7 +35,12 @@ const RemoteContent = () => {
     if (actualRoomId && actualRoomId !== '') {
       console.log('Remote useEffect triggered with roomId:', actualRoomId);
       setShowCodeInput(false);
-      const socket = io();
+      const socket = io({
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5
+      });
       socketRef.current = socket;
       
       socket.on('connect', () => {
@@ -67,6 +72,16 @@ const RemoteContent = () => {
         console.log('Remote disconnected from server');
         setIsConnected(false);
         setCurrentVideoType(null);
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('Remote connection error:', error);
+        setIsConnected(false);
+      });
+
+      socket.on('error', (error) => {
+        console.error('Remote socket error:', error);
+        setIsConnected(false);
       });
 
       return () => {
