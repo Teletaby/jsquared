@@ -34,14 +34,22 @@ const RemoteContent = () => {
   useEffect(() => {
     if (actualRoomId && actualRoomId !== '') {
       console.log('Remote useEffect triggered with roomId:', actualRoomId);
+      console.log('Window location:', typeof window !== 'undefined' ? window.location.origin : 'N/A');
       setShowCodeInput(false);
-      const socket = io({
+      
+      const socketConfig = {
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5
-      });
+        reconnectionAttempts: 5,
+        transports: ['websocket', 'polling'],
+      };
+      console.log('Initializing Socket.IO with config:', socketConfig);
+      
+      const socket = io(socketConfig);
       socketRef.current = socket;
+      
+      console.log('Socket.IO client created, attempting connection...');
       
       socket.on('connect', () => {
         console.log('Remote connected to server, socket ID:', socket.id);

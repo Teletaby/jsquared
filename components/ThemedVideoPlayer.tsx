@@ -637,6 +637,38 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             setIsLoading(false);
             embedLoadedRef.current = true;
             setIframeReady(true);
+            
+            // Send initial watch history entry when embed loads
+            if (user && mediaId && mediaType) {
+              console.log('Sending initial watch history entry for embed player');
+              fetch('/api/watch-history', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  mediaId,
+                  mediaType,
+                  title,
+                  posterPath,
+                  progress: 0,
+                  currentTime: 0,
+                  totalDuration: 0,
+                  totalPlayedSeconds: 0,
+                  seasonNumber: seasonNumber || undefined,
+                  episodeNumber: episodeNumber || undefined,
+                  finished: false,
+                }),
+              }).then(response => {
+                if (!response.ok) {
+                  console.error('Initial watch history entry failed:', response.status);
+                } else {
+                  console.log('Initial watch history entry created');
+                }
+              }).catch(error => {
+                console.error('Failed to create initial watch history entry:', error);
+              });
+            }
           }}
           onError={() => {
             setIsLoading(false);

@@ -30,13 +30,21 @@ app.prepare().then(() => {
 
   const io = new Server(server, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? process.env.NEXT_PUBLIC_APP_URL || ['https://*', 'http://localhost:3000']
-        : ['http://localhost:3000', 'http://localhost:3001'],
+      origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or Postman)
+        if(!origin) return callback(null, true);
+        
+        // In production, allow from any origin since this is self-hosted
+        // Socket.IO will only relay to connected clients anyway
+        callback(null, true);
+      },
       methods: ['GET', 'POST'],
       credentials: true,
+      allowEIO3: true,
     },
     transports: ['websocket', 'polling'],
+    pingInterval: 25000,
+    pingTimeout: 60000,
   });
 
   // Track room connections

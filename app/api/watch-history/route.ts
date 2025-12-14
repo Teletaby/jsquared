@@ -106,12 +106,13 @@ export async function POST(request: NextRequest) {
       updateData.totalPlayedSeconds = totalPlayedSeconds || 0;
       updateData.lastWatchedAt = new Date();
     } else {
-      // In vidsrc mode: only track history, no progress timestamp
+      // In vidsrc mode: only track history metadata (title, season, episode), no progress counter
       updateData.progress = 0;
       updateData.currentTime = 0;
       updateData.totalDuration = 0;
       updateData.totalPlayedSeconds = 0;
-      // Don't update lastWatchedAt to preserve old timestamps from vidking
+      // Still update lastWatchedAt so it shows in Continue Watching
+      updateData.lastWatchedAt = new Date();
     }
 
     // Only include seasonNumber and episodeNumber if they have valid values
