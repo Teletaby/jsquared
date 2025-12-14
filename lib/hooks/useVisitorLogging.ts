@@ -9,7 +9,6 @@ export function useVisitorLogging() {
   useEffect(() => {
     // Skip logging for admin users
     if (session?.user?.role === 'admin') {
-      console.log('Skipping visitor logging for admin user');
       return;
     }
 
@@ -17,16 +16,12 @@ export function useVisitorLogging() {
     
     // Skip logging for admin page
     if (pathname.startsWith('/admin')) {
-      console.log('Skipping visitor logging for admin page');
       return;
     }
-
-    console.log('useVisitorLogging hook mounted, starting visitor logging...');
     
     // Use localStorage to prevent duplicate logs within 5 seconds
     const logKey = `logged_${pathname}_${Math.floor(Date.now() / 5000)}`;
     if (sessionStorage.getItem(logKey)) {
-      console.log('Skipping duplicate log for this page in current session');
       return;
     }
     sessionStorage.setItem(logKey, 'true');
@@ -36,7 +31,6 @@ export function useVisitorLogging() {
       try {
         // Use a small delay to ensure page is ready
         setTimeout(async () => {
-          console.log('Sending visitor log to API...');
           const response = await fetch('/api/visitor-log', {
             method: 'POST',
             headers: {
@@ -49,16 +43,14 @@ export function useVisitorLogging() {
             }),
           });
           
-          const result = await response.json();
-          console.log('Visitor log API response:', result);
+          await response.json();
           
           if (!response.ok) {
-            console.warn('Visitor logging API returned non-ok status:', response.status);
+            // Silently fail
           }
         }, 100);
       } catch (error) {
         // Silently fail
-        console.debug('Error in visitor logging:', error);
       }
     };
 

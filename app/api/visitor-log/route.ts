@@ -5,10 +5,8 @@ import { isLoggingEnabled } from '@/lib/loggingState';
 export async function POST(request: Request) {
   // Check if logging is enabled globally
   const loggingEnabled = isLoggingEnabled();
-  console.log('Visitor logging request received. Logging enabled:', loggingEnabled);
   
   if (!loggingEnabled) {
-    console.log('Logging is disabled, skipping log entry');
     return NextResponse.json({ message: 'Logging is disabled' }, { status: 200 });
   }
 
@@ -21,8 +19,6 @@ export async function POST(request: Request) {
       pageLoadTime,
       userId,
     } = body;
-
-    console.log('Processing visitor log for URL:', url);
 
     // Get IP address
     const ipAddress =
@@ -82,18 +78,8 @@ export async function POST(request: Request) {
       userId: userId || undefined,
     };
 
-    console.log('Prepared visitor log:', {
-      ipAddress,
-      browser: browserName,
-      os: operatingSystem,
-      url,
-    });
-
     // Log visitor asynchronously without blocking response
-    logVisitor(visitorLog).then(() => {
-      console.log('Visitor log saved successfully');
-    }).catch((error) => {
-      console.error('Error logging visitor to database:', error);
+    logVisitor(visitorLog).catch((error) => {
       // Don't throw - let the response go through even if logging fails
     });
 
@@ -102,7 +88,6 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error('Error in visitor logging API:', error);
     // Return success anyway to not block the user experience
     return NextResponse.json(
       { message: 'Request processed' },

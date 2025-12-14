@@ -147,7 +147,6 @@ export default function AdminPage() {
       const data = await res.json();
       setIsLoggingEnabled(data.isLoggingEnabled);
     } catch (error: any) {
-      console.error('Failed to fetch logging status:', error);
       setIsLoggingEnabled(true); // Default to enabled
     } finally {
       setLoadingLogging(false);
@@ -172,7 +171,6 @@ export default function AdminPage() {
       const data = await res.json();
       setIsLoggingEnabled(data.isLoggingEnabled);
     } catch (error: any) {
-      console.error('Failed to toggle logging:', error);
     } finally {
       setTogglingLogging(false);
     }
@@ -189,7 +187,6 @@ export default function AdminPage() {
       setVisitorLogs(data.logs || []);
       setVisitorLogsCount(data.pagination?.totalCount || 0);
     } catch (error: any) {
-      console.error('Failed to fetch visitor logs:', error);
       setVisitorLogs([]);
       setVisitorLogsCount(0);
     } finally {
@@ -211,12 +208,10 @@ export default function AdminPage() {
         throw new Error(`Error: ${res.status}`);
       }
       const data = await res.json();
-      console.log('Logs cleared:', data);
       setVisitorLogs([]);
       setVisitorLogsCount(0);
       alert(`Successfully deleted ${data.deletedCount} logs`);
     } catch (error: any) {
-      console.error('Failed to clear visitor logs:', error);
       alert('Failed to clear logs');
     } finally {
       setClearingLogs(false);

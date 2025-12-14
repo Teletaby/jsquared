@@ -52,8 +52,6 @@ export async function POST(request: Request) {
     // Update logging state
     setLoggingEnabled(newLoggingState);
 
-    console.log(`Logging ${newLoggingState ? 'enabled' : 'disabled'} by admin`);
-
     return NextResponse.json({
       isLoggingEnabled: isLoggingEnabled(),
       message: `Logging has been ${newLoggingState ? 'enabled' : 'disabled'}`,
