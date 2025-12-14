@@ -81,7 +81,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl backdrop-blur-lg bg-white/10 border border-white/20 p-4 sm:p-6 text-left align-middle shadow-xl transition-all max-h-[90vh] overflow-y-auto">
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl backdrop-blur-lg bg-white/10 border border-white/20 p-4 sm:p-6 text-left align-middle shadow-xl transition-all max-h-[90vh]">
                 <Dialog.Title as="h3" className="text-lg sm:text-2xl font-bold leading-6 text-white flex justify-between items-center">
                   Advanced Search
                   <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-800 transition-colors">

@@ -323,10 +323,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
 
             {/* Content Overlay */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
+            <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full">
               <div className="max-w-2xl">
                 {/* Title */}
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-3 drop-shadow-2xl">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-2xl">
                   {mediaTitle}
                 </h1>
 
@@ -619,29 +619,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               </div>
             )}
 
-            {/* Content Grid - Poster + Info for Watch View */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Poster */}
-              <div className="md:col-span-1">
-                <div className="sticky top-24 group">
-                  <div className="relative overflow-hidden rounded">
-                    <Image
-                      src={posterUrl}
-                      alt={mediaTitle}
-                      width={200}
-                      height={300}
-                      priority={true}
-                      loading="eager"
-                      placeholder="blur"
-                      blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-                      className="w-full h-auto group-hover:brightness-110 transition-all duration-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
+            {/* Content Grid - Info for Watch View */}
+            <div className="grid grid-cols-1 gap-6">
               {/* Info Section */}
-              <div className="md:col-span-3 space-y-6">
+              <div className="space-y-6">
                 {/* Title and Quick Info */}
                 <div>
                   <div className="flex items-start sm:items-center gap-2 mb-2 flex-wrap">
