@@ -6,7 +6,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -68,6 +68,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
+  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
   
   const { id } = params;
   const tmdbId = parseInt(id);
@@ -209,14 +210,26 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     fetchWatchProgress();
   }, [session, tmdbId]);
 
+  // Fetch video source setting
+  useEffect(() => {
+    const fetchVideoSource = async () => {
+      const source = await getVideoSourceSetting();
+      setVideoSource(source);
+    };
+    fetchVideoSource();
+  }, []);
+
   // Construct embed URL with useMemo to prevent unnecessary changes
-  // Directly use tmdbId for Vidking Player as per their documentation
+  // Directly use tmdbId for Vidking or Vidsrc Player as per their documentation
   // NOTE: We intentionally don't use the progress parameter as it causes the player to get stuck
   // Instead, we show the user their saved progress and let them manually seek if needed
-  const embedUrl = useMemo(
-    () => `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoPlay=true`,
-    [tmdbId]
-  );
+  const embedUrl = useMemo(() => {
+    if (videoSource === 'vidsrc') {
+      return `https://vidsrc.icu/embed/movie/${tmdbId}`;
+    } else {
+      return `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoPlay=true`;
+    }
+  }, [tmdbId, videoSource]);
   const videoSrc = embedUrl;
 
   // Format saved progress for display

@@ -8,7 +8,7 @@ import Header from '@/components/Header';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
 import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
@@ -75,6 +75,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
+  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -197,13 +198,25 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchWatchProgress();
   }, [session, tmdbId, currentSeason, currentEpisode]);
 
+  // Fetch video source setting
+  useEffect(() => {
+    const fetchVideoSource = async () => {
+      const source = await getVideoSourceSetting();
+      setVideoSource(source);
+    };
+    fetchVideoSource();
+  }, []);
+
   // Construct embed URL with useMemo to prevent unnecessary changes
   // NOTE: We intentionally don't use the progress parameter as it causes the player to get stuck
   // Instead, we show the user their saved progress and let them manually seek if needed
-  const embedUrl = useMemo(
-    () => `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`,
-    [tmdbId, currentSeason, currentEpisode]
-  );
+  const embedUrl = useMemo(() => {
+    if (videoSource === 'vidsrc') {
+      return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
+    } else {
+      return `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`;
+    }
+  }, [tmdbId, currentSeason, currentEpisode, videoSource]);
   const videoSrc = embedUrl; // Use videoSrc for ThemedVideoPlayer
 
   // Format saved progress for display

@@ -5,7 +5,8 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { getVideoSourceSetting } from '@/lib/utils';
 
 interface WatchHistoryItem {
   _id: string;
@@ -29,6 +30,7 @@ export default function UserWatchHistory() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
   const scrollContainerRef: any = React.useRef(null);
 
   // Function to check scrollability
@@ -46,22 +48,27 @@ export default function UserWatchHistory() {
       return;
     }
 
-    const fetchWatchHistory = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/watch-history?limit=10');
-        if (response.ok) {
-          const data = await response.json();
+        // Fetch watch history
+        const historyResponse = await fetch('/api/watch-history?limit=10');
+        if (historyResponse.ok) {
+          const data = await historyResponse.json();
           console.log('Watch history data from API:', data);
           setWatchHistory(data);
         }
+
+        // Fetch video source setting
+        const source = await getVideoSourceSetting();
+        setVideoSource(source);
       } catch (error) {
-        console.error('Error fetching watch history:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchWatchHistory();
+    fetchData();
   }, [session]);
 
   useEffect(() => {
@@ -129,10 +136,21 @@ export default function UserWatchHistory() {
 
   return (
     <div className="my-8">
-      <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
-        <span className="w-1 h-6 bg-accent rounded-full"></span>
-        Continue Watching
-      </h2>
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+          <span className="w-1 h-6 bg-accent rounded-full"></span>
+          Continue Watching
+        </h2>
+        {videoSource === 'vidsrc' && (
+          <div className="ml-auto flex items-center gap-2 bg-yellow-500/20 border border-yellow-500/50 px-4 py-2 rounded-lg">
+            <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-yellow-300 font-semibold">Progress saving will be back soon</span>
+              <span className="text-xs text-yellow-200">Primary source is currently not available</span>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="relative px-2"> {/* Added px-2 here */}
         {/* Left Arrow */}

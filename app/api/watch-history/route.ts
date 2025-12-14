@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/mongodb';
-import { WatchHistory, User } from '@/lib/models';
+import { WatchHistory, User, Settings } from '@/lib/models';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,39 +56,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds } = await request.json();
-    console.log('Saving watch history:', { mediaId, mediaType, title, progress, currentTime, totalDuration, seasonNumber, episodeNumber, totalPlayedSeconds });
+    // Get current video source setting
+    let settings = await Settings.findOne({ key: 'app_settings' });
+    const videoSource = settings?.videoSource || 'vidking';
+    const isVidsrcMode = videoSource === 'vidsrc';
 
-    // Calculate progress as percentage if not provided
-    // For embed players where totalDuration might be 0, estimate based on typical video length
-    let calculatedProgress = progress;
-    
-    if (calculatedProgress === undefined || calculatedProgress === null) {
-      if (totalDuration && currentTime) {
-        calculatedProgress = Math.round((currentTime / totalDuration) * 100);
-      } else if (currentTime && !totalDuration) {
-        // For embed players without duration info, estimate based on typical movie/episode length
-        // Assume average movie is ~120 minutes or episode is ~45 minutes
-        const estimatedDuration = 120 * 60; // Default to 120 minutes in seconds
-        calculatedProgress = Math.round((currentTime / estimatedDuration) * 100);
-        // Cap progress at 99% to show it's not fully watched
-        if (calculatedProgress > 99) calculatedProgress = 99;
-      } else {
-        calculatedProgress = 0;
-      }
-    } else {
-      // If progress is provided (from embed player)
-      // Vidking sends progress as a decimal (0.2257 = 0.2257%), so keep decimals
-      // But if it's >= 1, treat it as already in 0-100 range and round it
-      if (calculatedProgress < 1) {
-        // Small decimal value (0-1), likely already a percentage but in decimal form
-        // Keep it as-is or round to 1 decimal place for display
-        calculatedProgress = Math.round(calculatedProgress * 10) / 10;
-      } else {
-        // Large value, likely in 0-100 range
-        calculatedProgress = Math.max(0, Math.min(100, Math.round(calculatedProgress)));
-      }
-    }
+    const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds } = await request.json();
+    console.log('Saving watch history:', { mediaId, mediaType, title, progress, currentTime, totalDuration, seasonNumber, episodeNumber, totalPlayedSeconds, videoSource });
 
     // Build the update object dynamically
     const updateData: any = {
@@ -97,13 +71,48 @@ export async function POST(request: NextRequest) {
       mediaType,
       title,
       posterPath,
-      progress: calculatedProgress,
-      currentTime: currentTime || 0,
-      totalDuration: totalDuration || 0,
-      totalPlayedSeconds: totalPlayedSeconds || 0,
       finished: finished || false,
-      lastWatchedAt: new Date(),
     };
+
+    // Only update progress-related fields if NOT in vidsrc mode
+    if (!isVidsrcMode) {
+      // Calculate progress as percentage if not provided
+      let calculatedProgress = progress;
+      
+      if (calculatedProgress === undefined || calculatedProgress === null) {
+        if (totalDuration && currentTime) {
+          calculatedProgress = Math.round((currentTime / totalDuration) * 100);
+        } else if (currentTime && !totalDuration) {
+          // For embed players without duration info, estimate based on typical movie/episode length
+          const estimatedDuration = 120 * 60; // Default to 120 minutes in seconds
+          calculatedProgress = Math.round((currentTime / estimatedDuration) * 100);
+          // Cap progress at 99% to show it's not fully watched
+          if (calculatedProgress > 99) calculatedProgress = 99;
+        } else {
+          calculatedProgress = 0;
+        }
+      } else {
+        // If progress is provided (from embed player)
+        if (calculatedProgress < 1) {
+          calculatedProgress = Math.round(calculatedProgress * 10) / 10;
+        } else {
+          calculatedProgress = Math.max(0, Math.min(100, Math.round(calculatedProgress)));
+        }
+      }
+
+      updateData.progress = calculatedProgress;
+      updateData.currentTime = currentTime || 0;
+      updateData.totalDuration = totalDuration || 0;
+      updateData.totalPlayedSeconds = totalPlayedSeconds || 0;
+      updateData.lastWatchedAt = new Date();
+    } else {
+      // In vidsrc mode: only track history, no progress timestamp
+      updateData.progress = 0;
+      updateData.currentTime = 0;
+      updateData.totalDuration = 0;
+      updateData.totalPlayedSeconds = 0;
+      // Don't update lastWatchedAt to preserve old timestamps from vidking
+    }
 
     // Only include seasonNumber and episodeNumber if they have valid values
     if (seasonNumber !== undefined && seasonNumber !== null) {
