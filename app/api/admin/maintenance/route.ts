@@ -16,14 +16,18 @@ async function ensureSettingsDocument() {
     settings = await Settings.create({ 
       key: 'app_settings', 
       isMaintenanceMode: false,
-      isChatbotMaintenanceMode: false
+      isChatbotMaintenanceMode: false,
+      videoSource: 'vidking'
     });
   } else {
-    // Ensure existing documents have both fields
+    // Ensure existing documents have all fields
     if (settings.isChatbotMaintenanceMode === undefined) {
       settings.isChatbotMaintenanceMode = false;
-      await settings.save();
     }
+    if (settings.videoSource === undefined) {
+      settings.videoSource = 'vidking';
+    }
+    await settings.save();
   }
   return settings;
 }
@@ -35,12 +39,14 @@ export async function GET() {
     
     console.log('Fetched settings:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
-      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode 
+      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
+      videoSource: settings.videoSource
     });
 
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
-      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false
+      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
+      videoSource: settings.videoSource || 'vidking'
     }, { status: 200 });
   } catch (error) {
     console.error('Error fetching maintenance mode:', error);
@@ -56,7 +62,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const { isMaintenanceMode, isChatbotMaintenanceMode } = await req.json();
+    const { isMaintenanceMode, isChatbotMaintenanceMode, videoSource } = await req.json();
 
     if (isMaintenanceMode !== undefined && typeof isMaintenanceMode !== 'boolean') {
       return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
@@ -66,6 +72,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
     }
 
+    if (videoSource !== undefined && !['vidking', 'vidsrc'].includes(videoSource)) {
+      return NextResponse.json({ message: 'Invalid video source' }, { status: 400 });
+    }
+
     const settings = await ensureSettingsDocument();
     if (isMaintenanceMode !== undefined) {
       settings.isMaintenanceMode = isMaintenanceMode;
@@ -73,22 +83,28 @@ export async function POST(req: NextRequest) {
     if (isChatbotMaintenanceMode !== undefined) {
       settings.isChatbotMaintenanceMode = isChatbotMaintenanceMode;
     }
+    if (videoSource !== undefined) {
+      settings.videoSource = videoSource;
+    }
     
     console.log('Saving settings:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
-      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode 
+      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
+      videoSource: settings.videoSource
     });
     
     await settings.save();
     
     console.log('Settings saved:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
-      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode 
+      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
+      videoSource: settings.videoSource
     });
 
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
-      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false
+      isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
+      videoSource: settings.videoSource || 'vidking'
     });
   } catch (error) {
     console.error('Error updating maintenance mode:', error);

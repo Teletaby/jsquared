@@ -63,7 +63,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Preload iframe in the background for faster loading
   useEffect(() => {
-    if (!stableSrc.includes('vidking')) return;
+    if (!stableSrc.includes('vidking') && !stableSrc.includes('vidsrc')) return;
     
     // Clear expired cache entries
     clearExpiredCache();
@@ -246,7 +246,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Reset player state when episode/movie changes (for embed players)
   useEffect(() => {
-    if (src.includes('vidking') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
       // Reset states for new content
       setIsLoading(true);
       embedLoadedRef.current = false;
@@ -266,7 +266,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     initialTimeSetRef.current = false;
 
     // Skip all video logic for embed URLs
-    if (src.includes('vidking') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
       return;
     }
 
@@ -322,7 +322,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       }
       // Page is now visible
       // For embed players, immediately clear loading if it has loaded
-      if (src.includes('vidking') || src.includes('embed')) {
+      if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
         if (embedLoadedRef.current) {
           setIsLoading(false);
         }
@@ -363,8 +363,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   // Separate effect to apply initial time when metadata is loaded (only once per video)
   // NOTE: Skip this for embed players - they handle progress via URL parameters
   useEffect(() => {
-    // Skip for embed players - Vidking handles progress via URL parameter
-    if (src.includes('vidking') || src.includes('embed')) {
+    // Skip for embed players - Vidking/Vidsrc handle progress via URL parameter
+    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
       return;
     }
 
@@ -380,7 +380,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     }
   }, [initialTime, src]);
 
-  const isEmbedPlayer = src.includes('vidking') || src.includes('embed');
+  const isEmbedPlayer = src.includes('vidking') || src.includes('vidsrc') || src.includes('embed');
 
   const sendWatchHistoryUpdate = useCallback(async (
     currentProgress: number,
@@ -614,8 +614,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       onMouseEnter={() => { setIsHovering(true); setShowControls(true); }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {src.includes('vidking') || src.includes('embed') ? (
-        // For embed URLs, use an iframe with vidking controls
+      {src.includes('vidking') || src.includes('vidsrc') || src.includes('embed') ? (
+        // For embed URLs, use an iframe with vidking/vidsrc controls
         // Key includes season/episode for TV shows to force remount when episode changes
         <iframe
           key={`iframe-${mediaId}-${mediaType}-${seasonNumber || 0}-${episodeNumber || 0}`}
@@ -626,6 +626,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           allow="autoplay"
           title={title}
           loading="eager"
+          scrolling="no"
+          style={{ overflow: 'hidden' }}
           onLoad={() => {
             const cachedMetrics = getCachedMetrics(mediaId);
             if (!cachedMetrics) {

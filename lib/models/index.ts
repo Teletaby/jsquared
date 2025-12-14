@@ -141,6 +141,11 @@ const settingsSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    videoSource: {
+      type: String,
+      enum: ['vidking', 'vidsrc'],
+      default: 'vidking',
+    },
   },
   { timestamps: true }
 );

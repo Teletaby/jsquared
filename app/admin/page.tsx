@@ -13,6 +13,7 @@ export default function AdminPage() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(null);
   const [isChatbotMaintenanceMode, setIsChatbotMaintenanceMode] = useState<boolean | null>(null);
   const [isLoggingEnabled, setIsLoggingEnabled] = useState<boolean | null>(null);
+  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc' | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
   const [loadingLogging, setLoadingLogging] = useState(true);
   const [loadingVisitorLogs, setLoadingVisitorLogs] = useState(true);
@@ -20,6 +21,7 @@ export default function AdminPage() {
   const [togglingMaintenance, setTogglingMaintenance] = useState(false);
   const [togglingChatbotMaintenance, setTogglingChatbotMaintenance] = useState(false);
   const [togglingLogging, setTogglingLogging] = useState(false);
+  const [togglingVideoSource, setTogglingVideoSource] = useState(false);
   const [visitorLogs, setVisitorLogs] = useState<any[]>([]);
   const [visitorLogsCount, setVisitorLogsCount] = useState(0);
   const [clearingLogs, setClearingLogs] = useState(false);
@@ -47,6 +49,7 @@ export default function AdminPage() {
       const data = await res.json();
       setIsMaintenanceMode(data.isMaintenanceMode);
       setIsChatbotMaintenanceMode(data.isChatbotMaintenanceMode || false);
+      setVideoSource(data.videoSource || 'vidking');
     } catch (error: any) {
       setErrorMaintenance(error.message);
       console.error('Failed to fetch maintenance status:', error);
@@ -104,6 +107,33 @@ export default function AdminPage() {
       console.error('Failed to toggle chatbot maintenance mode:', error);
     } finally {
       setTogglingChatbotMaintenance(false);
+    }
+  };
+
+  const toggleVideoSource = async () => {
+    if (videoSource === null) return;
+
+    const newSource = videoSource === 'vidking' ? 'vidsrc' : 'vidking';
+    setTogglingVideoSource(true);
+    setErrorMaintenance(null);
+    try {
+      const res = await fetch('/api/admin/maintenance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ videoSource: newSource }),
+      });
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+      const data = await res.json();
+      setVideoSource(data.videoSource);
+    } catch (error: any) {
+      setErrorMaintenance(error.message);
+      console.error('Failed to toggle video source:', error);
+    } finally {
+      setTogglingVideoSource(false);
     }
   };
 
@@ -259,6 +289,31 @@ export default function AdminPage() {
                 >
                   {togglingChatbotMaintenance && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                   {isChatbotMaintenanceMode ? 'Deactivate Chatbot Maintenance' : 'Activate Chatbot Maintenance'}
+                </button>
+              </div>
+
+              <div className="border-t border-gray-700 pt-6">
+                <p className="text-gray-300 mb-4">
+                  Video Source: <span className={`font-bold ${videoSource === 'vidsrc' ? 'text-yellow-500' : 'text-blue-500'}`}>
+                    {videoSource?.toUpperCase() || 'VIDKING'}
+                  </span>
+                </p>
+                <p className="text-gray-400 text-sm mb-4">
+                  {videoSource === 'vidsrc' 
+                    ? 'Currently using VidSrc - Progress tracking is disabled'
+                    : 'Currently using VidKing - Full progress tracking enabled'}
+                </p>
+                <button
+                  onClick={toggleVideoSource}
+                  disabled={togglingVideoSource}
+                  className={`px-6 py-3 rounded-lg text-white font-semibold transition-colors duration-200 flex items-center gap-2
+                    ${videoSource === 'vidsrc'
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-yellow-600 hover:bg-yellow-700'}
+                    ${togglingVideoSource ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {togglingVideoSource && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                  Switch to {videoSource === 'vidsrc' ? 'VidKing' : 'VidSrc'}
                 </button>
               </div>
             </div>
