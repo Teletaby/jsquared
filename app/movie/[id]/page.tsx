@@ -823,7 +823,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {videoSource === 'vidsrc' && (
                   <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3 mt-4">
                     <p className="text-yellow-300 text-xs sm:text-sm">
-                      ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                      ⚠️ You are currently using Source 2. Source 2 might be faster than Source 1, but some selections might not display content properly. If you experience any issues, switch back to Source 1.
                     </p>
                   </div>
                 )}
