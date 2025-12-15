@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Loader } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 
 
 interface Message {
@@ -30,6 +31,7 @@ const TypingIndicator = () => (
 );
 
 const Chatbot = () => {
+  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [showChatbot, setShowChatbot] = useState(false); // New state for managing rendering
   const [messages, setMessages] = useState<Message[]>([
@@ -39,6 +41,13 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
   const [isChatbotUnderMaintenance, setIsChatbotUnderMaintenance] = useState(false);
   const chatEndRef = useRef<null | HTMLDivElement>(null);
+
+  // Only show chatbot for admin users
+  const isAdmin = session?.user?.role === 'admin';
+
+  if (!isAdmin) {
+    return null;
+  }
 
   // Fetch chatbot maintenance status
   useEffect(() => {
@@ -76,8 +85,8 @@ const Chatbot = () => {
   const handleSendMessage = async () => {
     if (inputValue.trim() === '') return;
 
-    // Check if chatbot is under maintenance
-    if (isChatbotUnderMaintenance) {
+    // Check if chatbot is under maintenance (but admins can always use it)
+    if (isChatbotUnderMaintenance && !isAdmin) {
       const maintenanceMessage: Message = { text: "The chatbot is currently under maintenance. Please try again later.", sender: 'bot' };
       setMessages(prev => [...prev, maintenanceMessage]);
       setInputValue('');
@@ -149,7 +158,7 @@ const Chatbot = () => {
             </button>
           </div>
           <div className="flex-grow p-4 overflow-y-auto bg-background relative">
-            {isChatbotUnderMaintenance ? (
+            {isChatbotUnderMaintenance && !isAdmin ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 rounded-b-lg">
                 <Loader className="text-accent mb-4 animate-spin" size={48} />
                 <p className="text-white text-center font-semibold">Chatbot is under maintenance</p>
@@ -178,14 +187,14 @@ const Chatbot = () => {
           <div className="p-2 border-t border-gray-700 flex">
             <input
               type="text"
-              placeholder={isChatbotUnderMaintenance ? "Chatbot is under maintenance..." : isLoading ? "Gemini is thinking..." : "Type your message..."}
+              placeholder={isChatbotUnderMaintenance && !isAdmin ? "Chatbot is under maintenance..." : isLoading ? "Gemini is thinking..." : "Type your message..."}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               className="w-full bg-gray-800 text-white p-2 rounded-l-md focus:outline-none"
-              disabled={isLoading || isChatbotUnderMaintenance}
+              disabled={isLoading || (isChatbotUnderMaintenance && !isAdmin)}
             />
-            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isLoading || isChatbotUnderMaintenance}>
+            <button onClick={handleSendMessage} className="bg-accent p-2 rounded-r-md" disabled={isLoading || (isChatbotUnderMaintenance && !isAdmin)}>
               <Send className="text-white" />
             </button>
           </div>

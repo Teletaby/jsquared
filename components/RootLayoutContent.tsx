@@ -11,12 +11,18 @@ import { Providers } from '@/app/providers';
 import MaintenancePage from '@/app/maintenance/page';
 import { useSession } from 'next-auth/react';
 import LoadingSpinner from './LoadingSpinner'; // Assuming you have a LoadingSpinner component
+import { disableConsoleInProduction } from '@/lib/disableConsole';
 
 export default function RootLayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isLoadingMaintenanceStatus, setIsLoadingMaintenanceStatus] = useState(true);
+
+  // Disable console in production on mount
+  useEffect(() => {
+    disableConsoleInProduction();
+  }, []);
 
   useEffect(() => {
     async function fetchMaintenanceStatus() {

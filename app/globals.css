@@ -6,6 +6,27 @@
 
 html {
   @apply overflow-x-hidden;
+  /* Custom scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: #E50914 #1A1A1A;
+}
+
+/* Chrome, Safari and Edge scrollbar styling */
+html::-webkit-scrollbar {
+  width: 10px;
+}
+
+html::-webkit-scrollbar-track {
+  background: #1A1A1A;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: #E50914;
+  border-radius: 5px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: #ff1a25;
 }
 
 body {

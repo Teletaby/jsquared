@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchMulti } from '@/lib/tmdb';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
+    // Get IP for rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+
+    // Apply rate limiting
+    if (!checkRateLimit(`search_${ip}`, RATE_LIMITS.SEARCH)) {
+      return NextResponse.json(
+        { error: 'Too many search requests. Please try again later.', results: [] },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query');
     const type = searchParams.get('type') || 'multi';

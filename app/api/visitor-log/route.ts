@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { logVisitor, VisitorLog } from '@/lib/visitorLogging';
+import { VisitorLog } from '@/lib/visitorLogging';
+import { queueVisitorLog } from '@/lib/visitorLoggingBatch';
 import { isLoggingEnabled } from '@/lib/loggingState';
 
 export async function POST(request: Request) {
@@ -78,9 +79,10 @@ export async function POST(request: Request) {
       userId: userId || undefined,
     };
 
-    // Log visitor asynchronously without blocking response
-    logVisitor(visitorLog).catch((error) => {
+    // Queue visitor log for batch writing (async, non-blocking)
+    queueVisitorLog(visitorLog).catch((error) => {
       // Don't throw - let the response go through even if logging fails
+      console.error('[Visitor Log API] Error queuing log:', error);
     });
 
     return NextResponse.json(

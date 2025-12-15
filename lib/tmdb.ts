@@ -1,3 +1,5 @@
+import { getFromCache, setCache, CACHE_TTL } from './cache';
+
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -97,8 +99,18 @@ export const phobiaKeywords: { [key: string]: number } = {
   'Cynophobia (Fear of Dogs)': 16668,
 };
 
-// Helper function to fetch from TMDB API
+// Helper function to fetch from TMDB API with caching
 async function fetchFromTMDB(endpoint: string, params: Record<string, string> = {}) {
+  // Create cache key from endpoint and params
+  const cacheKey = `tmdb_${endpoint}_${JSON.stringify(params)}`;
+  
+  // Check cache first
+  const cached = getFromCache<any>(cacheKey);
+  if (cached) {
+    console.log(`[TMDB Cache] Hit: ${endpoint}`);
+    return cached;
+  }
+
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   url.searchParams.append('api_key', TMDB_API_KEY || '');
 
@@ -117,7 +129,15 @@ async function fetchFromTMDB(endpoint: string, params: Record<string, string> = 
       return null;
     }
 
-    return await response.json();
+    const data = await response.json();
+    
+    // Cache the result (generic TMDB data: 24 hours)
+    if (data) {
+      setCache(cacheKey, data, CACHE_TTL.TMDB_DETAILS);
+      console.log(`[TMDB Cache] Stored: ${endpoint}`);
+    }
+    
+    return data;
   } catch (error) {
     console.error('Failed to fetch from TMDB:', error);
     return null;
@@ -252,4 +272,18 @@ export async function discoverMovies(filters: Record<string, string> = {}) {
 // Discover TV shows with filters
 export async function discoverTvShows(filters: Record<string, string> = {}) {
   return fetchFromTMDB('/discover/tv', filters);
+}
+
+// Get movie/TV show logos and images
+export async function getMediaLogos(mediaType: 'movie' | 'tv', id: number) {
+  const endpoint = mediaType === 'movie' ? `/movie/${id}/images` : `/tv/${id}/images`;
+  const data = await fetchFromTMDB(endpoint);
+  
+  if (!data) return null;
+
+  // Return logos if available, otherwise return null
+  return {
+    logos: data.logos || [],
+    posters: data.posters || [],
+  };
 }

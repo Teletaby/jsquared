@@ -1,8 +1,22 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { startNewChat, sendChatMessage } from '@/lib/gemini';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Get IP for rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+
+    // Apply rate limiting
+    if (!checkRateLimit(`chat_${ip}`, RATE_LIMITS.CHAT)) {
+      return NextResponse.json(
+        { error: 'Too many chat messages. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const { messages, currentMessage } = await request.json();
 
     if (!currentMessage) {

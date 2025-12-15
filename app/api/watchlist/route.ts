@@ -3,11 +3,23 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/mongodb';
 import { Watchlist, User } from '@/lib/models';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+
+    if (!checkRateLimit(`watchlist_${ip}`, RATE_LIMITS.API)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {

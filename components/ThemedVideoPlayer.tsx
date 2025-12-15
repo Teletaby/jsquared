@@ -39,7 +39,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const lastUpdateTimeRef = useRef<number>(0); // Ref for tracking last watch history update
   const embedLoadedRef = useRef<boolean>(false); // Track if embed has loaded
   const iframeRef = useRef<HTMLIFrameElement>(null); // Ref for the iframe
-  const initialTimeSetRef = useRef<boolean>(false); // Track if initial time has been set
+  const initialTimeSetRef = useRef<boolean>(false); // Track if we've initialized playtime tracking with initial time
   const lastTrackedTimeRef = useRef<number>(0); // Track last time we recorded for playtime
   const embedPlayerIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined); // Track embed player interval
   const latestEmbedDataRef = useRef<{ progress: number; currentTime: number; duration: number } | null>(null); // Store latest embed data
@@ -263,7 +263,6 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   useEffect(() => {
     // Reset interaction tracking for new video
     userHasInteractedRef.current = false;
-    initialTimeSetRef.current = false;
 
     // Skip all video logic for embed URLs
     if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
@@ -369,14 +368,27 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     }
 
     const video = videoRef.current;
-    if (!video || userHasInteractedRef.current || initialTimeSetRef.current) {
-      return; // Don't apply if user has already interacted or if we already set it
+    if (!video || userHasInteractedRef.current) {
+      return; // Don't apply if user has already interacted
     }
 
-    if (video.duration > 0 && initialTime > 0 && initialTime < video.duration) {
-      video.currentTime = initialTime;
-      setCurrentTime(initialTime);
-      initialTimeSetRef.current = true; // Mark that we've set the initial time
+    // When initialTime changes, reset the flag to allow it to be set
+    const applyInitialTime = () => {
+      if (video.duration > 0 && initialTime > 0 && initialTime < video.duration) {
+        video.currentTime = initialTime;
+        setCurrentTime(initialTime);
+      }
+    };
+
+    if (video.duration > 0) {
+      // Duration already available, apply immediately
+      applyInitialTime();
+    } else {
+      // Wait for loadedmetadata event
+      video.addEventListener('loadedmetadata', applyInitialTime, { once: true });
+      return () => {
+        video.removeEventListener('loadedmetadata', applyInitialTime);
+      };
     }
   }, [initialTime, src]);
 
@@ -450,17 +462,23 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   useEffect(() => {
     if (!isEmbedPlayer) return;
 
+    // Get the current source to validate messages
+    const currentSource = stableSrc.includes('vidsrc') ? 'vidsrc' : 'vidking';
+    console.log(`[Watch History] Setting up message listener for source: ${currentSource}`);
+
     const handleMessage = (event: MessageEvent) => {
-      console.log("Message received from embed player:", event.data);
+      // Only log if this looks like a player message
+      if (typeof event.data === 'string' && event.data.includes('PLAYER_EVENT')) {
+        console.log("Message received from embed player:", event.data);
+      }
       
       if (typeof event.data === 'string') {
         try {
           const message = JSON.parse(event.data);
-          console.log("Parsed message from embed player:", message);
           
           if (message.type === 'PLAYER_EVENT' && message.data) {
             const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration, season: embedSeason, episode: embedEpisode } = message.data;
-            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, embedEpisode });
+            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, episodeNumber, source: currentSource });
             
             // Check if this message is for our media
             if (String(id) === String(mediaId) && eventMediaType === mediaType) {
@@ -478,9 +496,13 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                 duration: eventDuration
               };
               
-              // For embed players, send immediately to database without throttle
+              // Determine if this is an important event that needs immediate DB write
+              // seeked, pause, ended events should be saved immediately to prevent data loss
+              const isImportantEvent = ['seeked', 'pause', 'ended'].includes(playerEvent);
+              
+              // For embed players, send to database
               if (user && mediaId && eventMediaType) {
-                console.log('Immediately saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber);
+                console.log('Saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
                 fetch('/api/watch-history', {
                   method: 'POST',
                   headers: {
@@ -497,13 +519,14 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                     totalPlayedSeconds: 0,
                     seasonNumber: effectiveSeasonNumber,
                     episodeNumber: effectiveEpisodeNumber,
-                    finished: false,
+                    finished: playerEvent === 'ended',
+                    immediate: isImportantEvent, // Write immediately for important events
                   }),
                 }).then(response => {
                   if (!response.ok) {
                     console.error('Watch history API error:', response.status);
                   } else {
-                    console.log('Embed player progress saved to database');
+                    console.log('Embed player progress saved to database', isImportantEvent ? '(immediate)' : '(batched)');
                   }
                 }).catch(error => {
                   console.error('Failed to save embed player progress:', error);
@@ -517,20 +540,127 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       }
     };
 
+    // Function to save current progress immediately (for page unload/visibility change)
+    const saveProgressImmediately = () => {
+      const latestData = latestEmbedDataRef.current;
+      if (latestData && user && mediaId && mediaType) {
+        console.log('Saving progress immediately before leaving page:', latestData);
+        // Use sendBeacon for reliable delivery during page unload
+        const payload = JSON.stringify({
+          mediaId,
+          mediaType,
+          title,
+          posterPath,
+          progress: latestData.progress,
+          currentTime: Math.floor(latestData.currentTime),
+          totalDuration: Math.floor(latestData.duration),
+          totalPlayedSeconds: 0,
+          seasonNumber: seasonNumber || undefined,
+          episodeNumber: episodeNumber || undefined,
+          finished: false,
+          immediate: true,
+        });
+        
+        // Try sendBeacon first (more reliable for page unload)
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/watch-history', new Blob([payload], { type: 'application/json' }));
+        } else {
+          // Fallback to sync fetch
+          fetch('/api/watch-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload,
+            keepalive: true,
+          });
+        }
+      }
+    };
+
+    // Handle visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveProgressImmediately();
+      }
+    };
+
+    // Handle page unload
+    const handleBeforeUnload = () => {
+      saveProgressImmediately();
+    };
+
     if (isEmbedPlayer) {
       window.addEventListener("message", handleMessage);
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+      window.addEventListener("beforeunload", handleBeforeUnload);
       console.log("Added message listener for embed player");
     }
 
     return () => {
       if (isEmbedPlayer) {
         window.removeEventListener("message", handleMessage);
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        // Save progress when component unmounts (navigation)
+        saveProgressImmediately();
       }
       if (embedPlayerIntervalRef.current) {
         clearInterval(embedPlayerIntervalRef.current);
       }
     };
-  }, [isEmbedPlayer, mediaId, mediaType, user, title, posterPath, seasonNumber, episodeNumber]);
+  }, [isEmbedPlayer, user, mediaId, mediaType, title, posterPath, seasonNumber, episodeNumber, stableSrc]);
+
+  // Fallback polling mechanism for embed players that don't support postMessage
+  // This ensures watch history is saved even for sources like vidsrc
+  useEffect(() => {
+    if (!isEmbedPlayer || !iframeRef.current) return;
+    
+    const currentSource = stableSrc.includes('vidsrc') ? 'vidsrc' : 'vidking';
+    console.log(`[Fallback Polling] Starting for source: ${currentSource}`);
+    
+    // For vidsrc and other embeds that may not send messages, use a periodic save
+    const fallbackInterval = setInterval(() => {
+      if (!user || !mediaId) return;
+      
+      // Store the latest embed data and send it to DB periodically
+      if (latestEmbedDataRef.current) {
+        const { progress, currentTime, duration } = latestEmbedDataRef.current;
+        console.log(`[Fallback Polling] Sending periodic update for ${currentSource}:`, { progress, currentTime, duration });
+        
+        fetch('/api/watch-history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            mediaId,
+            mediaType,
+            title,
+            posterPath,
+            progress: progress,
+            currentTime: Math.floor(currentTime),
+            totalDuration: Math.floor(duration),
+            totalPlayedSeconds: 0,
+            seasonNumber,
+            episodeNumber,
+            finished: false,
+            immediate: false, // Use batch for periodic updates
+          }),
+        }).then(response => {
+          if (!response.ok) {
+            console.error(`[Fallback Polling] API error for ${currentSource}:`, response.status);
+          } else {
+            console.log(`[Fallback Polling] Progress saved for ${currentSource}`, { progress, currentTime, duration });
+          }
+        }).catch(error => {
+          console.error(`[Fallback Polling] Error saving progress for ${currentSource}:`, error);
+        });
+      }
+    }, 30000); // Poll every 30 seconds for sources that don't send messages
+    
+    return () => {
+      clearInterval(fallbackInterval);
+    };
+  }, [isEmbedPlayer, user, mediaId, mediaType, title, posterPath, seasonNumber, episodeNumber, stableSrc]);
 
 
   // Watch history tracking for direct video - uses internal player states
@@ -616,19 +746,20 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     >
       {src.includes('vidking') || src.includes('vidsrc') || src.includes('embed') ? (
         // For embed URLs, use an iframe with vidking/vidsrc controls
-        // Key includes season/episode for TV shows to force remount when episode changes
+        // Key includes full src URL to force remount when source/progress changes
         <iframe
-          key={`iframe-${mediaId}-${mediaType}-${seasonNumber || 0}-${episodeNumber || 0}`}
+          key={src}
           ref={iframeRef}
           src={stableSrc}
           className="w-full h-full"
           allowFullScreen
-          allow="autoplay"
+          allow="autoplay; fullscreen; encrypted-media"
           title={title}
           loading="eager"
           scrolling="no"
-          style={{ overflow: 'hidden' }}
+          style={{ overflow: 'hidden', border: 'none' }}
           onLoad={() => {
+            console.log('Iframe loaded, initializing player');
             const cachedMetrics = getCachedMetrics(mediaId);
             if (!cachedMetrics) {
               // Track main frame load if not already cached
@@ -637,6 +768,48 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             setIsLoading(false);
             embedLoadedRef.current = true;
             setIframeReady(true);
+            console.log('Iframe ready - embedLoadedRef set to true');
+            
+            // Attempt to inject script to seek the vidking player  
+            // Some embedded players allow window.postMessage or direct methods
+            if (initialTime > 0 && iframeRef.current) {
+              console.log('Attempting to seek embed player to:', initialTime, 'seconds');
+              // Try multiple times with increasing delays as the player initializes
+              [2000, 3000, 4000].forEach((delay, index) => {
+                setTimeout(() => {
+                  if (!iframeRef.current?.contentWindow) return;
+                  
+                  try {
+                    // Try standard postMessage seek
+                    iframeRef.current.contentWindow.postMessage({
+                      type: 'SEEK',
+                      time: initialTime,
+                    }, '*');
+                    
+                    // Also try alternative message format
+                    iframeRef.current.contentWindow.postMessage({
+                      action: 'seek',
+                      seconds: initialTime,
+                    }, '*');
+                    
+                    // Try HTML5 seeking if player exposes it
+                    const contentWindow = iframeRef.current.contentWindow as any;
+                    if (contentWindow?.player) {
+                      if (typeof contentWindow.player.seek === 'function') {
+                        contentWindow.player.seek(initialTime);
+                      }
+                      if (typeof contentWindow.player.currentTime === 'number') {
+                        contentWindow.player.currentTime = initialTime;
+                      }
+                    }
+                    
+                    console.log(`Seek attempt ${index + 1} sent to iframe at ${delay}ms`);
+                  } catch (e) {
+                    console.warn(`Seek attempt ${index + 1} failed:`, e);
+                  }
+                }, delay);
+              });
+            }
             
             // Send initial watch history entry when embed loads
             if (user && mediaId && mediaType) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, Review, getTvShowVideos } from '@/lib/tmdb';
+import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, Review, getTvShowVideos, getMediaLogos } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
@@ -14,6 +14,7 @@ import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import MarkdownBoldText from '@/components/MarkdownBoldText';
+import SourceWarningDialog from '@/components/SourceWarningDialog';
 
 
 interface TvDetailPageProps {
@@ -64,9 +65,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
+  const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLoaded, setTrailerLoaded] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
   const [castInfo, setCastInfo] = useState<CastDetails | null>(null);
@@ -76,6 +79,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
+  const [showSourceWarning, setShowSourceWarning] = useState(false);
+  const [pendingSource, setPendingSource] = useState<'vidsrc' | null>(null);
+  const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
+  const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
+  const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
+  const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -88,6 +97,28 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const mediaType = 'tv';
   const currentSeason = searchParams.get('season') ? parseInt(searchParams.get('season')!, 10) : 1;
   const currentEpisode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!, 10) : 1;
+
+  // Auto-hide notification after 5 seconds
+  useEffect(() => {
+    if (showResumePrompt && notificationVisible) {
+      const timer = setTimeout(() => {
+        setNotificationVisible(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showResumePrompt, notificationVisible]);
+
+  // Effect to reset state when media ID or episode changes
+  useEffect(() => {
+    if (lastMediaIdRef.current !== null && lastMediaIdRef.current !== tmdbId) {
+      // Media has changed, reset to default source
+      setVideoSource('vidking');
+    }
+    // Reset resume choice for new media or episode
+    setResumeChoice('pending');
+    setShowResumePrompt(false);
+    lastMediaIdRef.current = tmdbId;
+  }, [tmdbId, currentSeason, currentEpisode]);
 
   // Effect for fetching data
   useEffect(() => {
@@ -151,6 +182,27 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchData();
   }, [tmdbId]); // Only depend on tmdbId to prevent unnecessary refetches
 
+  // Fetch logo for the TV show
+  useEffect(() => {
+    const fetchLogo = async () => {
+      if (tmdbId) {
+        try {
+          const imageData = await getMediaLogos('tv', tmdbId);
+          if (imageData?.logos && imageData.logos.length > 0) {
+            const englishLogo = imageData.logos.find((logo: any) => logo.iso_639_1 === 'en');
+            const logoPath = englishLogo?.file_path || imageData.logos[0]?.file_path;
+            if (logoPath) {
+              setLogoUrl(`https://image.tmdb.org/t/p/w500${logoPath}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching logo:', error);
+        }
+      }
+    };
+    fetchLogo();
+  }, [tmdbId]);
+
   // Separate effect to check watchlist status when session becomes available
   useEffect(() => {
     const checkStatus = async () => {
@@ -166,6 +218,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   useEffect(() => {
     // Reset progress when episode changes
     setSavedProgress(0);
+    setSavedDuration(0);
     setCurrentPlaybackTime(0);
     
     if (!session?.user) return;
@@ -185,6 +238,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           if (tvHistory && tvHistory.currentTime > 0) {
             console.log('Found episode-specific progress:', tvHistory.currentTime, 'for S', currentSeason, 'E', currentEpisode);
             setSavedProgress(Math.floor(tvHistory.currentTime));
+            setSavedDuration(tvHistory.totalDuration || 0);
             setCurrentPlaybackTime(tvHistory.currentTime);
           } else {
             console.log('No saved progress for S', currentSeason, 'E', currentEpisode);
@@ -207,16 +261,40 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchVideoSource();
   }, []);
 
-  // Construct embed URL with useMemo to prevent unnecessary changes
-  // NOTE: We intentionally don't use the progress parameter as it causes the player to get stuck
-  // Instead, we show the user their saved progress and let them manually seek if needed
-  const embedUrl = useMemo(() => {
-    if (videoSource === 'vidsrc') {
-      return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
-    } else {
-      return `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`;
+  // Show resume prompt when we have saved progress and user hasn't made a choice yet
+  useEffect(() => {
+    if (savedProgress > 0 && resumeChoice === 'pending') {
+      setShowResumePrompt(true);
     }
-  }, [tmdbId, currentSeason, currentEpisode, videoSource]);
+  }, [savedProgress, resumeChoice]);
+
+  // Handle resume choice
+  const handleResumeYes = () => {
+    setResumeChoice('yes');
+    setShowResumePrompt(false);
+  };
+
+  const handleResumeNo = () => {
+    setResumeChoice('no');
+    setShowResumePrompt(false);
+  };
+
+  // Construct embed URL with useMemo to prevent unnecessary changes
+  const embedUrl = useMemo(
+    () => {
+      if (videoSource === 'vidsrc') {
+        return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
+      } else {
+        let url = `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`;
+        // Add progress parameter if user chose to resume
+        if (resumeChoice === 'yes' && savedProgress > 0) {
+          url += `&progress=${Math.floor(savedProgress)}`;
+        }
+        return url;
+      }
+    },
+    [tmdbId, currentSeason, currentEpisode, videoSource, resumeChoice, savedProgress]
+  );
   const videoSrc = embedUrl; // Use videoSrc for ThemedVideoPlayer
 
   // Format saved progress for display
@@ -271,8 +349,46 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   const mediaTitle = tvShow.name || 'Untitled Show';
 
+  const handleChangeSource = async () => {
+    // If already on source 2, toggle back to source 1
+    if (videoSource === 'vidsrc') {
+      setVideoSource('vidking');
+      return;
+    }
+
+    // Otherwise, try to switch to source 2
+    // If user is logged in and switching to source 2, show warning
+    if (session) {
+      setPendingSource('vidsrc');
+      setShowSourceWarning(true);
+    } else {
+      // If not logged in, just switch without warning
+      setVideoSource('vidsrc');
+    }
+  };
+
+  const handleConfirmSourceChange = () => {
+    if (pendingSource) {
+      setVideoSource(pendingSource);
+      setPendingSource(null);
+    }
+    setShowSourceWarning(false);
+  };
+
+  const handleCancelSourceChange = () => {
+    setPendingSource(null);
+    setShowSourceWarning(false);
+  };
+
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
+      {/* Source Warning Dialog */}
+      <SourceWarningDialog
+        isOpen={showSourceWarning}
+        onConfirm={handleConfirmSourceChange}
+        onCancel={handleCancelSourceChange}
+      />
+
       <Header />
 
       {view === 'info' && (
@@ -319,45 +435,54 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
 
             {/* Content Overlay */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full">
+            <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
               <div className="max-w-2xl">
-                {/* Title */}
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-2xl">
-                  {mediaTitle}
-                </h1>
+                {/* Logo or Title */}
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={mediaTitle}
+                    draggable={false}
+                    className="h-16 md:h-20 lg:h-28 w-auto object-contain mb-2 drop-shadow-lg select-none"
+                  />
+                ) : (
+                  <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-bold text-white mb-2 drop-shadow-2xl">
+                    {mediaTitle}
+                  </h1>
+                )}
 
                 {/* Quick Stats - Single Row */}
-                <div className="flex flex-wrap gap-4 mb-4 text-sm md:text-base">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-xs text-gray-400 uppercase">RATING</span>
-                    <span className="text-lg md:text-2xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
+                <div className="flex flex-wrap gap-2 mb-2 text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xs lg:text-sm text-gray-400 uppercase">RATING</span>
+                    <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
                   </div>
                   
                   {tvShow.first_air_date && (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-gray-400 uppercase">FIRST AIRED</span>
-                      <span className="text-sm md:text-lg font-bold text-white">{new Date(tvShow.first_air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs lg:text-sm text-gray-400 uppercase">FIRST AIRED</span>
+                      <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{new Date(tvShow.first_air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                     </div>
                   )}
 
                   {tvShow.episode_run_time && tvShow.episode_run_time.length > 0 && (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-gray-400 uppercase">EPISODE AVG</span>
-                      <span className="text-sm md:text-lg font-bold text-white">{formatDuration(tvShow.episode_run_time[0])}</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs lg:text-sm text-gray-400 uppercase">EPISODE AVG</span>
+                      <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{formatDuration(tvShow.episode_run_time[0])}</span>
                     </div>
                   )}
 
                   {tvShow.seasons && (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-gray-400 uppercase">SEASONS</span>
-                      <span className="text-sm md:text-lg font-bold text-white">{tvShow.seasons.length}</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs lg:text-sm text-gray-400 uppercase">SEASONS</span>
+                      <span className="text-xs md:text-sm lg:text-lg font-bold text-white">{tvShow.seasons.length}</span>
                     </div>
                   )}
 
                   {tvShow.first_air_date && (
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs text-gray-400 uppercase">STATUS</span>
-                      <span className="text-sm md:text-lg font-bold text-white">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs lg:text-sm text-gray-400 uppercase">STATUS</span>
+                      <span className="text-xs md:text-sm lg:text-lg font-bold text-white">
                         {(() => {
                           const firstAirDate = new Date(tvShow.first_air_date);
                           const today = new Date();
@@ -372,11 +497,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {/* Genres */}
                 {tvShow.genres && tvShow.genres.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex flex-wrap gap-1 mb-2">
                     {tvShow.genres.map((genre) => (
                       <span
                         key={genre.id}
-                        className="text-xs md:text-sm text-gray-300 font-medium"
+                        className="text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-300 font-medium"
                       >
                         {genre.name}
                       </span>
@@ -386,7 +511,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {/* Description */}
                 {tvShow.overview && (
-                  <p className="text-gray-300 text-xs md:text-sm leading-relaxed mb-4 max-w-xl drop-shadow-lg line-clamp-3">{tvShow.overview}</p>
+                  <p className="text-gray-300 text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg leading-relaxed mb-3 max-w-xl drop-shadow-lg line-clamp-2">{tvShow.overview}</p>
                 )}
 
                 {/* Action Buttons */}
@@ -397,7 +522,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     style={{ 
                       backgroundColor: tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? '#666666' : '#E50914'
                     }}
-                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base shadow-lg ${
+                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl shadow-lg ${
                       tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date()
                         ? 'cursor-not-allowed opacity-60'
                         : 'hover:brightness-110'
@@ -407,7 +532,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   </button>
                   <button
                     onClick={() => setActiveTab('overview')}
-                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base"
+                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl"
                   >
                     More Info
                   </button>
@@ -563,13 +688,34 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         {/* Player Section - Appears at top when watching */}
         {view !== 'info' && (
           <div className="space-y-8 mb-8">
-            {/* Video Player */}
+            {/* Resume Watching Prompt */}
+            {showResumePrompt && savedProgress > 0 && notificationVisible && (
+              <div className="fixed top-20 right-4 z-[9999] max-w-xs animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="bg-yellow-900 bg-opacity-90 rounded-lg p-4 shadow-lg border border-yellow-700 flex items-start justify-between gap-3">
+                  <p className="text-yellow-300 text-sm flex-1">
+                    ⚠️ Source 1 is having issues with automatic resume. You left off at <span className="font-bold text-white">{formatProgressTime(currentPlaybackTime > 0 ? currentPlaybackTime : savedProgress)}</span>. Please manually seek to continue watching.
+                  </p>
+                  <button
+                    onClick={() => setNotificationVisible(false)}
+                    className="text-yellow-300 hover:text-yellow-100 transition-colors flex-shrink-0 mt-0.5"
+                    aria-label="Close notification"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Video Player - Show immediately with notification if resuming */}
             {videoSrc ? (
               <ThemedVideoPlayer
+                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
                 src={videoSrc}
                 poster={posterUrl}
                 autoplay={true}
-                initialTime={0}
+                initialTime={resumeChoice === 'yes' ? savedProgress : 0}
                 title={mediaTitle}
                 mediaId={tmdbId}
                 mediaType={mediaType}
@@ -615,11 +761,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Select Episode (S{currentSeason}E{currentEpisode})
                   </button>
                   <button
-                    disabled
-                    style={{ backgroundColor: '#1A1A1A' }}
-                    className="text-gray-500 font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded opacity-50 cursor-not-allowed border border-gray-700"
+                    onClick={handleChangeSource}
+                    style={{ 
+                      backgroundColor: videoSource === 'vidsrc' ? '#E50914' : '#1A1A1A'
+                    }}
+                    className={`font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded transition-all ${
+                      videoSource === 'vidsrc'
+                        ? 'text-white hover:brightness-110'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500'
+                    }`}
                   >
-                    Watch on TV
+                    {videoSource === 'vidsrc' ? 'Switch to Source 1' : 'Switch to Source 2'}
                   </button>
                 </>
               ) : (
@@ -640,6 +792,15 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 initialIsInWatchlist={initialIsInWatchlist}
               />
             </div>
+
+            {/* Source 2 Warning Note */}
+            {videoSource === 'vidsrc' && (
+              <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3">
+                <p className="text-yellow-300 text-xs sm:text-sm">
+                  ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                </p>
+              </div>
+            )}
 
             {/* Rating and Quick Info */}
             <div className="text-gray-400">
@@ -785,6 +946,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           <EpisodeSelector
             tvShowId={id}
             showTitle={mediaTitle}
+            posterPath={tvShow.poster_path}
             onClose={() => setShowEpisodeSelector(false)}
             onEpisodeSelect={handleEpisodeSelect}
           />
