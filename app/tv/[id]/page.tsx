@@ -15,6 +15,9 @@ import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import MarkdownBoldText from '@/components/MarkdownBoldText';
 import SourceWarningDialog from '@/components/SourceWarningDialog';
+import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
+import ResumePrompt from '@/components/ResumePrompt';
+import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
 
 interface TvDetailPageProps {
@@ -77,6 +80,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [initialIsInWatchlist, setInitialIsInWatchlist] = useState<boolean | undefined>(undefined);
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
+  const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
   const [showSourceWarning, setShowSourceWarning] = useState(false);
@@ -221,13 +225,19 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     setSavedDuration(0);
     setCurrentPlaybackTime(0);
     
-    if (!session?.user) return;
+    console.log('📍 Session status:', session?.user?.email || 'NO SESSION');
+    if (!session?.user) {
+      console.log('⏳ Waiting for session...');
+      return;
+    }
 
     const fetchWatchProgress = async () => {
       try {
+        console.log('🔍 Fetching watch progress for user:', session.user?.email);
         const response = await fetch('/api/watch-history');
         if (response.ok) {
           const data = await response.json();
+          console.log('📋 Returned watch history count:', data.length);
           // Find history for this specific episode (matching season AND episode)
           const tvHistory = data.find((item: any) => 
             item.mediaId === tmdbId && 
@@ -236,16 +246,19 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             item.episodeNumber === currentEpisode
           );
           if (tvHistory && tvHistory.currentTime > 0) {
-            console.log('Found episode-specific progress:', tvHistory.currentTime, 'for S', currentSeason, 'E', currentEpisode);
+            console.log('✅ FOUND! Progress:', tvHistory.currentTime, 's for S', currentSeason, 'E', currentEpisode);
             setSavedProgress(Math.floor(tvHistory.currentTime));
             setSavedDuration(tvHistory.totalDuration || 0);
             setCurrentPlaybackTime(tvHistory.currentTime);
           } else {
-            console.log('No saved progress for S', currentSeason, 'E', currentEpisode);
+            console.log('❌ NOT FOUND! Looking for S', currentSeason, 'E', currentEpisode, 'mediaId:', tmdbId);
+            console.log('Available episodes:', data.filter((h: any) => h.mediaId === tmdbId && h.mediaType === 'tv').map((h: any) => `S${h.seasonNumber}E${h.episodeNumber}`));
           }
+        } else {
+          console.error('API ERROR! Status:', response.status);
         }
       } catch (error) {
-        console.error('Error fetching watch progress:', error);
+        console.error('FETCH ERROR:', error);
       }
     };
 
@@ -261,15 +274,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchVideoSource();
   }, []);
 
-  // Show resume prompt when we have saved progress and user hasn't made a choice yet
+  // Automatically resume if saved progress exists (no prompt needed)
   useEffect(() => {
     if (savedProgress > 0 && resumeChoice === 'pending') {
-      setShowResumePrompt(true);
+      console.log('📺 Auto-resuming from', savedProgress, 'seconds');
+      setResumeChoice('yes');
     }
   }, [savedProgress, resumeChoice]);
 
   // Handle resume choice
   const handleResumeYes = () => {
+    console.log('✅ User clicked RESUME - savedProgress:', savedProgress, 'seconds');
     setResumeChoice('yes');
     setShowResumePrompt(false);
   };
@@ -688,41 +703,42 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         {/* Player Section - Appears at top when watching */}
         {view !== 'info' && (
           <div className="space-y-8 mb-8">
-            {/* Resume Watching Prompt */}
-            {showResumePrompt && savedProgress > 0 && notificationVisible && (
-              <div className="fixed top-20 right-4 z-[9999] max-w-xs animate-in fade-in slide-in-from-top-4 duration-300">
-                <div className="bg-yellow-900 bg-opacity-90 rounded-lg p-4 shadow-lg border border-yellow-700 flex items-start justify-between gap-3">
-                  <p className="text-yellow-300 text-sm flex-1">
-                    ⚠️ Source 1 is having issues with automatic resume. You left off at <span className="font-bold text-white">{formatProgressTime(currentPlaybackTime > 0 ? currentPlaybackTime : savedProgress)}</span>. Please manually seek to continue watching.
-                  </p>
-                  <button
-                    onClick={() => setNotificationVisible(false)}
-                    className="text-yellow-300 hover:text-yellow-100 transition-colors flex-shrink-0 mt-0.5"
-                    aria-label="Close notification"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Video Player - Show immediately with notification if resuming */}
             {videoSrc ? (
-              <ThemedVideoPlayer
+              <AdvancedVideoPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
-                src={videoSrc}
-                poster={posterUrl}
-                autoplay={true}
-                initialTime={resumeChoice === 'yes' ? savedProgress : 0}
-                title={mediaTitle}
+                embedUrl={videoSrc}
+                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
                 mediaId={tmdbId}
                 mediaType={mediaType}
-                posterPath={tvShow.poster_path}
+                posterPath={tvShow?.poster_path}
                 seasonNumber={currentSeason}
                 episodeNumber={currentEpisode}
-                onTimeUpdate={setCurrentPlaybackTime}
+                initialTime={savedProgress}
+                videoSource={videoSource}
+                onTimeUpdate={(time) => {
+                  setCurrentPlaybackTime(time);
+                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
+                  
+                  // Cap progress at 100% even if user watched past episode end
+                  const progress = Math.min((time / totalSeconds) * 100, 100);
+                  
+                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                  
+                  queueUpdate({
+                    mediaId: tmdbId,
+                    mediaType,
+                    title: mediaTitle,
+                    currentTime: time,
+                    totalDuration: totalSeconds,
+                    progress: progress,
+                    posterPath: tvShow?.poster_path,
+                    seasonNumber: currentSeason,
+                    episodeNumber: currentEpisode,
+                  });
+                }}
               />
             ) : (
               <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">

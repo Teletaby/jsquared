@@ -21,7 +21,8 @@ export default function RootLayoutContent({ children }: { children: ReactNode })
 
   // Disable console in production on mount
   useEffect(() => {
-    disableConsoleInProduction();
+    // Temporarily disabled for debugging
+    // disableConsoleInProduction();
   }, []);
 
   useEffect(() => {

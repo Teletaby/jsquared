@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
 
     const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds, immediate } = await request.json();
     console.log('Saving watch history:', { mediaId, mediaType, title, progress, currentTime, totalDuration, seasonNumber, episodeNumber, totalPlayedSeconds, videoSource, immediate });
+    if (totalDuration === 0) {
+      console.warn('⚠️  WARNING: totalDuration is 0 when saving watch history for', mediaId);
+    }
 
     // Build the update object dynamically
     const updateData: any = {

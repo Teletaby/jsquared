@@ -5,7 +5,7 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, Trash2, X } from 'lucide-react';
 import { getVideoSourceSetting } from '@/lib/utils';
 
 interface WatchHistoryItem {
@@ -31,6 +31,7 @@ export default function UserWatchHistory() {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; title: string } | null>(null);
   const scrollContainerRef: any = React.useRef(null);
 
   // Function to check scrollability
@@ -93,6 +94,25 @@ export default function UserWatchHistory() {
     setTimeout(checkScrollability, 300); // Small delay to allow scroll animation to complete
   };
 
+  const handleDelete = async (historyId: string) => {
+    try {
+      const response = await fetch(`/api/watch-history/${historyId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Remove from UI
+        setWatchHistory(watchHistory.filter(item => item._id !== historyId));
+        setDeleteConfirmation(null);
+      } else {
+        alert('Failed to delete history item');
+      }
+    } catch (error) {
+      console.error('Error deleting history:', error);
+      alert('Error deleting history item');
+    }
+  };
+
   if (loading) {
     return <div className="animate-pulse text-gray-400">Loading your history...</div>;
   }
@@ -153,11 +173,15 @@ export default function UserWatchHistory() {
       </div>
 
       <div className="relative px-2"> {/* Added px-2 here */}
-        {/* Left Arrow */}
-        {canScrollLeft && (
+        {/* Left Arrow - Always show if there are items */}
+        {consolidatedHistory.length > 0 && (
           <button
             onClick={() => scroll('left')}
-            className="absolute left-2 inset-y-0 my-auto h-fit z-10 bg-gray-800/70 hover:bg-gray-800 text-white p-3 rounded-full transition-all duration-300 shadow-lg"
+            className={`absolute left-2 inset-y-0 my-auto h-fit z-10 p-3 rounded-full transition-all duration-300 shadow-lg ${
+              canScrollLeft
+                ? 'bg-gray-800/70 hover:bg-gray-800 text-white cursor-pointer'
+                : 'bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-50'
+            }`}
           >
             <ChevronLeft size={24} />
           </button>
@@ -176,13 +200,16 @@ export default function UserWatchHistory() {
               : `/${item.mediaType}/${item.mediaId}`;
 
             return (
-            <Link
+            <div
               key={item._id}
-              href={href}
-              className="flex-shrink-0 group relative overflow-hidden rounded-lg w-[200px] h-auto transition-transform duration-300 hover:scale-105"
+              className="flex-shrink-0 group relative overflow-hidden rounded-lg w-[200px] h-[300px] transition-transform duration-300"
             >
-              <div className="relative w-full bg-gray-900 flex flex-col h-full rounded-lg shadow-lg">
-                <div className="relative w-full h-36 overflow-hidden rounded-t-lg">
+              <Link
+                href={href}
+                className="block hover:scale-105 transition-transform duration-300 h-full"
+              >
+                <div className="relative w-full bg-gray-900 flex flex-col h-full rounded-lg shadow-lg">
+                  <div className="relative w-full h-36 overflow-hidden rounded-t-lg">
                   {item.posterPath ? (
                     <Image
                       src={`https://image.tmdb.org/t/p/w400${item.posterPath}`}
@@ -248,21 +275,70 @@ export default function UserWatchHistory() {
                   </p>
                 </div>
               </div>
-            </Link>
+              </Link>
+
+            </div>
             );
           })}
         </div>
 
-        {/* Right Arrow */}
-        {canScrollRight && (
+        {/* Right Arrow - Always show if there are items */}
+        {consolidatedHistory.length > 0 && (
           <button
             onClick={() => scroll('right')}
-            className="absolute right-2 inset-y-0 my-auto h-fit z-10 bg-gray-800/70 hover:bg-gray-800 text-white p-3 rounded-full transition-all duration-300 shadow-lg"
+            className={`absolute right-2 inset-y-0 my-auto h-fit z-10 p-3 rounded-full transition-all duration-300 shadow-lg ${
+              canScrollRight
+                ? 'bg-gray-800/70 hover:bg-gray-800 text-white cursor-pointer'
+                : 'bg-gray-800/30 text-gray-600 cursor-not-allowed opacity-50'
+            }`}
           >
             <ChevronRight size={24} />
           </button>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmation && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg shadow-xl max-w-sm w-full border border-gray-700">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Trash2 className="text-red-500" size={24} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white">Delete from History?</h3>
+                  <p className="text-sm text-gray-300 mt-2">
+                    Are you sure you want to remove <span className="font-semibold">{deleteConfirmation.title}</span> from your watch history?
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteConfirmation(null)}
+                  className="text-gray-400 hover:text-gray-200"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setDeleteConfirmation(null)}
+                  className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirmation.id)}
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
