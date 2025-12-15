@@ -610,11 +610,18 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   }, [isEmbedPlayer, user, mediaId, mediaType, title, posterPath, seasonNumber, episodeNumber, stableSrc]);
 
   // Fallback polling mechanism for embed players that don't support postMessage
-  // This ensures watch history is saved even for sources like vidsrc
+  // DISABLED FOR VIDKING - Only for VidSrc to avoid timestamp glitching
   useEffect(() => {
     if (!isEmbedPlayer || !iframeRef.current) return;
     
     const currentSource = stableSrc.includes('vidsrc') ? 'vidsrc' : 'vidking';
+    
+    // DISABLED: Skip fallback polling for VidKing due to timestamp glitching
+    if (currentSource === 'vidking') {
+      console.log('[Fallback Polling] DISABLED for VidKing - preventing timestamp glitches');
+      return;
+    }
+    
     console.log(`[Fallback Polling] Starting for source: ${currentSource}`);
     
     // For vidsrc and other embeds that may not send messages, use a periodic save

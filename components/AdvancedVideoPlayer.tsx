@@ -244,10 +244,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       setIsLoading(false);
       embedLoadedRef.current = true;
 
-      // Try to set initial time if supported
+      // DISABLED: VidKing auto-resume disabled to prevent timestamp glitching
       if (initialTime > 0 && embedUrl.includes('vidking')) {
-        // VidKing supports progress parameter, which is handled via URL
-        console.log('VidKing: Initial time will be set via URL parameter');
+        console.log('VidKing: Auto-resume DISABLED - preventing timestamp glitches');
       }
     };
 
@@ -273,8 +272,8 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       className={`relative w-full bg-black`}
       style={{ aspectRatio: '16 / 9' }}
     >
-      {/* Resume indicator badge with instructions - ONLY SHOW FOR VIDKING (not VidSrc) */}
-      {videoSource === 'vidking' && initialTime > 0 && showResumeHint && (
+      {/* Resume indicator badge with instructions - DISABLED FOR VIDKING to prevent glitches */}
+      {videoSource === 'vidsrc' && initialTime > 0 && showResumeHint && (
         <div className="absolute bottom-4 left-4 z-50 bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow-lg flex items-center gap-2 animate-pulse">
           <span>⏱️ Last watched at {Math.floor(initialTime)}s</span>
           <span className="text-xs opacity-90">- Drag progress bar to resume</span>
