@@ -22,6 +22,7 @@ const ThemedVideoPlayer = dynamic(() => import('@/components/ThemedVideoPlayer')
 
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
+import VideasyPlayer from '@/components/VideasyPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
@@ -310,12 +311,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/movie/${tmdbId}`;
       } else {
-        let url = `https://www.vidking.net/embed/movie/${tmdbId}?color=cccccc&autoPlay=true`;
-        // Add progress parameter if user chose to resume
-        if (resumeChoice === 'yes' && savedProgress > 0) {
-          url += `&progress=${Math.floor(savedProgress)}`;
-        }
-        return url;
+        // For vidking source, we now use VIDEASY
+        // This is handled by the VideasyPlayer component
+        return null; // We'll use VideasyPlayer instead
       }
     },
     [tmdbId, videoSource, resumeChoice, savedProgress]
@@ -401,10 +399,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
-      {/* Preload vidking.net for faster video loading */}
-      <link rel="dns-prefetch" href="https://www.vidking.net" />
-      <link rel="preconnect" href="https://www.vidking.net" />
-      <link rel="preload" as="frame" href={embedUrl} />
+      {/* Preload VIDEASY and VidSrc for faster loading */}
+      <link rel="dns-prefetch" href="https://player.videasy.net" />
+      <link rel="preconnect" href="https://player.videasy.net" />
+      <link rel="dns-prefetch" href="https://vidsrc.icu" />
+      <link rel="preconnect" href="https://vidsrc.icu" />
       
       {/* Source Warning Dialog */}
       <SourceWarningDialog
@@ -748,7 +747,38 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       {view !== 'info' && (
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16 space-y-8">
             {/* Video Player */}
-            {videoSrc ? (
+            {videoSource === 'vidking' ? (
+              // Use VIDEASY player for source 1
+              <VideasyPlayer
+                key={`${tmdbId}-videasy`}
+                mediaId={tmdbId}
+                mediaType={mediaType}
+                title={mediaTitle}
+                posterPath={movie.poster_path}
+                initialTime={savedProgress}
+                onTimeUpdate={(time) => {
+                  setCurrentPlaybackTime(time);
+                  // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
+                  const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
+                  
+                  // Cap progress at 100% even if user watched past movie end
+                  const progress = Math.min((time / totalSeconds) * 100, 100);
+                  
+                  console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                  
+                  queueUpdate({
+                    mediaId: tmdbId,
+                    mediaType,
+                    title: mediaTitle,
+                    currentTime: time,
+                    totalDuration: totalSeconds,
+                    progress: progress,
+                    posterPath: movie.poster_path,
+                  });
+                }}
+              />
+            ) : videoSrc ? (
+              // Use VidSrc for source 2
               <AdvancedVideoPlayer
                 key={`${tmdbId}-${resumeChoice}`}
                 embedUrl={videoSrc}
@@ -834,7 +864,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {videoSource === 'vidsrc' && (
                   <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3 mt-4">
                     <p className="text-yellow-300 text-xs sm:text-sm">
-                      ⚠️ You are currently using Source 2. Source 2 might be faster than Source 1, but some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                      ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
                     </p>
                   </div>
                 )}

@@ -290,13 +290,13 @@ export default function AdminPage() {
               <div className="border-t border-gray-700 pt-6">
                 <p className="text-gray-300 mb-4">
                   Video Source: <span className={`font-bold ${videoSource === 'vidsrc' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                    {videoSource?.toUpperCase() || 'VIDKING'}
+                    {videoSource === 'vidsrc' ? 'VIDSRC' : 'VIDEASY'}
                   </span>
                 </p>
                 <p className="text-gray-400 text-sm mb-4">
                   {videoSource === 'vidsrc' 
-                    ? 'Currently using VidSrc - Progress tracking is disabled'
-                    : 'Currently using VidKing - Full progress tracking enabled'}
+                    ? 'Currently using VidSrc - Alternative source'
+                    : 'Currently using VIDEASY - Full progress tracking enabled'}
                 </p>
                 <button
                   onClick={toggleVideoSource}
@@ -308,7 +308,7 @@ export default function AdminPage() {
                     ${togglingVideoSource ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {togglingVideoSource && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                  Switch to {videoSource === 'vidsrc' ? 'VidKing' : 'VidSrc'}
+                  Switch to {videoSource === 'vidsrc' ? 'VIDEASY' : 'VidSrc'}
                 </button>
               </div>
             </div>

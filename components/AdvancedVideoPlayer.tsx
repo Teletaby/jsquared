@@ -65,9 +65,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     const interval = setInterval(() => {
       elapsedRef.current += 10; // Increment by 10 seconds every interval
       
-      // Only call onTimeUpdate if it exists
-      // Send TOTAL time: saved progress (initialTime) + new watching (elapsedRef)
-      if (onTimeUpdate) {
+      // Only call onTimeUpdate if it exists AND we're using vidking source
+      // VidSrc (source 2) does not support progress tracking
+      if (onTimeUpdate && videoSource === 'vidking') {
         const totalTime = initialTime + elapsedRef.current;
         onTimeUpdate(totalTime);
       }
@@ -75,7 +75,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     // Capture time immediately before page unload
     const handleBeforeUnload = () => {
-      if (elapsedRef.current > 0 && onTimeUpdate) {
+      if (elapsedRef.current > 0 && onTimeUpdate && videoSource === 'vidking') {
         const totalTime = initialTime + elapsedRef.current;
         onTimeUpdate(totalTime);
       }
@@ -83,7 +83,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     // Also save when user switches tabs
     const handleVisibilityChange = () => {
-      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate) {
+      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate && videoSource === 'vidking') {
         const totalTime = initialTime + elapsedRef.current;
         onTimeUpdate(totalTime);
       }
@@ -97,7 +97,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, videoSource, initialTime]);
 
   // Auto-hide resume hint after 8 seconds
   useEffect(() => {
@@ -163,9 +163,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }
   }, [user, embedUrl, mediaId, mediaType, duration, posterPath, seasonNumber, episodeNumber]);
 
-  // Auto-save every 10 seconds
+  // Auto-save every 10 seconds (only for VidKing source)
   useEffect(() => {
-    if (!user) return;
+    if (!user || videoSource !== 'vidking') return;
 
     const interval = setInterval(() => {
       if (currentTime > 0 && currentTime - lastSaveTimeRef.current > 10) {
@@ -175,10 +175,12 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [currentTime, savePlaytime, user]);
+  }, [currentTime, savePlaytime, user, videoSource]);
 
-  // Save on page unload
+  // Save on page unload (only for VidKing source)
   useEffect(() => {
+    if (videoSource !== 'vidking') return;
+
     const handleBeforeUnload = async () => {
       if (currentTime > 0) {
         await savePlaytime(currentTime);
@@ -187,7 +189,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [currentTime, savePlaytime]);
+  }, [currentTime, savePlaytime, videoSource]);
 
   // Handle fullscreen
   const handleFullscreen = useCallback(async () => {

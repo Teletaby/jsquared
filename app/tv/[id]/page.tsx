@@ -16,6 +16,7 @@ import VideoInfoPopup from '@/components/VideoInfoPopup';
 import MarkdownBoldText from '@/components/MarkdownBoldText';
 import SourceWarningDialog from '@/components/SourceWarningDialog';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
+import VideasyPlayer from '@/components/VideasyPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
@@ -300,12 +301,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
       } else {
-        let url = `https://www.vidking.net/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}?color=cccccc&autoPlay=true&nextEpisode=true&episodeSelector=true`;
-        // Add progress parameter if user chose to resume
-        if (resumeChoice === 'yes' && savedProgress > 0) {
-          url += `&progress=${Math.floor(savedProgress)}`;
-        }
-        return url;
+        // For vidking source, we now use VIDEASY
+        // This is handled by the VideasyPlayer component
+        return null; // We'll use VideasyPlayer instead
       }
     },
     [tmdbId, currentSeason, currentEpisode, videoSource, resumeChoice, savedProgress]
@@ -704,7 +702,43 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         {view !== 'info' && (
           <div className="space-y-8 mb-8">
             {/* Video Player - Show immediately with notification if resuming */}
-            {videoSrc ? (
+            {videoSource === 'vidking' ? (
+              // Use VIDEASY player for source 1
+              <VideasyPlayer
+                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-videasy`}
+                mediaId={tmdbId}
+                mediaType={mediaType}
+                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
+                posterPath={tvShow?.poster_path}
+                seasonNumber={currentSeason}
+                episodeNumber={currentEpisode}
+                initialTime={savedProgress}
+                onTimeUpdate={(time) => {
+                  setCurrentPlaybackTime(time);
+                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
+                  
+                  // Cap progress at 100% even if user watched past episode end
+                  const progress = Math.min((time / totalSeconds) * 100, 100);
+                  
+                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                  
+                  queueUpdate({
+                    mediaId: tmdbId,
+                    mediaType,
+                    title: mediaTitle,
+                    currentTime: time,
+                    totalDuration: totalSeconds,
+                    progress: progress,
+                    posterPath: tvShow?.poster_path,
+                    seasonNumber: currentSeason,
+                    episodeNumber: currentEpisode,
+                  });
+                }}
+              />
+            ) : videoSrc ? (
+              // Use VidSrc for source 2
               <AdvancedVideoPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
                 embedUrl={videoSrc}
@@ -813,7 +847,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {videoSource === 'vidsrc' && (
               <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3">
                 <p className="text-yellow-300 text-xs sm:text-sm">
-                  ⚠️ You are currently using Source 2. Source 2 might be faster than Source 1, but some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                  ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
                 </p>
               </div>
             )}
@@ -963,6 +997,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             tvShowId={id}
             showTitle={mediaTitle}
             posterPath={tvShow.poster_path}
+            currentSeason={currentSeason}
+            currentEpisode={currentEpisode}
             onClose={() => setShowEpisodeSelector(false)}
             onEpisodeSelect={handleEpisodeSelect}
           />

@@ -24,7 +24,7 @@ interface WatchHistoryItem {
 }
 
 export default function UserWatchHistory() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -44,10 +44,22 @@ export default function UserWatchHistory() {
   };
 
   useEffect(() => {
+    // Wait for session to load (status is 'loading' initially, then 'authenticated' or 'unauthenticated')
+    if (status === 'loading') {
+      console.log('📺 [Watch History] Session loading...');
+      setLoading(true);
+      return;
+    }
+
     if (!session?.user) {
+      console.log('📺 [Watch History] No session, clearing data');
+      setWatchHistory([]);
       setLoading(false);
       return;
     }
+
+    console.log('📺 [Watch History] Session loaded for:', session.user.email);
+    setLoading(true);
 
     const fetchData = async () => {
       try {
@@ -55,8 +67,11 @@ export default function UserWatchHistory() {
         const historyResponse = await fetch('/api/watch-history?limit=10');
         if (historyResponse.ok) {
           const data = await historyResponse.json();
-          console.log('Watch history data from API:', data);
+          console.log('📺 [Watch History] Initial load:', data.length, 'items');
           setWatchHistory(data);
+        } else {
+          console.log('📺 [Watch History] API returned status:', historyResponse.status);
+          setWatchHistory([]);
         }
 
         // Fetch video source setting
@@ -64,13 +79,14 @@ export default function UserWatchHistory() {
         setVideoSource(source);
       } catch (error) {
         console.error('Error fetching data:', error);
+        setWatchHistory([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [session]);
+  }, [status, session?.user?.email]); // Added status to wait for session loading
 
   useEffect(() => {
     // Initial check and re-check when watchHistory changes
@@ -113,12 +129,64 @@ export default function UserWatchHistory() {
     }
   };
 
-  if (loading) {
-    return <div className="animate-pulse text-gray-400">Loading your history...</div>;
+  // Refetch watch history periodically to catch updates during playback
+  useEffect(() => {
+    if (status === 'loading' || !session?.user) {
+      console.log('📺 [Watch History] Polling disabled - session not ready');
+      return;
+    }
+
+    let isMounted = true;
+    let refreshTimeout: NodeJS.Timeout;
+    let lastDataLength = watchHistory.length;
+
+    const refreshWatchHistory = async () => {
+      try {
+        const response = await fetch('/api/watch-history?limit=10');
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          
+          // Log if data changed
+          if (data.length !== lastDataLength) {
+            console.log(`📺 [Watch History] Refresh: ${lastDataLength} → ${data.length} items`);
+            lastDataLength = data.length;
+          }
+          
+          setWatchHistory(data);
+        }
+      } catch (error) {
+        console.error('[Watch History] Refresh error:', error);
+        // Silent error - keep existing data
+      }
+      
+      if (isMounted) {
+        // Refresh every 1 second for progress bar updates
+        // API saves happen every 3 seconds, so 1 second polling provides smooth display without excessive API calls
+        refreshTimeout = setTimeout(refreshWatchHistory, 1000);
+      }
+    };
+
+    // Start the refresh cycle immediately
+    refreshTimeout = setTimeout(refreshWatchHistory, 500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(refreshTimeout);
+    };
+  }, [status, session?.user?.email, watchHistory.length]);
+
+  // Show nothing while session is loading
+  if (status === 'loading') {
+    return null;
   }
 
   if (!session?.user) {
     return null;
+  }
+
+  // Show loading message only after we know there's a user
+  if (loading) {
+    return <div className="animate-pulse text-gray-400 my-8">Loading your history...</div>;
   }
 
   // Group TV shows to only show the latest episode
@@ -245,6 +313,19 @@ export default function UserWatchHistory() {
                   <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
                     {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')}
                   </div>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDeleteConfirmation({ id: item._id, title: item.title });
+                    }}
+                    className="absolute bottom-2 right-2 bg-red-600/80 hover:bg-red-600 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20"
+                    aria-label="Delete from history"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 {/* Title and Progress */}

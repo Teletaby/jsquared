@@ -20,6 +20,8 @@ interface EpisodeSelectorProps {
   showTitle: string;
   posterPath?: string;
   mediaType?: 'tv' | 'movie';
+  currentSeason?: number;
+  currentEpisode?: number;
   onClose: () => void;
   onEpisodeSelect: (season: number, episode: number) => void;
 }
@@ -29,6 +31,8 @@ export default function EpisodeSelector({
   showTitle,
   posterPath,
   mediaType = 'tv',
+  currentSeason,
+  currentEpisode,
   onClose,
   onEpisodeSelect,
 }: EpisodeSelectorProps) {
@@ -81,7 +85,11 @@ export default function EpisodeSelector({
         const data = await res.json();
         setSeasons(data.seasons);
         if (data.seasons.length > 0) {
-          setSelectedSeason(data.seasons[0]);
+          // If currentSeason is provided, select that season; otherwise select the first
+          const seasonToSelect = currentSeason 
+            ? data.seasons.find((s: Season) => s.season_number === currentSeason) || data.seasons[0]
+            : data.seasons[0];
+          setSelectedSeason(seasonToSelect);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred.');
@@ -91,7 +99,7 @@ export default function EpisodeSelector({
     };
 
     fetchSeasons();
-  }, [tvShowId]);
+  }, [tvShowId, currentSeason]);
 
   const handleSeasonChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const seasonNumber = parseInt(event.target.value, 10);
@@ -107,46 +115,19 @@ export default function EpisodeSelector({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 pt-24">
-      <div className="bg-neutral-900 rounded-lg max-w-4xl w-full max-h-[85vh] overflow-y-auto">
-        {/* Header with Logo and Title */}
-        <div className="relative bg-gradient-to-b from-neutral-800 to-neutral-900 p-4 sm:p-6 border-b border-gray-700">
+      <div className="bg-neutral-900 rounded-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto shadow-2xl">
+        {/* Minimal Header with Close Button */}
+        <div className="relative bg-gradient-to-r from-neutral-800 to-neutral-900 p-4 sm:p-6 border-b border-gray-700 flex items-center justify-between">
+          <div className="text-lg font-semibold text-gray-300">
+            Select Season & Episode
+          </div>
           <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 text-white text-2xl hover:text-gray-400 transition-colors flex-shrink-0 z-10"
+            className="text-gray-400 hover:text-white text-3xl transition-colors flex-shrink-0 z-10 -mr-2"
+            aria-label="Close"
           >
-            &times;
+            ×
           </button>
-          
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            {/* Logo or Poster */}
-            {logoUrl ? (
-              <div className="flex-shrink-0">
-                <img
-                  src={logoUrl}
-                  alt={showTitle}
-                  className="h-32 object-contain"
-                />
-              </div>
-            ) : posterPath ? (
-              <div className="flex-shrink-0">
-                <img
-                  src={posterUrl}
-                  alt={showTitle}
-                  className="rounded-lg border border-gray-600 shadow-lg w-32 h-auto"
-                />
-              </div>
-            ) : null}
-            
-            {/* Title */}
-            <div className="flex-1">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 break-words">
-                {showTitle}
-              </h2>
-              <div className="text-gray-400 text-sm">
-                Select a season and episode to watch
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Content */}
@@ -161,14 +142,14 @@ export default function EpisodeSelector({
             <>
               {seasons.length > 0 ? (
                 <>
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-gray-300 mb-2">
-                      Select Season
+                  <div className="mb-8">
+                    <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">
+                      Season
                     </label>
                     <select
                       onChange={handleSeasonChange}
                       value={selectedSeason?.season_number || ''}
-                      className="w-full p-3 rounded bg-neutral-800 text-white border border-gray-700 focus:ring-2 focus:ring-accent focus:border-accent transition-all duration-200 font-medium"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border border-neutral-700 hover:border-gray-500 focus:border-accent focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-200 font-medium cursor-pointer"
                     >
                       {seasons.map(season => (
                         <option key={season.season_number} value={season.season_number}>
@@ -178,30 +159,47 @@ export default function EpisodeSelector({
                     </select>
                   </div>
 
-                  {selectedSeason && (
+                  {selectedSeason && selectedSeason.episodes.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-bold text-white mb-3">
-                        Episodes - Season {selectedSeason.season_number}
+                      <h3 className="text-sm font-bold text-gray-300 mb-4 uppercase tracking-wider">
+                        Season {selectedSeason.season_number} — {selectedSeason.episodes.length} Episodes
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {selectedSeason.episodes.map(episode => (
-                          <div
-                            key={episode.episode_number}
-                            onClick={() => handleEpisodeClick(episode.episode_number)}
-                            className="p-3 bg-neutral-800 hover:bg-neutral-700 rounded cursor-pointer transition-colors duration-200 border border-gray-700 hover:border-accent group"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="flex-shrink-0 w-10 h-10 bg-accent rounded flex items-center justify-center font-bold text-black text-sm group-hover:bg-red-600 transition-colors">
-                                {episode.episode_number}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white font-semibold text-sm group-hover:text-accent transition-colors truncate">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {selectedSeason.episodes.map(episode => {
+                          const isCurrentEpisode = 
+                            currentSeason === selectedSeason.season_number && 
+                            currentEpisode === episode.episode_number;
+                          
+                          return (
+                            <button
+                              key={episode.episode_number}
+                              onClick={() => handleEpisodeClick(episode.episode_number)}
+                              className={`group relative w-full p-4 rounded-lg cursor-pointer transition-all duration-200 border font-medium focus:outline-none focus:ring-2 focus:ring-accent ${
+                                isCurrentEpisode
+                                  ? 'bg-accent text-black border-accent shadow-lg shadow-accent/50'
+                                  : 'bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700 hover:border-accent hover:shadow-lg'
+                              }`}
+                            >
+                              <div className="flex flex-col items-center gap-2">
+                                <div className={`text-2xl font-bold transition-colors duration-200 ${
+                                  isCurrentEpisode ? 'text-black' : 'text-accent group-hover:text-white'
+                                }`}>
+                                  Ep. {episode.episode_number}
+                                </div>
+                                <p className={`text-xs text-center line-clamp-2 w-full transition-colors duration-200 ${
+                                  isCurrentEpisode 
+                                    ? 'text-black font-semibold' 
+                                    : 'text-white group-hover:text-accent'
+                                }`}>
                                   {episode.name || `Episode ${episode.episode_number}`}
                                 </p>
+                                {isCurrentEpisode && (
+                                  <span className="text-xs font-bold uppercase tracking-wider">Now Playing</span>
+                                )}
                               </div>
-                            </div>
-                          </div>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

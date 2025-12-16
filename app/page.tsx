@@ -54,7 +54,7 @@ export default async function HomePage() {
   return (
     <RootLayoutContent>
       <HeroCarousel items={trendingMovies} />
-      {session && <UserWatchHistory />}
+      <UserWatchHistory />
       <Top20Week />
       
       {/* Popular Movies */}
