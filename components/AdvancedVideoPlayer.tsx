@@ -82,12 +82,13 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       }
     };
 
-    // Also save when user switches tabs
+    // Also save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
       if (document.hidden && elapsedRef.current > 0 && onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
         const totalTime = initialTime + elapsedRef.current;
-        console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's');
+        console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's (player stays alive)');
         onTimeUpdate(totalTime);
+        // Note: We do NOT unmount or reload the player here - it stays alive in the background
       }
     };
 

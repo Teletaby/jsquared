@@ -173,12 +173,32 @@ export async function POST(request: NextRequest) {
     // If immediate flag is set (for seek, pause, ended events), write directly to DB
     // Otherwise, batch the update for efficiency
     if (immediate) {
+      // For TV shows, delete other episodes of the same series when switching episodes
+      if (mediaType === 'tv' && seasonNumber !== undefined && episodeNumber !== undefined) {
+        await WatchHistory.deleteMany({
+          userId: user._id,
+          mediaId,
+          mediaType: 'tv',
+          $or: [
+            { seasonNumber: { $ne: seasonNumber } },
+            { episodeNumber: { $ne: episodeNumber } },
+          ]
+        });
+        console.log(`🗑️ Deleted other episodes for S${seasonNumber}E${episodeNumber}`);
+      }
+
       // Write directly to database for important events
-      const filter = {
+      const filter: any = {
         userId: user._id,
         mediaId,
         mediaType,
       };
+
+      // For TV shows, include season and episode in the filter for precision
+      if (mediaType === 'tv' && seasonNumber !== undefined && episodeNumber !== undefined) {
+        filter.seasonNumber = seasonNumber;
+        filter.episodeNumber = episodeNumber;
+      }
 
       // Only include fields that should be updated
       const updateFields: any = {

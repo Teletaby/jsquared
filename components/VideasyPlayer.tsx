@@ -149,7 +149,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
     console.log('🔌 [VideasyPlayer] Setting up message listener');
     window.addEventListener('message', handleMessage);
     
-    // Save progress before leaving
+    // Save progress before leaving (page unload, not tab switch)
     const handleBeforeUnload = () => {
       console.log('⏹️ [VideasyPlayer] Page unloading, saving final progress:', lastSavedTimeRef.current);
       if (lastSavedTimeRef.current > 0 && onTimeUpdate) {
@@ -157,11 +157,12 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
       }
     };
 
-    // Save when user switches tabs
+    // Save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
       if (document.hidden && lastSavedTimeRef.current > 0 && onTimeUpdate) {
         console.log('👁️ [VideasyPlayer] Page hidden, saving progress:', lastSavedTimeRef.current);
         onTimeUpdate(lastSavedTimeRef.current);
+        // Note: We do NOT unmount or reload the player here - it stays alive in the background
       }
     };
 

@@ -143,7 +143,7 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
     console.log('🔌 [VidLinkPlayer] Setting up message listener for VidLink');
     window.addEventListener('message', handleMessage);
 
-    // Save progress before leaving
+    // Save progress before leaving (page unload, not tab switch)
     const handleBeforeUnload = () => {
       console.log('⏹️ [VidLinkPlayer] Page unloading, saving final progress:', lastSavedTimeRef.current);
       if (lastSavedTimeRef.current > 0 && onTimeUpdate) {
@@ -151,11 +151,12 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
       }
     };
 
-    // Save when user switches tabs
+    // Save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
       if (document.hidden && lastSavedTimeRef.current > 0 && onTimeUpdate) {
         console.log('👁️ [VidLinkPlayer] Page hidden, saving progress:', lastSavedTimeRef.current);
         onTimeUpdate(lastSavedTimeRef.current);
+        // Note: We do NOT unmount or reload the player here - it stays alive in the background
       }
     };
 
