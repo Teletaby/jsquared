@@ -11,23 +11,48 @@ export const dynamic = 'force-dynamic';
 // Helper to ensure settings document exists
 async function ensureSettingsDocument() {
   await connectToDatabase();
+  const validSources = ['videasy', 'vidlink', 'vidsrc'];
+  
+  // First, migrate any documents with invalid videoSource values using updateMany with validation bypass
+  const db = require('mongoose').connection;
+  if (db && db.db) {
+    try {
+      await db.collection('settings').updateMany(
+        { 
+          key: 'app_settings',
+          videoSource: { $nin: validSources }
+        },
+        { 
+          $set: { videoSource: 'videasy' }
+        }
+      );
+    } catch (err) {
+      console.log('Migration attempt (non-critical):', err);
+    }
+  }
+  
   let settings = await Settings.findOne({ key: 'app_settings' });
   if (!settings) {
     settings = await Settings.create({ 
       key: 'app_settings', 
       isMaintenanceMode: false,
       isChatbotMaintenanceMode: false,
-      videoSource: 'vidking'
+      videoSource: 'videasy'
     });
   } else {
     // Ensure existing documents have all fields
+    let needsSave = false;
     if (settings.isChatbotMaintenanceMode === undefined) {
       settings.isChatbotMaintenanceMode = false;
+      needsSave = true;
     }
-    if (settings.videoSource === undefined) {
-      settings.videoSource = 'vidking';
+    if (settings.videoSource === undefined || !validSources.includes(settings.videoSource)) {
+      settings.videoSource = 'videasy';
+      needsSave = true;
     }
-    await settings.save();
+    if (needsSave) {
+      await settings.save();
+    }
   }
   return settings;
 }
@@ -46,7 +71,7 @@ export async function GET() {
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
-      videoSource: settings.videoSource || 'vidking'
+      videoSource: settings.videoSource || 'videasy'
     }, { status: 200 });
   } catch (error) {
     console.error('Error fetching maintenance mode:', error);
@@ -72,7 +97,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
     }
 
-    if (videoSource !== undefined && !['vidking', 'vidsrc'].includes(videoSource)) {
+    if (videoSource !== undefined && !['videasy', 'vidlink', 'vidsrc'].includes(videoSource)) {
       return NextResponse.json({ message: 'Invalid video source' }, { status: 400 });
     }
 
@@ -104,7 +129,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
-      videoSource: settings.videoSource || 'vidking'
+      videoSource: settings.videoSource || 'videasy'
     });
   } catch (error) {
     console.error('Error updating maintenance mode:', error);

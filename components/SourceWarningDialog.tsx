@@ -47,14 +47,14 @@ const SourceWarningDialog: React.FC<SourceWarningDialogProps> = ({
         {/* Message */}
         <div className="mb-6 space-y-3">
           <p className="text-gray-300 text-sm">
-            This alternative source may not save your watch progress accurately.
+            Source 3 may not save your watch progress accurately.
           </p>
           <p className="text-gray-400 text-sm">
-            However, it can still save the last title you watched. You can return to Source 1 at any time to resume with full progress tracking.
+            However, it can still save the last title you watched. You can return to Source 1 or 2 at any time to resume with full progress tracking.
           </p>
           <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3">
             <p className="text-yellow-300 text-xs">
-              ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
+              ⚠️ Source 3 may not display content properly. If you experience any issues, switch back to Source 1 or 2.
             </p>
           </div>
         </div>

@@ -143,8 +143,8 @@ const settingsSchema = new Schema(
     },
     videoSource: {
       type: String,
-      enum: ['vidking', 'vidsrc'],
-      default: 'vidking',
+      enum: ['videasy', 'vidlink', 'vidsrc'],
+      default: 'videasy',
     },
   },
   { timestamps: true }

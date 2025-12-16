@@ -13,8 +13,8 @@ interface SourceInfo {
 }
 
 interface VideoSourceSelectorProps {
-  currentSource: 'vidking' | 'vidsrc';
-  onSourceChange: (source: 'vidking' | 'vidsrc') => void;
+  currentSource: 'videasy' | 'vidlink' | 'vidsrc';
+  onSourceChange: (source: 'videasy' | 'vidlink' | 'vidsrc') => void;
   onConfirm: () => void;
   showWarning?: boolean;
 }
@@ -26,15 +26,25 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
   showWarning = false,
 }) => {
   const sources = {
-    vidking: {
-      name: 'VidKing',
+    videasy: {
+      name: 'Videasy',
       supportsProgress: true,
       supportsAutoResume: true,
       supportsQuality: true,
       supportsSubtitles: true,
       latency: 'low',
-      description: 'Best quality, auto-resume support, fast loading',
+      description: 'Recommended source, full auto-resume support, fast loading',
       icon: '⚡',
+    } as SourceInfo & { description: string; icon: string },
+    vidlink: {
+      name: 'VidLink',
+      supportsProgress: true,
+      supportsAutoResume: true,
+      supportsQuality: true,
+      supportsSubtitles: true,
+      latency: 'low',
+      description: 'Premium source, auto-resume support, huge library',
+      icon: '🎬',
     } as SourceInfo & { description: string; icon: string },
     vidsrc: {
       name: 'VidSrc',
@@ -43,7 +53,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsQuality: false,
       supportsSubtitles: true,
       latency: 'medium',
-      description: 'Alternative source, no auto-resume support',
+      description: 'Fallback source, watch history only (no progress saving)',
       icon: '📺',
     } as SourceInfo & { description: string; icon: string },
   };
@@ -67,12 +77,12 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {(Object.entries(sources) as [keyof typeof sources, typeof sources['vidking']][]).map(
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {(Object.entries(sources) as [keyof typeof sources, typeof sources['videasy']][]).map(
           ([key, source]) => (
             <button
               key={key}
-              onClick={() => onSourceChange(key as 'vidking' | 'vidsrc')}
+              onClick={() => onSourceChange(key as 'videasy' | 'vidlink' | 'vidsrc')}
               className={`relative p-4 rounded-lg border-2 transition text-left ${
                 currentSource === key
                   ? 'border-blue-500 bg-blue-900/20'

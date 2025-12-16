@@ -74,7 +74,43 @@ export async function POST(request: NextRequest) {
     let settings = await Settings.findOne({ key: 'app_settings' });
     const videoSource = settings?.videoSource || 'vidking';
 
-    const { mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds, immediate } = await request.json();
+    // Handle both JSON and form-encoded data (sendBeacon uses form-encoded)
+    let mediaId, mediaType, title, posterPath, progress, currentTime, totalDuration, seasonNumber, episodeNumber, finished, totalPlayedSeconds, immediate;
+    
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Parse form-encoded data from sendBeacon
+      const formData = await request.formData();
+      mediaId = parseInt(formData.get('mediaId') as string);
+      mediaType = formData.get('mediaType');
+      title = formData.get('title');
+      posterPath = formData.get('posterPath');
+      progress = parseFloat(formData.get('progress') as string);
+      currentTime = parseFloat(formData.get('currentTime') as string);
+      totalDuration = parseFloat(formData.get('totalDuration') as string);
+      seasonNumber = formData.get('seasonNumber') ? parseInt(formData.get('seasonNumber') as string) : undefined;
+      episodeNumber = formData.get('episodeNumber') ? parseInt(formData.get('episodeNumber') as string) : undefined;
+      finished = formData.get('finished') === 'true';
+      totalPlayedSeconds = parseFloat(formData.get('totalPlayedSeconds') as string) || undefined;
+      immediate = formData.get('immediate') === 'true';
+      console.log('[Beacon] Form-encoded data received:', { mediaId, mediaType, currentTime, immediate });
+    } else {
+      // Parse JSON data (standard fetch)
+      const jsonData = await request.json();
+      mediaId = jsonData.mediaId;
+      mediaType = jsonData.mediaType;
+      title = jsonData.title;
+      posterPath = jsonData.posterPath;
+      progress = jsonData.progress;
+      currentTime = jsonData.currentTime;
+      totalDuration = jsonData.totalDuration;
+      seasonNumber = jsonData.seasonNumber;
+      episodeNumber = jsonData.episodeNumber;
+      finished = jsonData.finished;
+      totalPlayedSeconds = jsonData.totalPlayedSeconds;
+      immediate = jsonData.immediate;
+    }
+
     console.log('Saving watch history:', { mediaId, mediaType, title, progress, currentTime, totalDuration, seasonNumber, episodeNumber, totalPlayedSeconds, videoSource, immediate });
     if (totalDuration === 0) {
       console.warn('⚠️  WARNING: totalDuration is 0 when saving watch history for', mediaId);

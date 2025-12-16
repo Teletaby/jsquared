@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Video Proxy API - Handles VidKing and VidSrc video extraction
+ * Video Proxy API - Handles Videasy, VidLink, and VidSrc video extraction
  * This allows us to:
  * 1. Get direct video URLs (if available)
  * 2. Track playback without iframe limitations
@@ -25,14 +25,15 @@ export async function POST(request: NextRequest) {
     let videoUrl = '';
     let metadata = {};
 
-    // Handle VidKing
-    if (source === 'vidking') {
-      const embedUrl = `https://www.vidking.net/embed/${mediaType}/${tmdbId}${
-        season && episode ? `/${season}/${episode}` : ''
-      }`;
+    // Handle Videasy (Source 1)
+    if (source === 'videasy') {
+      const embedUrl = mediaType === 'movie'
+        ? `https://player.videasy.net/movie/${tmdbId}?color=E50914&overlay=true&autoplay=true`
+        : `https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?color=E50914&overlay=true&autoplay=true`;
+      
       videoUrl = embedUrl;
       metadata = {
-        source: 'vidking',
+        source: 'videasy',
         embedUrl,
         features: {
           supportsProgress: true,
@@ -42,7 +43,25 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Handle VidSrc
+    // Handle VidLink (Source 2)
+    if (source === 'vidlink') {
+      const embedUrl = mediaType === 'movie'
+        ? `https://vidlink.pro/movie/${tmdbId}?primaryColor=E50914&secondaryColor=a2a2a2&iconColor=eefdec&icons=default&player=default&title=true&poster=true&autoplay=true`
+        : `https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?primaryColor=E50914&secondaryColor=a2a2a2&iconColor=eefdec&icons=default&player=default&title=true&poster=true&autoplay=true`;
+      
+      videoUrl = embedUrl;
+      metadata = {
+        source: 'vidlink',
+        embedUrl,
+        features: {
+          supportsProgress: true,
+          supportsSubtitles: true,
+          supportsQualitySelect: true,
+        },
+      };
+    }
+
+    // Handle VidSrc (Source 3)
     if (source === 'vidsrc') {
       const embedUrl = `https://vidsrc.icu/embed/${mediaType}/${tmdbId}${
         season && episode ? `/${season}/${episode}` : ''
@@ -96,8 +115,16 @@ export async function GET(request: NextRequest) {
 
     // Return capabilities of each source
     const capabilities = {
-      vidking: {
-        name: 'VidKing',
+      videasy: {
+        name: 'Videasy',
+        supportsProgress: true,
+        supportsAutoResume: true,
+        supportsQuality: true,
+        supportsSubtitles: true,
+        latency: 'low',
+      },
+      vidlink: {
+        name: 'VidLink',
         supportsProgress: true,
         supportsAutoResume: true,
         supportsQuality: true,

@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(null);
   const [isChatbotMaintenanceMode, setIsChatbotMaintenanceMode] = useState<boolean | null>(null);
   const [isLoggingEnabled, setIsLoggingEnabled] = useState<boolean | null>(null);
-  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc' | null>(null);
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc' | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
   const [loadingLogging, setLoadingLogging] = useState(true);
   const [loadingVisitorLogs, setLoadingVisitorLogs] = useState(true);
@@ -49,7 +49,7 @@ export default function AdminPage() {
       const data = await res.json();
       setIsMaintenanceMode(data.isMaintenanceMode);
       setIsChatbotMaintenanceMode(data.isChatbotMaintenanceMode || false);
-      setVideoSource(data.videoSource || 'vidking');
+      setVideoSource(data.videoSource || 'videasy');
     } catch (error: any) {
       setErrorMaintenance(error.message);
       console.error('Failed to fetch maintenance status:', error);
@@ -113,7 +113,16 @@ export default function AdminPage() {
   const toggleVideoSource = async () => {
     if (videoSource === null) return;
 
-    const newSource = videoSource === 'vidking' ? 'vidsrc' : 'vidking';
+    // Cycle through sources: videasy -> vidlink -> vidsrc -> videasy
+    let newSource: 'videasy' | 'vidlink' | 'vidsrc';
+    if (videoSource === 'videasy') {
+      newSource = 'vidlink';
+    } else if (videoSource === 'vidlink') {
+      newSource = 'vidsrc';
+    } else {
+      newSource = 'videasy';
+    }
+
     setTogglingVideoSource(true);
     setErrorMaintenance(null);
     try {
@@ -289,26 +298,36 @@ export default function AdminPage() {
 
               <div className="border-t border-gray-700 pt-6">
                 <p className="text-gray-300 mb-4">
-                  Video Source: <span className={`font-bold ${videoSource === 'vidsrc' ? 'text-yellow-500' : 'text-blue-500'}`}>
-                    {videoSource === 'vidsrc' ? 'VIDSRC' : 'VIDEASY'}
+                  Video Source: <span className={`font-bold ${
+                    videoSource === 'videasy' ? 'text-blue-500' :
+                    videoSource === 'vidlink' ? 'text-green-500' :
+                    'text-yellow-500'
+                  }`}>
+                    {videoSource === 'videasy' ? 'VIDEASY (Source 1)' : 
+                     videoSource === 'vidlink' ? 'VIDLINK (Source 2)' :
+                     'VIDSRC (Source 3)'}
                   </span>
                 </p>
                 <p className="text-gray-400 text-sm mb-4">
-                  {videoSource === 'vidsrc' 
-                    ? 'Currently using VidSrc - Alternative source'
-                    : 'Currently using VIDEASY - Full progress tracking enabled'}
+                  {videoSource === 'videasy'
+                    ? 'Currently using Videasy - Full progress tracking enabled'
+                    : videoSource === 'vidlink'
+                    ? 'Currently using VidLink - Full progress tracking enabled'
+                    : 'Currently using VidSrc - Watch history only (no progress saving)'}
                 </p>
                 <button
                   onClick={toggleVideoSource}
                   disabled={togglingVideoSource}
                   className={`px-6 py-3 rounded-lg text-white font-semibold transition-colors duration-200 flex items-center gap-2
-                    ${videoSource === 'vidsrc'
-                      ? 'bg-blue-600 hover:bg-blue-700'
-                      : 'bg-yellow-600 hover:bg-yellow-700'}
+                    ${videoSource === 'videasy'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : videoSource === 'vidlink'
+                      ? 'bg-yellow-600 hover:bg-yellow-700'
+                      : 'bg-blue-600 hover:bg-blue-700'}
                     ${togglingVideoSource ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {togglingVideoSource && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                  Switch to {videoSource === 'vidsrc' ? 'VIDEASY' : 'VidSrc'}
+                  Switch to {videoSource === 'videasy' ? 'VIDLINK' : videoSource === 'vidlink' ? 'VIDSRC' : 'VIDEASY'}
                 </button>
               </div>
             </div>

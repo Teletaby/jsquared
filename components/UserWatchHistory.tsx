@@ -30,7 +30,7 @@ export default function UserWatchHistory() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc'>('videasy');
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; title: string } | null>(null);
   const scrollContainerRef: any = React.useRef(null);
 
@@ -310,8 +310,8 @@ export default function UserWatchHistory() {
                   )}
 
                   {/* Duration Badge */}
-                  <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
-                    {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')}
+                  <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 rounded text-xs text-white hidden">
+                    {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')} / {Math.floor((item.totalDuration || 0) / 60)}:{String(Math.floor((item.totalDuration || 0) % 60)).padStart(2, '0')}
                   </div>
 
                   {/* Delete Button */}

@@ -25,7 +25,7 @@ interface AdvancedVideoPlayerProps {
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
-  videoSource?: 'vidking' | 'vidsrc'; // Which video source to display counter for
+  videoSource?: 'videasy' | 'vidlink' | 'vidsrc'; // Which video source to display counter for
 }
 
 const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
@@ -38,7 +38,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
   episodeNumber,
   initialTime = 0,
   onTimeUpdate,
-  videoSource = 'vidking',
+  videoSource = 'videasy',
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,30 +61,32 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
   }, [initialTime]);
 
   useEffect(() => {
-    // Update every 10 seconds for better granularity - this interval must keep running
+    // Update every 5 seconds for better accuracy (was 10 seconds)
     const interval = setInterval(() => {
-      elapsedRef.current += 10; // Increment by 10 seconds every interval
+      elapsedRef.current += 5; // Increment by 5 seconds every interval
       
-      // Only call onTimeUpdate if it exists AND we're using vidking source
-      // VidSrc (source 2) does not support progress tracking
-      if (onTimeUpdate && videoSource === 'vidking') {
+      // Only call onTimeUpdate if it exists AND we're using videasy/vidlink source
+      // (embed sources don't support progress tracking via postMessage)
+      if (onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
         const totalTime = initialTime + elapsedRef.current;
         onTimeUpdate(totalTime);
       }
-    }, 10000); // Fires every 10 seconds
+    }, 5000); // Fires every 5 seconds (more frequent for accuracy)
 
     // Capture time immediately before page unload
     const handleBeforeUnload = () => {
-      if (elapsedRef.current > 0 && onTimeUpdate && videoSource === 'vidking') {
+      if (elapsedRef.current > 0 && onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
         const totalTime = initialTime + elapsedRef.current;
+        console.log('[AdvancedVideoPlayer] Unload event - saving final time:', totalTime, 's');
         onTimeUpdate(totalTime);
       }
     };
 
     // Also save when user switches tabs
     const handleVisibilityChange = () => {
-      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate && videoSource === 'vidking') {
+      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
         const totalTime = initialTime + elapsedRef.current;
+        console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's');
         onTimeUpdate(totalTime);
       }
     };
@@ -163,9 +165,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }
   }, [user, embedUrl, mediaId, mediaType, duration, posterPath, seasonNumber, episodeNumber]);
 
-  // Auto-save every 10 seconds (only for VidKing source)
+  // Auto-save every 10 seconds (only for embed sources: videasy, vidlink)
   useEffect(() => {
-    if (!user || videoSource !== 'vidking') return;
+    if (!user || (videoSource !== 'videasy' && videoSource !== 'vidlink')) return;
 
     const interval = setInterval(() => {
       if (currentTime > 0 && currentTime - lastSaveTimeRef.current > 10) {
@@ -177,9 +179,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     return () => clearInterval(interval);
   }, [currentTime, savePlaytime, user, videoSource]);
 
-  // Save on page unload (only for VidKing source)
+  // Save on page unload (only for embed sources: videasy, vidlink)
   useEffect(() => {
-    if (videoSource !== 'vidking') return;
+    if (videoSource !== 'videasy' && videoSource !== 'vidlink') return;
 
     const handleBeforeUnload = async () => {
       if (currentTime > 0) {

@@ -23,6 +23,7 @@ const ThemedVideoPlayer = dynamic(() => import('@/components/ThemedVideoPlayer')
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
+import VidLinkPlayer from '@/components/VidLinkPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
@@ -76,9 +77,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc'>('videasy');
   const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'vidsrc' | null>(null);
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidsrc' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
@@ -99,45 +100,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   }, [showResumePrompt, notificationVisible]);
 
   // Effect to reset player state when content changes - no longer needed here
-  // useEffect(() => {
-  //   hasPlayedOnceRef.current = false;
-  //   setIsPaused(false);
-  // }, [tmdbId]);
-
-  // Effect for handling player events from the iframe - no longer needed
-  // useEffect(() => {
-  //   const handlePlayerMessage = (event: MessageEvent) => {
-  //     try {
-  //       const message = JSON.parse(event.data);
-  //       if (message.type === 'PLAYER_EVENT') {
-  //         if (message.data.event === 'play') {
-  //           setIsPaused(false);
-  //           hasPlayedOnceRef.current = true; // Mark that playback has successfully started
-  //         } else if (message.data.event === 'pause') {
-  //           // Only show the PAUSED overlay if the video has played at least once.
-  //           // This prevents the overlay from showing if autoplay is blocked on load.
-  //           if (hasPlayedOnceRef.current) {
-  //             setIsPaused(true);
-  //           }
-  //         }
-  //       }
-  //     } catch (error) {
-  //       // Ignore errors from non-player messages
-  //     }
-  //   };
-
-  //   window.addEventListener("message", handlePlayerMessage);
-
-  //   return () => {
-  //     window.removeEventListener("message", handlePlayerMessage);
-  //   };
-  // }, []); // This effect should only run once to set up the listener
-
-  // Effect to reset state when media ID changes
   useEffect(() => {
     if (lastMediaIdRef.current !== null && lastMediaIdRef.current !== tmdbId) {
       // Media has changed, reset to default source
-      setVideoSource('vidking');
+      setVideoSource('videasy');
       // Reset resume choice for new media
       setResumeChoice('pending');
       setShowResumePrompt(false);
@@ -258,7 +224,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           const movieHistory = data.find((item: any) => item.mediaId === tmdbId && item.mediaType === 'movie');
           if (movieHistory && movieHistory.currentTime > 0) {
             console.log('✅ FOUND! Movie progress:', movieHistory.currentTime, 's');
-            setSavedProgress(Math.floor(movieHistory.currentTime));
+            setSavedProgress(movieHistory.currentTime); // Keep full precision, no rounding
             setSavedDuration(movieHistory.totalDuration || 0);
             setCurrentPlaybackTime(movieHistory.currentTime);
           } else {
@@ -311,9 +277,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/movie/${tmdbId}`;
       } else {
-        // For vidking source, we now use VIDEASY
-        // This is handled by the VideasyPlayer component
-        return null; // We'll use VideasyPlayer instead
+        // For videasy and vidlink sources, we use dedicated player components
+        return null; // We'll use VideasyPlayer or VidLinkPlayer instead
       }
     },
     [tmdbId, videoSource, resumeChoice, savedProgress]
@@ -360,21 +325,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   // Centralize title logic to handle optional properties and provide a fallback.
   const mediaTitle = movie.title || 'Untitled Movie';
   
-  const handleChangeSource = async () => {
-    // If already on source 2, toggle back to source 1
-    if (videoSource === 'vidsrc') {
-      setVideoSource('vidking');
-      return;
-    }
-
-    // Otherwise, try to switch to source 2
-    // If user is logged in and switching to source 2, show warning
-    if (session) {
-      setPendingSource('vidsrc');
+  const handleSelectSource = (source: 'videasy' | 'vidlink' | 'vidsrc') => {
+    if (videoSource === source) return; // Already on this source
+    
+    setPendingSource(source);
+    // Only show warning dialog when switching to Source 3 (vidsrc)
+    if (session && source === 'vidsrc') {
       setShowSourceWarning(true);
     } else {
-      // If not logged in, just switch without warning
-      setVideoSource('vidsrc');
+      setVideoSource(source);
     }
   };
 
@@ -399,9 +358,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
-      {/* Preload VIDEASY and VidSrc for faster loading */}
+      {/* Preload VIDEASY, VidLink and VidSrc for faster loading */}
       <link rel="dns-prefetch" href="https://player.videasy.net" />
       <link rel="preconnect" href="https://player.videasy.net" />
+      <link rel="dns-prefetch" href="https://vidlink.pro" />
+      <link rel="preconnect" href="https://vidlink.pro" />
       <link rel="dns-prefetch" href="https://vidsrc.icu" />
       <link rel="preconnect" href="https://vidsrc.icu" />
       
@@ -747,7 +708,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       {view !== 'info' && (
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16 space-y-8">
             {/* Video Player */}
-            {videoSource === 'vidking' ? (
+            {videoSource === 'videasy' ? (
               // Use VIDEASY player for source 1
               <VideasyPlayer
                 key={`${tmdbId}-videasy`}
@@ -777,17 +738,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   });
                 }}
               />
-            ) : videoSrc ? (
-              // Use VidSrc for source 2
-              <AdvancedVideoPlayer
-                key={`${tmdbId}-${resumeChoice}`}
-                embedUrl={videoSrc}
-                title={mediaTitle}
+            ) : videoSource === 'vidlink' ? (
+              // Use VidLink player for source 2
+              <VidLinkPlayer
+                key={`${tmdbId}-vidlink`}
                 mediaId={tmdbId}
                 mediaType={mediaType}
+                title={mediaTitle}
                 posterPath={movie.poster_path}
                 initialTime={savedProgress}
-                videoSource={videoSource}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
                   // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
@@ -807,6 +766,24 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                     progress: progress,
                     posterPath: movie.poster_path,
                   });
+                }}
+              />
+            ) : videoSrc ? (
+              // Use VidSrc for source 3 (watch history only, no progress tracking)
+              <AdvancedVideoPlayer
+                key={`${tmdbId}-${resumeChoice}`}
+                embedUrl={videoSrc}
+                title={mediaTitle}
+                mediaId={tmdbId}
+                mediaType={mediaType}
+                posterPath={movie.poster_path}
+                initialTime={savedProgress}
+                videoSource={videoSource}
+                onTimeUpdate={(time) => {
+                  setCurrentPlaybackTime(time);
+                  // VidSrc doesn't support progress tracking, so we don't save progress
+                  // But we can still track watch history via watch-history API
+                  console.log(`⏱️ VidSrc watching at ${time}s - Watch history only (no progress saving)`);
                 }}
               />
             ) : (
@@ -835,20 +812,37 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Source Selector Buttons */}
                 <div className="flex flex-wrap gap-2 sm:gap-3">
                   <button
-                    onClick={handleChangeSource}
-                    style={{ 
-                      backgroundColor: videoSource === 'vidsrc' ? '#E50914' : '#1A1A1A'
-                    }}
+                    onClick={() => handleSelectSource('videasy')}
                     className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
-                      videoSource === 'vidsrc'
-                        ? 'text-white hover:brightness-110'
-                        : 'text-gray-400 border border-gray-700 hover:border-gray-500'
+                      videoSource === 'videasy'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    {videoSource === 'vidsrc' ? 'Switch to Source 1' : 'Switch to Source 2'}
+                    Source 1 {videoSource === 'videasy' && '✓'}
+                  </button>
+                  <button
+                    onClick={() => handleSelectSource('vidlink')}
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidlink'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 2 {videoSource === 'vidlink' && '✓'}
+                  </button>
+                  <button
+                    onClick={() => handleSelectSource('vidsrc')}
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidsrc'
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 3 {videoSource === 'vidsrc' && '✓'}
                   </button>
                   <WatchlistButton
                     mediaId={tmdbId}
@@ -864,7 +858,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {videoSource === 'vidsrc' && (
                   <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3 mt-4">
                     <p className="text-yellow-300 text-xs sm:text-sm">
-                      ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                      ⚠️ You are currently using Source 3. Some selections might not display content properly. If you experience any issues, switch back to Source 1 or 2.
                     </p>
                   </div>
                 )}

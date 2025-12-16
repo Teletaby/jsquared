@@ -57,18 +57,18 @@ export function formatDuration(minutes: number): string {
 
 /**
  * Fetch the current video source setting from the server
- * @returns Promise<'vidking' | 'vidsrc'> The current video source
+ * @returns Promise<'videasy' | 'vidlink' | 'vidsrc'> The current video source
  */
-export async function getVideoSourceSetting(): Promise<'vidking' | 'vidsrc'> {
+export async function getVideoSourceSetting(): Promise<'videasy' | 'vidlink' | 'vidsrc'> {
   try {
     const res = await fetch('/api/admin/maintenance');
     if (!res.ok) {
-      return 'vidking'; // Default to vidking if fetch fails
+      return 'videasy'; // Default to videasy if fetch fails
     }
     const data = await res.json();
-    return data.videoSource || 'vidking';
+    return data.videoSource || 'videasy';
   } catch (error) {
     console.error('Error fetching video source setting:', error);
-    return 'vidking'; // Default to vidking on error
+    return 'videasy'; // Default to videasy on error
   }
 }

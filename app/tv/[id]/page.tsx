@@ -17,6 +17,7 @@ import MarkdownBoldText from '@/components/MarkdownBoldText';
 import SourceWarningDialog from '@/components/SourceWarningDialog';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
+import VidLinkPlayer from '@/components/VidLinkPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
@@ -83,9 +84,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  const [videoSource, setVideoSource] = useState<'vidking' | 'vidsrc'>('vidking');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc'>('videasy');
   const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'vidsrc' | null>(null);
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidsrc' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
@@ -117,7 +118,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   useEffect(() => {
     if (lastMediaIdRef.current !== null && lastMediaIdRef.current !== tmdbId) {
       // Media has changed, reset to default source
-      setVideoSource('vidking');
+      setVideoSource('videasy');
     }
     // Reset resume choice for new media or episode
     setResumeChoice('pending');
@@ -248,7 +249,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           );
           if (tvHistory && tvHistory.currentTime > 0) {
             console.log('✅ FOUND! Progress:', tvHistory.currentTime, 's for S', currentSeason, 'E', currentEpisode);
-            setSavedProgress(Math.floor(tvHistory.currentTime));
+            setSavedProgress(tvHistory.currentTime); // Keep full precision, no rounding
             setSavedDuration(tvHistory.totalDuration || 0);
             setCurrentPlaybackTime(tvHistory.currentTime);
           } else {
@@ -362,21 +363,15 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   const mediaTitle = tvShow.name || 'Untitled Show';
 
-  const handleChangeSource = async () => {
-    // If already on source 2, toggle back to source 1
-    if (videoSource === 'vidsrc') {
-      setVideoSource('vidking');
-      return;
-    }
-
-    // Otherwise, try to switch to source 2
-    // If user is logged in and switching to source 2, show warning
-    if (session) {
-      setPendingSource('vidsrc');
+  const handleChangeSource = (source: 'videasy' | 'vidlink' | 'vidsrc') => {
+    if (videoSource === source) return; // Already on this source
+    
+    setPendingSource(source);
+    // Only show warning dialog when switching to Source 3 (vidsrc)
+    if (session && source === 'vidsrc') {
       setShowSourceWarning(true);
     } else {
-      // If not logged in, just switch without warning
-      setVideoSource('vidsrc');
+      setVideoSource(source);
     }
   };
 
@@ -395,6 +390,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
+      {/* Preload VIDEASY, VidLink and VidSrc for faster loading */}
+      <link rel="dns-prefetch" href="https://player.videasy.net" />
+      <link rel="preconnect" href="https://player.videasy.net" />
+      <link rel="dns-prefetch" href="https://vidlink.pro" />
+      <link rel="preconnect" href="https://vidlink.pro" />
+      <link rel="dns-prefetch" href="https://vidsrc.icu" />
+      <link rel="preconnect" href="https://vidsrc.icu" />
+
       {/* Source Warning Dialog */}
       <SourceWarningDialog
         isOpen={showSourceWarning}
@@ -702,7 +705,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         {view !== 'info' && (
           <div className="space-y-8 mb-8">
             {/* Video Player - Show immediately with notification if resuming */}
-            {videoSource === 'vidking' ? (
+            {videoSource === 'videasy' ? (
               // Use VIDEASY player for source 1
               <VideasyPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-videasy`}
@@ -737,8 +740,43 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   });
                 }}
               />
+            ) : videoSource === 'vidlink' ? (
+              // Use VidLink player for source 2
+              <VidLinkPlayer
+                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-vidlink`}
+                mediaId={tmdbId}
+                mediaType={mediaType}
+                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
+                posterPath={tvShow?.poster_path}
+                seasonNumber={currentSeason}
+                episodeNumber={currentEpisode}
+                initialTime={savedProgress}
+                onTimeUpdate={(time) => {
+                  setCurrentPlaybackTime(time);
+                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
+                  
+                  // Cap progress at 100% even if user watched past episode end
+                  const progress = Math.min((time / totalSeconds) * 100, 100);
+                  
+                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                  
+                  queueUpdate({
+                    mediaId: tmdbId,
+                    mediaType,
+                    title: mediaTitle,
+                    currentTime: time,
+                    totalDuration: totalSeconds,
+                    progress: progress,
+                    posterPath: tvShow?.poster_path,
+                    seasonNumber: currentSeason,
+                    episodeNumber: currentEpisode,
+                  });
+                }}
+              />
             ) : videoSrc ? (
-              // Use VidSrc for source 2
+              // Use VidSrc for source 3 (watch history only, no progress tracking)
               <AdvancedVideoPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
                 embedUrl={videoSrc}
@@ -811,17 +849,34 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Select Episode (S{currentSeason}E{currentEpisode})
                   </button>
                   <button
-                    onClick={handleChangeSource}
-                    style={{ 
-                      backgroundColor: videoSource === 'vidsrc' ? '#E50914' : '#1A1A1A'
-                    }}
-                    className={`font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded transition-all ${
-                      videoSource === 'vidsrc'
-                        ? 'text-white hover:brightness-110'
-                        : 'text-gray-400 border border-gray-700 hover:border-gray-500'
+                    onClick={() => handleChangeSource('videasy')}
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'videasy'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    {videoSource === 'vidsrc' ? 'Switch to Source 1' : 'Switch to Source 2'}
+                    Source 1 {videoSource === 'videasy' && '✓'}
+                  </button>
+                  <button
+                    onClick={() => handleChangeSource('vidlink')}
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidlink'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 2 {videoSource === 'vidlink' && '✓'}
+                  </button>
+                  <button
+                    onClick={() => handleChangeSource('vidsrc')}
+                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidsrc'
+                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 3 {videoSource === 'vidsrc' && '✓'}
                   </button>
                 </>
               ) : (
@@ -847,7 +902,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {videoSource === 'vidsrc' && (
               <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3">
                 <p className="text-yellow-300 text-xs sm:text-sm">
-                  ⚠️ You are currently using Source 2. Some selections might not display content properly. If you experience any issues, switch back to Source 1.
+                  ⚠️ You are currently using Source 3. Some selections might not display content properly. If you experience any issues, switch back to Source 1 or 2.
                 </p>
               </div>
             )}

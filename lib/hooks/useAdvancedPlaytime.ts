@@ -22,22 +22,49 @@ interface PlaytimeData {
 export function useAdvancedPlaytime() {
   const isSavingRef = useRef(false);
   const lastSaveTimeRef = useRef<{ time: number; timestamp: number } | null>(null);
+  const lastPlaytimeDataRef = useRef<PlaytimeData | null>(null);
+
+  /**
+   * Synchronous save for use during page unload
+   */
+  const saveSynchronously = useCallback((data: PlaytimeData) => {
+    try {
+      const formData = new URLSearchParams();
+      formData.append('mediaId', String(data.mediaId));
+      formData.append('mediaType', data.mediaType);
+      formData.append('title', data.title || '');
+      formData.append('currentTime', String(data.currentTime));
+      formData.append('totalDuration', String(data.totalDuration));
+      formData.append('progress', String(data.progress));
+      formData.append('posterPath', data.posterPath || '');
+      formData.append('immediate', 'true');
+      if (data.seasonNumber !== undefined) formData.append('seasonNumber', String(data.seasonNumber));
+      if (data.episodeNumber !== undefined) formData.append('episodeNumber', String(data.episodeNumber));
+
+      // Use sendBeacon for reliable delivery on page unload
+      navigator.sendBeacon('/api/watch-history', formData);
+      console.log('[Playtime] 🔔 Beacon sent with final progress:', Math.floor(data.currentTime), 's');
+    } catch (error) {
+      console.error('[Playtime] Beacon send error:', error);
+    }
+  }, []);
 
   /**
    * Save a playtime update immediately
    */
   const queueUpdate = useCallback((data: PlaytimeData) => {
-    // Debounce: save if either condition is met:
-    // 1. 3+ seconds since last save (time-based), OR
-    // 2. Time moved 2+ seconds (position-based)
+    // Always store the latest data for emergency saves
+    lastPlaytimeDataRef.current = data;
+
+    // Minimal debounce: only save if time has actually moved
+    // This ensures we capture accurate resume positions
     const now = Date.now();
     if (lastSaveTimeRef.current) {
-      const timeSinceLastSave = now - lastSaveTimeRef.current.timestamp;
       const timeDiff = Math.abs(data.currentTime - lastSaveTimeRef.current.time);
       
-      // Skip only if BOTH conditions are false (too soon AND time hasn't moved much)
-      if (timeSinceLastSave < 3000 && timeDiff < 2) {
-        return; // Not enough time or movement, skip this save
+      // Skip ONLY if position hasn't changed at all (within 0.5 seconds tolerance)
+      if (timeDiff < 0.5) {
+        return; // Exact same position, skip duplicate save
       }
     }
     
@@ -52,7 +79,7 @@ export function useAdvancedPlaytime() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...data,
-        immediate: true, // Force immediate write for live progress bar updates
+        immediate: true, // Force immediate write for accurate progress tracking
       }),
     })
       .then((res) => {
@@ -75,12 +102,17 @@ export function useAdvancedPlaytime() {
    */
   useEffect(() => {
     const handleBeforeUnload = () => {
-      console.log('[Playtime] Page unloading - final save triggered');
+      // Send final progress via beacon (most reliable on page unload)
+      if (lastPlaytimeDataRef.current) {
+        console.log('[Playtime] Page unloading - sending final save via beacon');
+        saveSynchronously(lastPlaytimeDataRef.current);
+      }
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log('[Playtime] Page hidden - ensuring data persisted');
+      if (document.hidden && lastPlaytimeDataRef.current) {
+        console.log('[Playtime] Page hidden - ensuring data persisted via beacon');
+        saveSynchronously(lastPlaytimeDataRef.current);
       }
     };
 
@@ -91,7 +123,7 @@ export function useAdvancedPlaytime() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [saveSynchronously]);
 
   return {
     queueUpdate,
