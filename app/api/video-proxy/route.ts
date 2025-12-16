@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Video Proxy API - Handles Videasy, VidLink, and VidSrc video extraction
+ * Video Proxy API - Handles Videasy, VidLink, and VIDNEST video extraction
  * This allows us to:
  * 1. Get direct video URLs (if available)
  * 2. Track playback without iframe limitations
@@ -61,19 +61,19 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    // Handle VidSrc (Source 3)
-    if (source === 'vidsrc') {
-      const embedUrl = `https://vidsrc.icu/embed/${mediaType}/${tmdbId}${
-        season && episode ? `/${season}/${episode}` : ''
-      }`;
+    // Handle VIDNEST (Source 3)
+    if (source === 'vidnest') {
+      const embedUrl = mediaType === 'movie'
+        ? `https://vidnest.fun/movie/${tmdbId}`
+        : `https://vidnest.fun/tv/${tmdbId}/${season}/${episode}`;
       videoUrl = embedUrl;
       metadata = {
-        source: 'vidsrc',
+        source: 'vidnest',
         embedUrl,
         features: {
-          supportsProgress: false, // VidSrc doesn't support progress parameter
+          supportsProgress: true, // VIDNEST supports progress tracking via message events
           supportsSubtitles: true,
-          supportsQualitySelect: false,
+          supportsQualitySelect: true,
         },
       };
     }
@@ -131,13 +131,13 @@ export async function GET(request: NextRequest) {
         supportsSubtitles: true,
         latency: 'low',
       },
-      vidsrc: {
-        name: 'VidSrc',
-        supportsProgress: false,
-        supportsAutoResume: false,
-        supportsQuality: false,
+      vidnest: {
+        name: 'VIDNEST',
+        supportsProgress: true,
+        supportsAutoResume: true,
+        supportsQuality: true,
         supportsSubtitles: true,
-        latency: 'medium',
+        latency: 'low',
       },
     };
 

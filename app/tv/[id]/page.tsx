@@ -9,6 +9,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
+import { Download } from 'lucide-react';
 import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
@@ -84,9 +85,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc'>('videasy');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');
   const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidsrc' | null>(null);
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
@@ -299,12 +300,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   // Construct embed URL with useMemo to prevent unnecessary changes
   const embedUrl = useMemo(
     () => {
-      if (videoSource === 'vidsrc') {
-        return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
+      if (videoSource === 'vidnest') {
+        return `https://vidnest.fun/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
       } else {
-        // For vidking source, we now use VIDEASY
+        // For videasy and vidlink sources, we use dedicated player components
         // This is handled by the VideasyPlayer component
-        return null; // We'll use VideasyPlayer instead
+        return null; // We'll use VideasyPlayer or VidLinkPlayer instead
       }
     },
     [tmdbId, currentSeason, currentEpisode, videoSource, resumeChoice, savedProgress]
@@ -363,16 +364,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   const mediaTitle = tvShow.name || 'Untitled Show';
 
-  const handleChangeSource = (source: 'videasy' | 'vidlink' | 'vidsrc') => {
+  const handleChangeSource = (source: 'videasy' | 'vidlink' | 'vidnest') => {
     if (videoSource === source) return; // Already on this source
     
     setPendingSource(source);
-    // Only show warning dialog when switching to Source 3 (vidsrc)
-    if (session && source === 'vidsrc') {
-      setShowSourceWarning(true);
-    } else {
-      setVideoSource(source);
-    }
+    setVideoSource(source);
   };
 
   const handleConfirmSourceChange = () => {
@@ -390,13 +386,13 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
-      {/* Preload VIDEASY, VidLink and VidSrc for faster loading */}
+      {/* Preload VIDEASY, VidLink and VIDNEST for faster loading */}
       <link rel="dns-prefetch" href="https://player.videasy.net" />
       <link rel="preconnect" href="https://player.videasy.net" />
       <link rel="dns-prefetch" href="https://vidlink.pro" />
       <link rel="preconnect" href="https://vidlink.pro" />
-      <link rel="dns-prefetch" href="https://vidsrc.icu" />
-      <link rel="preconnect" href="https://vidsrc.icu" />
+      <link rel="dns-prefetch" href="https://vidnest.fun" />
+      <link rel="preconnect" href="https://vidnest.fun" />
 
       {/* Source Warning Dialog */}
       <SourceWarningDialog
@@ -776,7 +772,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 }}
               />
             ) : videoSrc ? (
-              // Use VidSrc for source 3 (watch history only, no progress tracking)
+              // Use VIDNEST for source 3 (full progress tracking support)
               <AdvancedVideoPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
                 embedUrl={videoSrc}
@@ -827,14 +823,24 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         <div className="grid grid-cols-1 gap-6">
           {/* Details */}
           <div className="space-y-6">
-            {/* Title Section */}
-            <div>
-              <div className="flex items-start sm:items-center gap-2 mb-2 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
-                  {mediaTitle}
-                </h1>
-                <VideoInfoPopup title={mediaTitle} />
+            {/* Title Section with Download Button */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex-1">
+                <div className="flex items-start sm:items-center gap-2 mb-2 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
+                    {mediaTitle}
+                  </h1>
+                  <VideoInfoPopup title={mediaTitle} />
+                </div>
               </div>
+              <a
+                href={`https://dl.vidsrc.vip/tv/${tmdbId}/${currentSeason}/${currentEpisode}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300 hover:bg-gray-700/30 flex items-center gap-2 whitespace-nowrap flex-shrink-0"
+              >
+                <Download size={16} /> Download
+              </a>
             </div>
 
             {/* Action Buttons */}
@@ -869,14 +875,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Source 2 {videoSource === 'vidlink' && '✓'}
                   </button>
                   <button
-                    onClick={() => handleChangeSource('vidsrc')}
+                    onClick={() => handleChangeSource('vidnest')}
                     className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
-                      videoSource === 'vidsrc'
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                      videoSource === 'vidnest'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 3 {videoSource === 'vidsrc' && '✓'}
+                    Source 3 {videoSource === 'vidnest' && '✓'}
                   </button>
                 </>
               ) : (
@@ -898,11 +904,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               />
             </div>
 
-            {/* Source 2 Warning Note */}
-            {videoSource === 'vidsrc' && (
-              <div className="bg-yellow-900 bg-opacity-30 border border-yellow-700 rounded p-3">
-                <p className="text-yellow-300 text-xs sm:text-sm">
-                  ⚠️ You are currently using Source 3. Some selections might not display content properly. If you experience any issues, switch back to Source 1 or 2.
+            {/* VIDNEST Adblocker Disclaimer */}
+            {videoSource === 'vidnest' && (
+              <div className="bg-blue-900 bg-opacity-40 border border-blue-600 rounded p-3">
+                <p className="text-blue-300 text-xs sm:text-sm">
+                  💡 <strong>Tip:</strong> Source 3 may have more ads. Please enable an adblocker for a better viewing experience.
                 </p>
               </div>
             )}

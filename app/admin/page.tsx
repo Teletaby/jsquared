@@ -13,7 +13,7 @@ export default function AdminPage() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(null);
   const [isChatbotMaintenanceMode, setIsChatbotMaintenanceMode] = useState<boolean | null>(null);
   const [isLoggingEnabled, setIsLoggingEnabled] = useState<boolean | null>(null);
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc' | null>(null);
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
   const [loadingLogging, setLoadingLogging] = useState(true);
   const [loadingVisitorLogs, setLoadingVisitorLogs] = useState(true);
@@ -113,12 +113,12 @@ export default function AdminPage() {
   const toggleVideoSource = async () => {
     if (videoSource === null) return;
 
-    // Cycle through sources: videasy -> vidlink -> vidsrc -> videasy
-    let newSource: 'videasy' | 'vidlink' | 'vidsrc';
+    // Cycle through sources: videasy -> vidlink -> vidnest -> videasy
+    let newSource: 'videasy' | 'vidlink' | 'vidnest';
     if (videoSource === 'videasy') {
       newSource = 'vidlink';
     } else if (videoSource === 'vidlink') {
-      newSource = 'vidsrc';
+      newSource = 'vidnest';
     } else {
       newSource = 'videasy';
     }
@@ -305,7 +305,7 @@ export default function AdminPage() {
                   }`}>
                     {videoSource === 'videasy' ? 'VIDEASY (Source 1)' : 
                      videoSource === 'vidlink' ? 'VIDLINK (Source 2)' :
-                     'VIDSRC (Source 3)'}
+                     'VIDNEST (Source 3)'}
                   </span>
                 </p>
                 <p className="text-gray-400 text-sm mb-4">
@@ -313,7 +313,7 @@ export default function AdminPage() {
                     ? 'Currently using Videasy - Full progress tracking enabled'
                     : videoSource === 'vidlink'
                     ? 'Currently using VidLink - Full progress tracking enabled'
-                    : 'Currently using VidSrc - Watch history only (no progress saving)'}
+                    : 'Currently using VIDNEST - Full progress tracking and auto-resume enabled'}
                 </p>
                 <button
                   onClick={toggleVideoSource}
@@ -327,7 +327,7 @@ export default function AdminPage() {
                     ${togglingVideoSource ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {togglingVideoSource && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                  Switch to {videoSource === 'videasy' ? 'VIDLINK' : videoSource === 'vidlink' ? 'VIDSRC' : 'VIDEASY'}
+                  Switch to {videoSource === 'videasy' ? 'VIDLINK' : videoSource === 'vidlink' ? 'VIDNEST' : 'VIDEASY'}
                 </button>
               </div>
             </div>

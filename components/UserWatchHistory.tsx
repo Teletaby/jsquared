@@ -30,7 +30,7 @@ export default function UserWatchHistory() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidsrc'>('videasy');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; title: string } | null>(null);
   const scrollContainerRef: any = React.useRef(null);
 
@@ -229,7 +229,7 @@ export default function UserWatchHistory() {
           <span className="w-1 h-6 bg-accent rounded-full"></span>
           Continue Watching
         </h2>
-        {videoSource === 'vidsrc' && (
+        {videoSource === 'vidnest' && (
           <div className="ml-auto flex items-center gap-2 bg-yellow-500/20 border border-yellow-500/50 px-4 py-2 rounded-lg">
             <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
             <div className="flex flex-col gap-0.5">

@@ -13,11 +13,25 @@ interface SearchModalProps {
   onClose: () => void;
 }
 
+const COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'CN', name: 'China' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'SG', name: 'Singapore' },
+];
+
 const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [rating, setRating] = useState(5);
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   useDisableScroll(isOpen);
 
   const handleGenreChange = (genreId: number) => {
@@ -27,9 +41,24 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   };
 
   const handleSearch = () => {
-    if (!searchTerm.trim() && selectedGenres.length === 0) {
+    if (!searchTerm.trim() && selectedGenres.length === 0 && !selectedCountry) {
       return;
     }
+
+    // If only country is selected, navigate to country page
+    if (selectedCountry && !searchTerm.trim() && selectedGenres.length === 0) {
+      router.push(`/browse/country/${selectedCountry.toLowerCase()}`);
+      onClose();
+      return;
+    }
+
+    // If both country and genres are selected, navigate to country page with genre filter
+    if (selectedCountry && selectedGenres.length > 0 && !searchTerm.trim()) {
+      router.push(`/browse/country/${selectedCountry.toLowerCase()}?genres=${selectedGenres.join(',')}`);
+      onClose();
+      return;
+    }
+
     const queryParams = new URLSearchParams();
     if (searchTerm.trim()) {
       queryParams.append('query', searchTerm.trim());
@@ -43,6 +72,10 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
       queryParams.append('minRating', rating.toString());
     }
 
+    if (selectedCountry) {
+      queryParams.append('country', selectedCountry);
+    }
+
     router.push(`/search?${queryParams.toString()}`);
     onClose();
   };
@@ -52,6 +85,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
       setSearchTerm('');
       setRating(5);
       setSelectedGenres([]);
+      setSelectedCountry(null);
     }
   }, [isOpen]);
 
@@ -70,7 +104,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
           <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
         </Transition.Child>
 
-        <div className="fixed inset-0 overflow-y-auto">
+        <div className="fixed inset-0 overflow-hidden">
           <div className="flex min-h-full items-center justify-center p-4 text-center">
             <Transition.Child
               as={Fragment}
@@ -81,8 +115,8 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-2xl backdrop-blur-lg bg-white/10 border border-white/20 p-4 sm:p-6 text-left align-middle shadow-xl transition-all max-h-[90vh]">
-                <Dialog.Title as="h3" className="text-lg sm:text-2xl font-bold leading-6 text-white flex justify-between items-center">
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-visible rounded-2xl backdrop-blur-lg bg-white/10 border border-white/20 p-4 sm:p-6 text-left align-middle shadow-xl transition-all flex flex-col">
+                <Dialog.Title as="h3" className="text-lg sm:text-2xl font-bold leading-6 text-white flex justify-between items-center flex-shrink-0">
                   Advanced Search
                   <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-800 transition-colors">
                     <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -105,7 +139,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="mt-6">
                   {/* Genre Filter */}
                   <div>
                     <label className="text-lg font-medium text-gray-300">Genres</label>
@@ -122,30 +156,33 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                       ))}
                     </div>
                   </div>
+                </div>
 
-                  {/* Rating Filter */}
-                  <div>
-                    <label htmlFor="rating-slider" className="text-base sm:text-lg font-medium text-gray-300">Min. Rating: <span className="font-bold text-blue-500">{rating.toFixed(1)}</span></label>
-                    <input
-                      id="rating-slider"
-                      type="range"
-                      min="0"
-                      max="10"
-                      step="0.1"
-                      value={rating}
-                      onChange={(e) => setRating(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer mt-3 accent-blue-500"
-                    />
+                {/* Country Filter */}
+                <div className="mt-6 pb-4">
+                  <label className="text-lg font-medium text-gray-300 block mb-3">Browse by Country</label>
+                  <div className="flex flex-wrap gap-2">
+                    {COUNTRIES.map((country) => (
+                      <button
+                        key={country.code}
+                        onClick={() => setSelectedCountry(selectedCountry === country.code ? null : country.code)}
+                        className={`px-4 py-2 rounded-md transition-colors text-sm font-medium
+                          ${selectedCountry === country.code ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
+                      >
+                        {country.name}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="mt-8 text-right">
+                <div className="mt-8 text-right flex-shrink-0">
                   <button
                     type="button"
-                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-500 px-6 py-2 text-base font-medium text-white hover:bg-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors"
+                    className="inline-flex justify-center rounded-md border border-transparent bg-blue-500 px-6 py-2 text-base font-medium text-white hover:bg-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleSearch}
+                    disabled={!searchTerm.trim() && selectedGenres.length === 0 && !selectedCountry}
                   >
-                    Search
+                    {selectedCountry ? `Explore ${COUNTRIES.find(c => c.code === selectedCountry)?.name}` : 'Search'}
                   </button>
                 </div>
               </Dialog.Panel>

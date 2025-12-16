@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface AdvancedVideoPlayerProps {
-  embedUrl: string; // VidKing or VidSrc embed URL
+  embedUrl: string; // VIDNEST embed URL
   title?: string;
   mediaId: number;
   mediaType: 'movie' | 'tv';
@@ -25,7 +25,7 @@ interface AdvancedVideoPlayerProps {
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
-  videoSource?: 'videasy' | 'vidlink' | 'vidsrc'; // Which video source to display counter for
+  videoSource?: 'videasy' | 'vidlink' | 'vidnest'; // Which video source to display counter for
 }
 
 const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
@@ -267,7 +267,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }
   }, [initialTime, embedUrl]);
 
-  // Memoize embed URL - VidSrc doesn't support time parameters
+  // Memoize embed URL - VIDNEST supports time parameters for progress
   // User will need to manually seek to timestamp using player controls
   const stableEmbedUrl = useMemo(() => embedUrl, [embedUrl]);
 
@@ -278,7 +278,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       style={{ aspectRatio: '16 / 9' }}
     >
       {/* Resume indicator badge with instructions - DISABLED FOR VIDKING to prevent glitches */}
-      {videoSource === 'vidsrc' && initialTime > 0 && showResumeHint && (
+      {videoSource === 'vidnest' && initialTime > 0 && showResumeHint && (
         <div className="absolute bottom-4 left-4 z-50 bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow-lg flex items-center gap-2 animate-pulse">
           <span>⏱️ Last watched at {Math.floor(initialTime)}s</span>
           <span className="text-xs opacity-90">- Drag progress bar to resume</span>

@@ -66,7 +66,7 @@ const VideoInfoPopup: React.FC<VideoInfoPopupProps> = ({ title = 'Video Player' 
                   Slow Loading?
                 </h3>
                 <p className="text-xs text-gray-300 leading-snug ml-6">
-                  Change the server in the player's settings next to the gear icon to get better speed.
+                  Try changing video sources to get better speed and stability.
                 </p>
               </div>
 

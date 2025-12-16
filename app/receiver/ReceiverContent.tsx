@@ -230,9 +230,9 @@ const ReceiverContent = () => {
         videoSource = ''; // Will show error in video player
       }
 
-      // For Watch TV remote feature, convert Vidking URLs to VidSrc for better quality and support
+      // For Watch TV remote feature, convert Vidking URLs to VIDNEST for better quality and support
       if (videoSource.includes('vidking.net')) {
-        console.log('Converting Vidking URL to VidSrc for Watch TV feature...');
+        console.log('Converting Vidking URL to VIDNEST for Watch TV feature...');
         
         if (videoData.type === 'tv') {
           // Extract season and episode from Vidking URL
@@ -240,12 +240,12 @@ const ReceiverContent = () => {
           const urlParts = videoSource.split('/');
           const season = urlParts[urlParts.indexOf('tv') + 2] || '1';
           const episode = urlParts[urlParts.indexOf('tv') + 3]?.split('?')[0] || '1';
-          videoSource = `https://vidsrc.icu/embed/tv/${videoData.id}/${season}/${episode}`;
-          console.log('Converted TV to VidSrc:', videoSource);
+          videoSource = `https://vidnest.fun/tv/${videoData.id}/${season}/${episode}`;
+          console.log('Converted TV to VIDNEST:', videoSource);
         } else if (videoData.type === 'movie') {
-          // Convert movie Vidking to VidSrc
-          videoSource = `https://vidsrc.icu/embed/movie/${videoData.id}`;
-          console.log('Converted movie to VidSrc:', videoSource);
+          // Convert movie Vidking to VIDNEST
+          videoSource = `https://vidnest.fun/movie/${videoData.id}`;
+          console.log('Converted movie to VIDNEST:', videoSource);
         }
       }
 
@@ -257,7 +257,7 @@ const ReceiverContent = () => {
       });
 
       // Determine video type and notify remote
-      const isIframe = videoSource.includes('vidking.net/embed') || videoSource.includes('vidsrc.icu/embed');
+      const isIframe = videoSource.includes('vidking.net/embed') || videoSource.includes('vidnest.fun');
       const videoType = isIframe ? 'iframe' : 'direct';
       console.log('Video source:', videoSource);
       console.log('Is Iframe player:', isIframe);
@@ -352,7 +352,7 @@ const ReceiverContent = () => {
         <div ref={fullscreenRef} className="w-full h-screen fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden">
           {currentVideo.url ? (
             <>
-              {currentVideo.url.includes('youtube.com/embed') || currentVideo.url.includes('vidking.net/embed') || currentVideo.url.includes('vidsrc.icu/embed') ? (
+              {currentVideo.url.includes('youtube.com/embed') || currentVideo.url.includes('vidking.net/embed') || currentVideo.url.includes('vidnest.fun') ? (
                 // YouTube or Vidking embed
                 <iframe
                   src={currentVideo.url}

@@ -63,7 +63,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Preload iframe in the background for faster loading
   useEffect(() => {
-    if (!stableSrc.includes('vidking') && !stableSrc.includes('vidsrc')) return;
+    if (!stableSrc.includes('vidking') && !stableSrc.includes('vidnest')) return;
     
     // Clear expired cache entries
     clearExpiredCache();
@@ -246,7 +246,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Reset player state when episode/movie changes (for embed players)
   useEffect(() => {
-    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
       // Reset states for new content
       setIsLoading(true);
       embedLoadedRef.current = false;
@@ -265,7 +265,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     userHasInteractedRef.current = false;
 
     // Skip all video logic for embed URLs
-    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
       return;
     }
 
@@ -321,7 +321,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       }
       // Page is now visible
       // For embed players, immediately clear loading if it has loaded
-      if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
+      if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
         if (embedLoadedRef.current) {
           setIsLoading(false);
         }
@@ -362,8 +362,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   // Separate effect to apply initial time when metadata is loaded (only once per video)
   // NOTE: Skip this for embed players - they handle progress via URL parameters
   useEffect(() => {
-    // Skip for embed players - Vidking/Vidsrc handle progress via URL parameter
-    if (src.includes('vidking') || src.includes('vidsrc') || src.includes('embed')) {
+    // Skip for embed players - Vidking/VIDNEST handle progress via URL parameter
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
       return;
     }
 
@@ -392,7 +392,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     }
   }, [initialTime, src]);
 
-  const isEmbedPlayer = src.includes('vidking') || src.includes('vidsrc') || src.includes('embed');
+  const isEmbedPlayer = src.includes('vidking') || src.includes('vidnest') || src.includes('embed');
 
   const sendWatchHistoryUpdate = useCallback(async (
     currentProgress: number,
@@ -463,7 +463,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     if (!isEmbedPlayer) return;
 
     // Get the current source to validate messages
-    const currentSource = stableSrc.includes('vidsrc') ? 'vidsrc' : 'vidking';
+    const currentSource = stableSrc.includes('vidnest') ? 'vidnest' : 'vidking';
     console.log(`[Watch History] Setting up message listener for source: ${currentSource}`);
 
     const handleMessage = (event: MessageEvent) => {
@@ -610,11 +610,11 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   }, [isEmbedPlayer, user, mediaId, mediaType, title, posterPath, seasonNumber, episodeNumber, stableSrc]);
 
   // Fallback polling mechanism for embed players that don't support postMessage
-  // DISABLED FOR VIDKING - Only for VidSrc to avoid timestamp glitching
+  // DISABLED FOR VIDKING - Only for VIDNEST to avoid timestamp glitching
   useEffect(() => {
     if (!isEmbedPlayer || !iframeRef.current) return;
     
-    const currentSource = stableSrc.includes('vidsrc') ? 'vidsrc' : 'vidking';
+    const currentSource = stableSrc.includes('vidnest') ? 'vidnest' : 'vidking';
     
     // DISABLED: Skip fallback polling for VidKing due to timestamp glitching
     if (currentSource === 'vidking') {
@@ -624,7 +624,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     
     console.log(`[Fallback Polling] Starting for source: ${currentSource}`);
     
-    // For vidsrc and other embeds that may not send messages, use a periodic save
+    // For vidnest and other embeds that may not send messages, use a periodic save
     const fallbackInterval = setInterval(() => {
       if (!user || !mediaId) return;
       
@@ -751,8 +751,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       onMouseEnter={() => { setIsHovering(true); setShowControls(true); }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {src.includes('vidking') || src.includes('vidsrc') || src.includes('embed') ? (
-        // For embed URLs, use an iframe with vidking/vidsrc controls
+      {src.includes('vidking') || src.includes('vidnest') || src.includes('embed') ? (
+        // For embed URLs, use an iframe with vidking/vidnest controls
         // Key includes full src URL to force remount when source/progress changes
         <iframe
           key={src}

@@ -30,21 +30,31 @@ html::-webkit-scrollbar-thumb:hover {
 }
 
 body {
-  @apply bg-background text-white font-body overflow-x-hidden;
+  @apply bg-background text-white font-body overflow-x-hidden overflow-y-auto;
 }
 
 h1, h2, h3, h4, h5, h6 {
   @apply font-heading;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-  height: 0;
-}
-
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  overflow-y: auto;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+  display: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  display: none;
 }
 
 .bg-signin {
