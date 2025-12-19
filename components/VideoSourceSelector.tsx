@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { AlertCircle, CheckCircle, Zap } from 'lucide-react';
 
 interface SourceInfo {
@@ -82,7 +82,11 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
           ([key, source]) => (
             <button
               key={key}
-              onClick={() => onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest')}
+              onClick={() => {
+                // Clear any text selection when switching sources
+                window.getSelection?.()?.removeAllRanges();
+                onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest');
+              }}
               className={`relative p-4 rounded-lg border-2 transition text-left ${
                 currentSource === key
                   ? 'border-blue-500 bg-blue-900/20'

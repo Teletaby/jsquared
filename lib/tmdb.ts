@@ -169,6 +169,11 @@ export async function getTrendingWeek() {
   return fetchFromTMDB('/trending/all/week');
 }
 
+// Get trending today (daily top)
+export async function getTrendingDay() {
+  return fetchFromTMDB('/trending/all/day');
+}
+
 // Get popular TV shows
 export async function getPopularTvShows(page: string = '1') {
   return fetchFromTMDB('/tv/popular', { page });

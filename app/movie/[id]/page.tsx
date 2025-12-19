@@ -1,25 +1,20 @@
 "use client";
 
-import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails, getMovieVideos, getMediaLogos } from '@/lib/tmdb';
+import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails, getMediaLogos } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
-import { useEffect, useState, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
 import { Download } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
+
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import MarkdownBoldText from '@/components/MarkdownBoldText';
 import SourceWarningDialog from '@/components/SourceWarningDialog';
 
-// Lazy load the video player for better performance
-const ThemedVideoPlayer = dynamic(() => import('@/components/ThemedVideoPlayer'), {
-  loading: () => <div className="w-full h-[600px] bg-gray-900 flex items-center justify-center rounded-lg"><div className="text-gray-400">Loading player...</div></div>,
-  ssr: false,
-});
 
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
@@ -61,7 +56,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [movie, setMovie] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0);
+  const [, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
   const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -287,22 +282,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const videoSrc = embedUrl;
 
   // Format saved progress for display
-  const formatProgressTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
-  const posterUrl = useMemo(
-    () => movie?.poster_path 
-      ? `https://image.tmdb.org/t/p/w780${movie.poster_path}`
-      : '/placeholder.png',
-    [movie?.poster_path]
-  );
 
   if (loading) {
     return <LoadingSpinner />;
@@ -321,7 +301,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     return null; // Or a "Not Found" component
   }
 
-  const imdbId = movie.external_ids?.imdb_id;
 
   // Centralize title logic to handle optional properties and provide a fallback.
   const mediaTitle = movie.title || 'Untitled Movie';
@@ -345,11 +324,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     setShowSourceWarning(false);
   };
 
-  const handleWatchOnTv = () => {
-    if (embedUrl) {
-      router.push(`/receiver?videoSrc=${encodeURIComponent(embedUrl)}`);
-    }
-  };
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
@@ -488,7 +462,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
                 {/* Tagline */}
                 {movie.tagline && (
-                  <p className="text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-2 font-light drop-shadow-lg italic">"{movie.tagline}"</p>
+                  <p className="text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-2 font-light drop-shadow-lg italic">&quot;{movie.tagline}&quot;</p>
                 )}
 
                 {/* Description */}
@@ -630,9 +604,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         <div className="flex items-start gap-4 mb-4">
                           {review.author_details.avatar_path ? (
                             <Image
-                              src={review.author_details.avatar_path.startsWith('/https')
+                              src={(review.author_details.avatar_path.startsWith('/https')
                                 ? review.author_details.avatar_path.substring(1)
-                                : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`}
+                                : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`)}
                               alt={review.author_details.username}
                               width={50}
                               height={50}
@@ -795,9 +769,23 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
                 <div>
                   <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
-                  <p className="text-gray-500">We couldn't find a playable source for this title.</p>
+                  <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
                 </div>
               </div>
+            )}
+
+            {/* Optionally show resume prompt */}
+            {showResumePrompt && (
+              <ResumePrompt
+                show={showResumePrompt}
+                title={mediaTitle}
+                savedTime={savedProgress}
+                totalDuration={savedDuration || 3600}
+                posterPath={movie?.poster_path}
+                onResume={handleResumeYes}
+                onStart={handleResumeNo}
+                onDismiss={() => setShowResumePrompt(false)}
+              />
             )}
 
             {/* Content Grid - Info for Watch View */}
@@ -811,10 +799,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                       <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
                         {mediaTitle}
                       </h1>
-                      <VideoInfoPopup title={mediaTitle} />
+                      <VideoInfoPopup />
                     </div>
                     {movie.tagline && (
-                      <p className="text-sm sm:text-base text-gray-400 font-light">"{movie.tagline}"</p>
+                      <p className="text-sm sm:text-base text-gray-400 font-light">&ldquo;{movie.tagline}&rdquo;</p>
                     )}
                   </div>
                   <a
@@ -957,9 +945,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                               <div className="flex items-start gap-3 mb-3">
                                 {review.author_details.avatar_path ? (
                                   <Image
-                                    src={review.author_details.avatar_path.startsWith('/https')
+                                    src={(review.author_details.avatar_path.startsWith('/https')
                                       ? review.author_details.avatar_path.substring(1)
-                                      : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`}
+                                      : `https://image.tmdb.org/t/p/w45${review.author_details.avatar_path}`)}
                                     alt={review.author_details.username}
                                     width={40}
                                     height={40}

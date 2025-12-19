@@ -1,10 +1,19 @@
 "use client";
 
 import MovieList from '@/components/MovieList';
-import LoadingSpinner from '@/components/LoadingSpinner';
+
+interface Media {
+  id: number;
+  title: string;
+  overview?: string;
+  poster_path?: string;
+  vote_average?: number;
+  media_type?: 'movie' | 'tv';
+  name?: string;
+}
 
 interface MoviesClientPageProps {
-  movies: any[];
+  movies: Media[];
   error: string | null;
 }
 

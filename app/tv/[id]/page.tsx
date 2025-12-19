@@ -1,16 +1,15 @@
 "use client";
 
-import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, Review, getTvShowVideos, getMediaLogos } from '@/lib/tmdb';
+import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, getMediaLogos } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
 import { Download } from 'lucide-react';
-import ThemedVideoPlayer from '@/components/ThemedVideoPlayer'; // Import the custom video player
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
@@ -19,7 +18,6 @@ import SourceWarningDialog from '@/components/SourceWarningDialog';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
 import VidLinkPlayer from '@/components/VidLinkPlayer';
-import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
 
@@ -27,21 +25,6 @@ interface TvDetailPageProps {
   params: {
     id: string;
   };
-}
-
-interface EpisodeDetails {
-  episode_number: number;
-  name: string;
-  overview: string;
-  still_path?: string;
-  vote_average: number;
-  runtime?: number;
-}
-
-interface SeasonDetails {
-  season_number: number;
-  name: string;
-  episodes: EpisodeDetails[];
 }
 
 interface MediaDetails {
@@ -69,9 +52,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [tvShow, setTvShow] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0);
+  const [, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
-  const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
+  const [, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLoaded, setTrailerLoaded] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
@@ -86,6 +69,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');
+
+
   const [showSourceWarning, setShowSourceWarning] = useState(false);
   const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
@@ -104,6 +89,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const mediaType = 'tv';
   const currentSeason = searchParams.get('season') ? parseInt(searchParams.get('season')!, 10) : 1;
   const currentEpisode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!, 10) : 1;
+
+
 
   // Auto-hide notification after 5 seconds
   useEffect(() => {
@@ -285,17 +272,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     }
   }, [savedProgress, resumeChoice]);
 
-  // Handle resume choice
-  const handleResumeYes = () => {
-    console.log('✅ User clicked RESUME - savedProgress:', savedProgress, 'seconds');
-    setResumeChoice('yes');
-    setShowResumePrompt(false);
-  };
-
-  const handleResumeNo = () => {
-    setResumeChoice('no');
-    setShowResumePrompt(false);
-  };
 
   // Construct embed URL with useMemo to prevent unnecessary changes
   const embedUrl = useMemo(
@@ -308,27 +284,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         return null; // We'll use VideasyPlayer or VidLinkPlayer instead
       }
     },
-    [tmdbId, currentSeason, currentEpisode, videoSource, resumeChoice, savedProgress]
+    [tmdbId, currentSeason, currentEpisode, videoSource]
   );
   const videoSrc = embedUrl; // Use videoSrc for ThemedVideoPlayer
-
-  // Format saved progress for display
-  const formatProgressTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const posterUrl = useMemo(
-    () => tvShow?.poster_path 
-      ? `https://image.tmdb.org/t/p/w780${tvShow.poster_path}`
-      : '/placeholder.png',
-    [tvShow?.poster_path]
-  );
 
   const handleEpisodeSelect = (seasonNum: number, episodeNum: number) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -336,12 +294,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     newSearchParams.set('episode', episodeNum.toString());
     router.push(`?${newSearchParams.toString()}`, { scroll: false });
     setShowEpisodeSelector(false);
-  };
-
-  const handleWatchOnTv = () => {
-    if (embedUrl) {
-      router.push(`/receiver?videoSrc=${encodeURIComponent(embedUrl)}`);
-    }
   };
 
 
@@ -363,6 +315,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   }
 
   const mediaTitle = tvShow.name || 'Untitled Show';
+
+
 
   const handleChangeSource = (source: 'videasy' | 'vidlink' | 'vidnest') => {
     if (videoSource === source) return; // Already on this source
@@ -467,7 +421,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 <div className="flex flex-wrap gap-2 mb-2 text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl">
                   <div className="flex items-baseline gap-1">
                     <span className="text-xs lg:text-sm text-gray-400 uppercase">RATING</span>
-                    <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
+                    {typeof tvShow.vote_average === 'number' && tvShow.vote_average > 0 ? (
+                      <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
+                    ) : (
+                      <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-400">—</span>
+                    )}
                   </div>
                   
                   {tvShow.first_air_date && (
@@ -698,11 +656,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16">
         {/* Player Section - Appears at top when watching */}
-        {view !== 'info' && (
           <div className="space-y-8 mb-8">
-            {/* Video Player - Show immediately with notification if resuming */}
+            {/* Video Player - embedded players used directly */}
             {videoSource === 'videasy' ? (
-              // Use VIDEASY player for source 1
               <VideasyPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-videasy`}
                 mediaId={tmdbId}
@@ -714,15 +670,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 initialTime={savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
-                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
-                  
-                  // Cap progress at 100% even if user watched past episode end
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
                   const progress = Math.min((time / totalSeconds) * 100, 100);
-                  
                   console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  
                   queueUpdate({
                     mediaId: tmdbId,
                     mediaType,
@@ -737,7 +688,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 }}
               />
             ) : videoSource === 'vidlink' ? (
-              // Use VidLink player for source 2
               <VidLinkPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-vidlink`}
                 mediaId={tmdbId}
@@ -749,15 +699,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 initialTime={savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
-                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
-                  
-                  // Cap progress at 100% even if user watched past episode end
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
                   const progress = Math.min((time / totalSeconds) * 100, 100);
-                  
                   console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  
                   queueUpdate({
                     mediaId: tmdbId,
                     mediaType,
@@ -772,7 +717,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 }}
               />
             ) : videoSrc ? (
-              // Use VIDNEST for source 3 (full progress tracking support)
               <AdvancedVideoPlayer
                 key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
                 embedUrl={videoSrc}
@@ -786,15 +730,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 videoSource={videoSource}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
-                  // Get accurate episode runtime - typically 40-50 mins for TV episodes
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45; // Default 45 minutes for TV
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1); // Minimum 1 second to avoid division by zero
-                  
-                  // Cap progress at 100% even if user watched past episode end
+                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
                   const progress = Math.min((time / totalSeconds) * 100, 100);
-                  
                   console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  
                   queueUpdate({
                     mediaId: tmdbId,
                     mediaType,
@@ -812,12 +751,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
                 <div>
                   <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
-                  <p className="text-gray-500">We couldn't find a playable source for this title.</p>
+                  <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
                 </div>
               </div>
             )}
           </div>
-        )}
 
         {view !== 'info' && (
         <div className="grid grid-cols-1 gap-6">
@@ -830,7 +768,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white break-words">
                     {mediaTitle}
                   </h1>
-                  <VideoInfoPopup title={mediaTitle} />
+                  <VideoInfoPopup />
                 </div>
               </div>
               <a
@@ -916,7 +854,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {/* Rating and Quick Info */}
             <div className="text-gray-400">
               <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-base">
-                {tvShow.vote_average && (
+                {typeof tvShow.vote_average === 'number' && tvShow.vote_average > 0 && (
                   <span className="font-semibold">Rating: {tvShow.vote_average.toFixed(1)}</span>
                 )}
                 {tvShow.first_air_date && (

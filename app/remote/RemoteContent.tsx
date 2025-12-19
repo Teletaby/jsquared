@@ -302,7 +302,7 @@ const RemoteContent = () => {
             {currentVideoType === 'iframe' && (
               <div className="bg-blue-900/30 border border-blue-500 rounded-lg p-2 md:p-3 lg:p-4 text-center">
                 <p className="text-blue-200 text-xs md:text-sm lg:text-base">📺 Using Web Player</p>
-                <p className="text-xs text-gray-400 mt-1 md:mt-2">Remote controls unavailable for web players. Use the player's built-in controls.</p>
+                <p className="text-xs text-gray-400 mt-1 md:mt-2">Remote controls unavailable for web players. Use the player&apos;s built-in controls.</p>
               </div>
             )}
 

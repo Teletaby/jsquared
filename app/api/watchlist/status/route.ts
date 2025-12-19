@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const mediaIdsParam = searchParams.get('mediaIds');
     const mediaTypesParam = searchParams.get('mediaTypes');
 
-    let query: any = { userId: user._id };
+    const query: any = { userId: user._id };
 
     if (mediaIdsParam && mediaTypesParam) {
       const mediaIds = mediaIdsParam.split(',').map(Number);
@@ -66,8 +66,8 @@ export async function GET(request: NextRequest) {
       const item = await Watchlist.findOne(query);
       return NextResponse.json({ isInWatchlist: !!item });
     }
-  } catch (error) {
-
+  } catch (err: unknown) {
+    console.error('Error checking watchlist status:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

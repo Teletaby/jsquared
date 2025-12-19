@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+
 import Header from "@/components/Header";
 
 function SignInContent() {
@@ -138,7 +138,7 @@ function SignInContent() {
           </button>
         </form>
         <p className="mt-4 text-center text-gray-400">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/signup" className="text-blue-400 hover:underline">
             Sign Up
           </Link>

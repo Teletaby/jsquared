@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query');
-    const type = searchParams.get('type') || 'multi';
+
 
     if (!query || query.trim().length < 2) {
       return NextResponse.json(
@@ -52,8 +52,8 @@ export async function GET(request: NextRequest) {
       results,
       total: response.total_results,
     });
-  } catch (error) {
-    console.error('Search error:', error);
+  } catch (err: unknown) {
+    console.error('Search error:', err);
     return NextResponse.json(
       { error: 'Failed to search', results: [] },
       { status: 500 }

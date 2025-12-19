@@ -27,7 +27,6 @@ export default function UserWatchHistory() {
   const { data: session, status } = useSession();
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scrollPosition, setScrollPosition] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');

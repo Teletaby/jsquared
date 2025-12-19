@@ -73,7 +73,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
           <div className="absolute inset-0 bg-black bg-opacity-60 flex-col justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex">
             <div>
               <h3 className="text-white text-lg font-bold">{title}</h3>
-              {media.vote_average && (
+              {typeof media.vote_average === 'number' && media.vote_average > 0 && (
                 <p className="text-yellow-400 text-sm font-semibold">
                   Rating: {media.vote_average.toFixed(1)} / 10
                 </p>
@@ -103,7 +103,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
         <div className="p-3 flex flex-col justify-between flex-grow md:hidden">
           <div>
             <h3 className="text-white text-base font-bold truncate">{title}</h3>
-            {media.vote_average && (
+            {typeof media.vote_average === 'number' && media.vote_average > 0 && (
               <p className="text-yellow-400 text-xs font-semibold">
                 Rating: {media.vote_average.toFixed(1)} / 10
               </p>

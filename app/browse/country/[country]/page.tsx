@@ -1,7 +1,6 @@
 import { discoverMovies, discoverTvShows } from '@/lib/tmdb';
 import MovieList from '@/components/MovieList';
 import CountryCarousel from '@/components/CountryCarousel';
-import LoadingSpinner from '@/components/LoadingSpinner';
 import Header from '@/components/Header';
 import Link from 'next/link';
 
@@ -36,7 +35,7 @@ const CountryPage = async ({ params, searchParams }: CountryPageProps) => {
     return (
       <div className="container mx-auto p-4 text-white text-center">
         <h1 className="text-3xl font-bold mb-4">Country Not Found</h1>
-        <p>The country you're looking for is not available.</p>
+        <p>The country you&apos;re looking for is not available.</p>
         <Link href="/" className="text-blue-500 hover:text-blue-400 mt-4">
           Back to Home
         </Link>

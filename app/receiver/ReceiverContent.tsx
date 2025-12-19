@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import QRCode from 'qrcode';
 import io from 'socket.io-client';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Copy, Check, RotateCcw, Wifi, WifiOff } from 'lucide-react';
 import Header from '@/components/Header';
 
@@ -32,7 +32,6 @@ const ReceiverContent = () => {
   const socketRef = useRef<any>(null);
   const roomIdRef = useRef<string>('');
   const fullscreenRef = useRef<HTMLDivElement>(null);
-  const searchParams = useSearchParams();
   const router = useRouter();
 
   // Generate room ID and socket connection

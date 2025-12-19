@@ -1,18 +1,7 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Maximize,
-  Minimize,
-  Settings,
-  SkipBack,
-  SkipForward,
-  Loader,
-} from 'lucide-react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface AdvancedVideoPlayerProps {
@@ -44,16 +33,11 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  // Player states
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [showResumeHint, setShowResumeHint] = useState(true); // Auto-hide resume hint after 8 seconds
-
   // Track playtime by periodic saves (since we can't access iframe's currentTime due to CORS)
   const elapsedRef = useRef(0); // Track ONLY new time watched in THIS session (starts at 0, not initialTime)
+
+  // Capture the initial resume timestamp on mount so changes later won't remount the iframe
+  const initialStartRef = useRef<number>(initialTime);
 
   useEffect(() => {
     // Reset elapsed time to 0 when initialTime changes (new video/episode)
@@ -102,41 +86,13 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     };
   }, [onTimeUpdate, videoSource, initialTime]);
 
-  // Auto-hide resume hint after 8 seconds
-  useEffect(() => {
-    // Reset hint visibility whenever initialTime changes
-    if (initialTime > 0) {
-      setShowResumeHint(true);
-      const timer = setTimeout(() => {
-        setShowResumeHint(false);
-      }, 8000); // Show for 8 seconds
-      return () => clearTimeout(timer);
-    }
-  }, [initialTime]);
+  // Resume hint removed for VIDNEST — player auto-resumes from the saved timestamp
 
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [quality, setQuality] = useState('auto');
-  const [mouseIdleTimer, setMouseIdleTimer] = useState<NodeJS.Timeout | null>(null);
+  const durationRef = useRef<number>(0);
 
   // Auto-save refs
   const lastSaveTimeRef = useRef(0);
   const embedLoadedRef = useRef(false);
-  const embedPollingRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Format time helper
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Save playtime to database
   const savePlaytime = useCallback(async (time: number) => {
@@ -150,8 +106,8 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
           mediaId,
           mediaType,
           currentTime: time,
-          progress: duration > 0 ? (time / duration) * 100 : 0,
-          totalDuration: duration,
+          progress: durationRef.current > 0 ? (time / durationRef.current) * 100 : 0,
+          totalDuration: durationRef.current,
           posterPath,
           seasonNumber,
           episodeNumber,
@@ -164,89 +120,43 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     } catch (error) {
       console.error('Error saving playtime:', error);
     }
-  }, [user, embedUrl, mediaId, mediaType, duration, posterPath, seasonNumber, episodeNumber]);
+  }, [user, embedUrl, mediaId, mediaType, posterPath, seasonNumber, episodeNumber]);
 
   // Auto-save every 10 seconds (only for embed sources: videasy, vidlink)
   useEffect(() => {
     if (!user || (videoSource !== 'videasy' && videoSource !== 'vidlink')) return;
 
     const interval = setInterval(() => {
-      if (currentTime > 0 && currentTime - lastSaveTimeRef.current > 10) {
-        savePlaytime(currentTime);
-        lastSaveTimeRef.current = currentTime;
+      if (elapsedRef.current > 0 && (elapsedRef.current - lastSaveTimeRef.current) > 10) {
+        const totalTime = initialTime + elapsedRef.current;
+        savePlaytime(totalTime);
+        lastSaveTimeRef.current = elapsedRef.current;
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [currentTime, savePlaytime, user, videoSource]);
+  }, [savePlaytime, user, videoSource, initialTime]);
 
   // Save on page unload (only for embed sources: videasy, vidlink)
   useEffect(() => {
     if (videoSource !== 'videasy' && videoSource !== 'vidlink') return;
 
     const handleBeforeUnload = async () => {
-      if (currentTime > 0) {
-        await savePlaytime(currentTime);
+      if (elapsedRef.current > 0) {
+        const totalTime = initialTime + elapsedRef.current;
+        await savePlaytime(totalTime);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [currentTime, savePlaytime, videoSource]);
+  }, [savePlaytime, videoSource, initialTime]);
 
-  // Handle fullscreen
-  const handleFullscreen = useCallback(async () => {
-    if (!containerRef.current) return;
 
-    try {
-      if (!isFullscreen) {
-        if (containerRef.current.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        } else if ((containerRef.current as any).webkitRequestFullscreen) {
-          await (containerRef.current as any).webkitRequestFullscreen();
-        }
-        setIsFullscreen(true);
-      } else {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-        setIsFullscreen(false);
-      }
-    } catch (error) {
-      console.error('Fullscreen error:', error);
-    }
-  }, [isFullscreen]);
-
-  // Auto-hide controls after 3 seconds of inactivity
-  const handleMouseMove = useCallback(() => {
-    setShowControls(true);
-
-    if (mouseIdleTimer) {
-      clearTimeout(mouseIdleTimer);
-    }
-
-    const timer = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
-    }, 3000);
-
-    setMouseIdleTimer(timer);
-  }, [mouseIdleTimer, isPlaying]);
-
-  // Cleanup timer
-  useEffect(() => {
-    return () => {
-      if (mouseIdleTimer) {
-        clearTimeout(mouseIdleTimer);
-      }
-    };
-  }, [mouseIdleTimer]);
 
   // Load iframe
   useEffect(() => {
     const handleLoad = () => {
-      setIsLoading(false);
       embedLoadedRef.current = true;
 
       // DISABLED: VidKing auto-resume disabled to prevent timestamp glitching
@@ -258,18 +168,29 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     const iframe = iframeRef.current;
     if (iframe) {
       iframe.addEventListener('load', handleLoad);
-      iframe.addEventListener('error', () => setIsLoading(false));
 
       return () => {
         iframe.removeEventListener('load', handleLoad);
-        iframe.removeEventListener('error', () => setIsLoading(false));
       };
     }
   }, [initialTime, embedUrl]);
 
-  // Memoize embed URL - VIDNEST supports time parameters for progress
-  // User will need to manually seek to timestamp using player controls
-  const stableEmbedUrl = useMemo(() => embedUrl, [embedUrl]);
+  // Memoize embed URL - append VIDNEST resume params (mount-only) so iframe auto-resumes
+  const stableEmbedUrl = useMemo(() => {
+    if (!embedUrl) return embedUrl;
+
+    // Only append params for VIDNEST (source 3) and only use the initial start time captured on mount
+    if (embedUrl.includes('vidnest') && initialStartRef.current > 0) {
+      const separator = embedUrl.includes('?') ? '&' : '?';
+      // For movies use startAt, for TV use progress (per VIDNEST docs)
+      const param = mediaType === 'movie' ? `startAt=${Math.floor(initialStartRef.current)}` : `progress=${Math.floor(initialStartRef.current)}`;
+      const urlWithParam = `${embedUrl}${separator}${param}`;
+      console.log('[AdvancedVideoPlayer] Using VIDNEST resume URL:', urlWithParam);
+      return urlWithParam;
+    }
+
+    return embedUrl;
+  }, [embedUrl, mediaType]);
 
   return (
     <div
@@ -277,13 +198,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       className={`relative w-full bg-black`}
       style={{ aspectRatio: '16 / 9' }}
     >
-      {/* Resume indicator badge with instructions - DISABLED FOR VIDKING to prevent glitches */}
-      {videoSource === 'vidnest' && initialTime > 0 && showResumeHint && (
-        <div className="absolute bottom-4 left-4 z-50 bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold shadow-lg flex items-center gap-2 animate-pulse">
-          <span>⏱️ Last watched at {Math.floor(initialTime)}s</span>
-          <span className="text-xs opacity-90">- Drag progress bar to resume</span>
-        </div>
-      )}
+      {/* Resume badge removed — VIDNEST auto-resumes at the saved timestamp */}
       
       {/* Embed Player - Full size with native controls */}
       <iframe

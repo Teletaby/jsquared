@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectToDatabase } from '@/lib/visitorLogging';
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
     // Check authentication and admin role
     const session = await getServerSession(authOptions);
@@ -30,13 +30,12 @@ export async function DELETE(request: NextRequest) {
       message: `Successfully deleted ${result.deletedCount} logs`,
       deletedCount: result.deletedCount,
     });
-  } catch (error: any) {
-    console.error('Error deleting visitor logs:', error);
+  } catch (err: unknown) {
+    console.error('Error deleting visitor logs:', err);
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to delete logs',
-        details: error.message,
       },
       { status: 500 }
     );

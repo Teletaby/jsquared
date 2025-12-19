@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Info, Tv, Film } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import WatchlistButton from './WatchlistButton';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -38,7 +38,6 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   const { data: session } = useSession();
   const { checkMultipleWatchlistStatuses } = useWatchlist();
   const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatusMap>({});
-  const [isLoadingWatchlist, setIsLoadingWatchlist] = useState(true);
 
   // Fetch logos for carousel items
   useEffect(() => {
@@ -73,7 +72,6 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   useEffect(() => {
     const fetchStatuses = async () => {
       if (session?.user && items.length > 0) {
-        setIsLoadingWatchlist(true);
         const mediaItems = items.map(item => ({
           mediaId: item.id,
           mediaType: (item.media_type === 'tv' || !!item.name ? 'tv' : 'movie') as 'movie' | 'tv',
@@ -85,16 +83,26 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
           console.error('checkMultipleWatchlistStatuses is not a function');
           setWatchlistStatus({});
         }
-        setIsLoadingWatchlist(false);
       } else {
         setWatchlistStatus({});
-        setIsLoadingWatchlist(false);
       }
     };
     fetchStatuses();
   }, [session, items, checkMultipleWatchlistStatuses]);
 
-  const currentItem = items[currentIndex];
+  const currentItem = items[currentIndex] || null;
+
+  // Ensure currentIndex stays within bounds when items array changes
+  useEffect(() => {
+    if (!items || items.length === 0) {
+      setCurrentIndex(0);
+      return;
+    }
+    if (currentIndex >= items.length) {
+      setCurrentIndex(0);
+    }
+  }, [items.length, currentIndex]);
+
   const title = currentItem?.title || currentItem?.name || '';
   const backdropUrl = currentItem?.backdrop_path
     ? `https://image.tmdb.org/t/p/w1280${currentItem.backdrop_path}`
@@ -143,6 +151,15 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
     router.push(`/${mediaType}/${currentItem.id}?view=info`);
   };
 
+  // Safeguard: if there is no content, show a simple placeholder
+  if (!items || items.length === 0) {
+    return (
+      <div className="relative w-screen left-1/2 -translate-x-1/2 h-[70vh] max-h-[500px] flex items-center justify-center mb-8 mt-0">
+        <div className="text-gray-400">No trending content available for today.</div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Carousel - positioned below navbar */}
@@ -190,21 +207,36 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                 )}
 
                 {/* Rating & Info */}
-                <div className="flex items-center gap-4 mb-6">
-                  {currentItem.vote_average !== null && currentItem.vote_average !== undefined && (
+                <div className="flex items-center gap-3 mb-6">
+                  {typeof item.vote_average === 'number' && item.vote_average > 0 && (
                     <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
                       <span className="text-yellow-400">⭐</span>
                       <span className="text-white font-semibold">
-                        {currentItem.vote_average.toFixed(1)}/10
+                        {item.vote_average.toFixed(1)}/10
                       </span>
                     </div>
                   )}
+
+                  {/* Media type badge placed to the right of the rating */}
+                  <div className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded-full border border-white/20">
+                    {itemMediaType === 'tv' ? (
+                      <>
+                        <Tv size={16} className="text-white opacity-90" aria-hidden />
+                        <span className="text-xs font-semibold uppercase text-white">TV</span>
+                      </>
+                    ) : (
+                      <>
+                        <Film size={16} className="text-white opacity-90" aria-hidden />
+                        <span className="text-xs font-semibold uppercase text-white">Movie</span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Description */}
-                {currentItem.overview && (
+                {currentItem?.overview && (
                   <p className="text-white text-sm md:text-base line-clamp-3 mb-6 drop-shadow-lg">
-                    {currentItem.overview}
+                    {currentItem?.overview}
                   </p>
                 )}
 

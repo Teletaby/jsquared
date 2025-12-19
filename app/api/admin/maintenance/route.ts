@@ -1,6 +1,7 @@
 // j-squared-cinema/app/api/admin/maintenance/route.ts
 import { getServerSession } from 'next-auth';
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectToDatabase } from '@/lib/mongodb';
 import { Settings } from '@/lib/models';
 import { authOptions } from '@/lib/auth';
@@ -14,7 +15,7 @@ async function ensureSettingsDocument() {
   const validSources = ['videasy', 'vidlink', 'vidsrc'];
   
   // First, migrate any documents with invalid videoSource values using updateMany with validation bypass
-  const db = require('mongoose').connection;
+  const db = mongoose.connection;
   if (db && db.db) {
     try {
       await db.collection('settings').updateMany(
@@ -26,7 +27,7 @@ async function ensureSettingsDocument() {
           $set: { videoSource: 'videasy' }
         }
       );
-    } catch (err) {
+    } catch (err: unknown) {
       console.log('Migration attempt (non-critical):', err);
     }
   }

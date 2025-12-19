@@ -45,12 +45,10 @@ const Chatbot = () => {
   // Only show chatbot for admin users
   const isAdmin = session?.user?.role === 'admin';
 
-  if (!isAdmin) {
-    return null;
-  }
-
   // Fetch chatbot maintenance status
   useEffect(() => {
+    if (!isAdmin) return;
+
     const fetchMaintenanceStatus = async () => {
       try {
         const res = await fetch('/api/admin/maintenance');
@@ -134,6 +132,10 @@ const Chatbot = () => {
     }
   };
 
+  if (!isAdmin) {
+    return null;
+  }
+
   return (
     <>
       {!isOpen && (
@@ -162,7 +164,7 @@ const Chatbot = () => {
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 rounded-b-lg">
                 <Loader className="text-accent mb-4 animate-spin" size={48} />
                 <p className="text-white text-center font-semibold">Chatbot is under maintenance</p>
-                <p className="text-gray-400 text-sm text-center mt-2">We'll be back shortly</p>
+                <p className="text-gray-400 text-sm text-center mt-2">We&apos;ll be back shortly</p>
               </div>
             ) : (
               <>

@@ -25,7 +25,7 @@ export default function WatchlistButton({
   initialIsInWatchlist,
 }: WatchlistButtonProps) {
   const { data: session } = useSession();
-  const { addToWatchlist, removeFromWatchlist, checkWatchlistStatus } = useWatchlist();
+  const { addToWatchlist, removeFromWatchlist } = useWatchlist();
   const [isInWatchlist, setIsInWatchlist] = useState(initialIsInWatchlist ?? false);
   const [isLoading, setIsLoading] = useState(false);
 

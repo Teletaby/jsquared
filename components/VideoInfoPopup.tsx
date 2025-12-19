@@ -4,11 +4,7 @@ import React, { useState } from 'react';
 import { Info, X } from 'lucide-react';
 import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
-interface VideoInfoPopupProps {
-  title?: string;
-}
-
-const VideoInfoPopup: React.FC<VideoInfoPopupProps> = ({ title = 'Video Player' }) => {
+const VideoInfoPopup = () => {
   const [isOpen, setIsOpen] = useState(false);
   useDisableScroll(isOpen);
 

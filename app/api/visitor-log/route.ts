@@ -89,8 +89,9 @@ export async function POST(request: Request) {
       { message: 'Visitor logged successfully' },
       { status: 200 }
     );
-  } catch (error) {
-    // Return success anyway to not block the user experience
+  } catch (err: unknown) {
+    // Log the error but return success to not block the user experience
+    console.error('[Visitor Log API] Error processing request:', err);
     return NextResponse.json(
       { message: 'Request processed' },
       { status: 200 }

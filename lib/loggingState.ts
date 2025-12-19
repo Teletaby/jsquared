@@ -1,5 +1,5 @@
 // In-memory store for logging state (in production, use database)
-let loggingState = {
+const loggingState = {
   isLoggingEnabled: true,
 };
 

@@ -15,7 +15,39 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 console.log('Attempting to prepare Next.js app...');
+console.log('Calling app.prepare() now...');
+let _prepareStart = Date.now();
+const _prepareInterval = setInterval(() => {
+  const s = Math.round((Date.now() - _prepareStart) / 1000);
+  console.log(`Still waiting for app.prepare() after ${s}s`);
+
+  // Diagnostic: list active handles and requests to see what's blocking
+  try {
+    const handles = (process._getActiveHandles && process._getActiveHandles()) || [];
+    const requests = (process._getActiveRequests && process._getActiveRequests()) || [];
+    console.log(`Diagnostic: activeHandles=${handles.length} activeRequests=${requests.length}`);
+    const types = handles.map(h => (h && h.constructor && h.constructor.name) ? h.constructor.name : typeof h);
+    console.log('Diagnostic: handleTypes=', types.slice(0, 30).join(', '));
+
+    handles.slice(0, 20).forEach((h, idx) => {
+      try {
+        if (h && h.constructor && h.constructor.name === 'ChildProcess') {
+          console.log(`ChildProcess[${idx}] pid=${h.pid} spawnargs=${JSON.stringify(h.spawnargs || h.args || [])}`);
+        }
+        if (h && h.constructor && h.constructor.name === 'Socket') {
+          console.log(`Socket[${idx}] remote=${h.remoteAddress}:${h.remotePort}`);
+        }
+      } catch (e) {
+        // ignore
+      }
+    });
+  } catch (e) {
+    console.log('Diagnostic error while inspecting handles:', e);
+  }
+}, 5000);
+
 app.prepare().then(() => {
+  clearInterval(_prepareInterval);
   console.log('Next.js app prepared successfully. Starting HTTP server...');
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);

@@ -27,12 +27,10 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
   const { data: session } = useSession();
   const { checkMultipleWatchlistStatuses } = useWatchlist(); // Call useWatchlist at the top level
   const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatusMap>({});
-  const [isLoadingWatchlist, setIsLoadingWatchlist] = useState(true);
 
   useEffect(() => {
     const fetchStatuses = async () => {
       if (session?.user && movies.length > 0) {
-        setIsLoadingWatchlist(true);
         const mediaItems = movies.map(movie => ({
           mediaId: movie.id,
           mediaType: (movie.media_type === 'tv' || !!movie.name ? 'tv' : 'movie') as 'tv' | 'movie',
@@ -45,10 +43,8 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
           console.error('checkMultipleWatchlistStatuses is not a function in MovieList');
           setWatchlistStatus({});
         }
-        setIsLoadingWatchlist(false);
       } else {
         setWatchlistStatus({});
-        setIsLoadingWatchlist(false);
       }
     };
     fetchStatuses();

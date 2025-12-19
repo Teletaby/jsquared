@@ -1,11 +1,9 @@
 // j-squared-cinema/app/signup/page.tsx
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import Header from "@/components/Header";
 
 function SignUpContent() {
@@ -14,7 +12,7 @@ function SignUpContent() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();

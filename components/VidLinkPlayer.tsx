@@ -1,28 +1,27 @@
 'use client';
 
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
-import { Loader } from 'lucide-react';
+import React, { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 
 interface VidLinkPlayerProps {
   mediaId: number;
   mediaType: 'movie' | 'tv';
   title?: string;
-  posterPath?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
+  posterPath?: string;
 }
 
 const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
   mediaId,
   mediaType,
   title = 'Video Player',
-  posterPath = '',
   seasonNumber,
   episodeNumber,
   initialTime = 0,
   onTimeUpdate,
+  posterPath,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -33,10 +32,13 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
   const messageReceivedRef = useRef(false);
   const lastTimeRef = useRef(0);
 
-  // Log when component mounts with initialTime
+  // Log when component mounts with the initial start time (mount-only)
   useEffect(() => {
-    console.log(`🎬 [VidLinkPlayer] Mounted with initialTime: ${initialTime}s, mediaId: ${mediaId}`);
-  }, [mediaId, initialTime]);
+    console.log(`🎬 [VidLinkPlayer] Mounted with initialTime: ${initialStartRef.current}s, mediaId: ${mediaId}`);
+  }, [mediaId]);
+
+  // Capture the initial start time once on mount to avoid remounting the iframe if the parent updates saved progress
+  const initialStartRef = useRef<number>(initialTime);
 
   // Construct VIDLINK embed URL with color theming and progress support
   const embedUrl = useMemo(() => {
@@ -49,9 +51,9 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
       // For movies: https://vidlink.pro/movie/{tmdbId}
       let url = `https://vidlink.pro/movie/${mediaId}?primaryColor=${primaryColor}&secondaryColor=${secondaryColor}&iconColor=${iconColor}&icons=default&player=default&title=true&poster=true&autoplay=true&muted=false`;
 
-      // Add startAt parameter if user has saved progress
-      if (initialTime > 0) {
-        url += `&startAt=${Math.floor(initialTime)}`;
+      // Use the initial start time captured on mount (do not react to subsequent prop changes)
+      if (initialStartRef.current > 0) {
+        url += `&startAt=${Math.floor(initialStartRef.current)}`;
       }
 
       return url;
@@ -63,20 +65,20 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
 
       let url = `https://vidlink.pro/tv/${mediaId}/${seasonNumber}/${episodeNumber}?primaryColor=${primaryColor}&secondaryColor=${secondaryColor}&iconColor=${iconColor}&icons=default&player=default&title=true&poster=true&autoplay=true&muted=false`;
 
-      // Add startAt parameter if user has saved progress
-      if (initialTime > 0) {
-        url += `&startAt=${Math.floor(initialTime)}`;
+      // Use the initial start time captured on mount (do not react to subsequent prop changes)
+      if (initialStartRef.current > 0) {
+        url += `&startAt=${Math.floor(initialStartRef.current)}`;
       }
 
       return url;
     }
-  }, [mediaId, mediaType, seasonNumber, episodeNumber, initialTime]);
+  }, [mediaId, mediaType, seasonNumber, episodeNumber]);
 
   // Handle iframe load
   const handleLoad = useCallback(() => {
     setIsLoading(false);
-    console.log(`🎬 [VidLinkPlayer] Iframe loaded. Initial time: ${initialTime}s`);
-  }, [initialTime]);
+    console.log(`🎬 [VidLinkPlayer] Iframe loaded. Initial time: ${initialStartRef.current}s`);
+  }, []);
 
   // Listen for progress messages from VidLink player and localStorage updates
   useEffect(() => {
@@ -135,7 +137,7 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
             }
           }
         }
-      } catch (error) {
+      } catch {
         // Silently ignore non-JSON or non-player messages
       }
     };
@@ -174,8 +176,8 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
   // Fallback: If VidLink doesn't send postMessage events, use a periodic heartbeat
   useEffect(() => {
     let heartbeatInterval: NodeJS.Timeout | null = null;
-    let startTime = Date.now();
-    let initialPlaybackTime = initialTime || 0;
+    const startTime = Date.now();
+    const initialPlaybackTime = initialStartRef.current || 0;
 
     // Wait 5 seconds to see if we get any messages from VidLink
     const waitTimer = setTimeout(() => {
@@ -202,7 +204,7 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
       clearTimeout(waitTimer);
       if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
-  }, [initialTime, onTimeUpdate]);
+  }, [onTimeUpdate]);
 
   if (!embedUrl) {
     return (

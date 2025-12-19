@@ -16,10 +16,6 @@ interface MovieCardProps {
 const MovieCard = ({ id, title, posterPath, voteAverage, mediaType }: MovieCardProps) => {
   // Removed isPopupOpen state
 
-  const posterUrl = posterPath 
-    ? `https://image.tmdb.org/t/p/w500${posterPath}`
-    : '/placeholder.svg';
-
   return (
     <Link href={`/${mediaType}/${id}`} className="block relative"> {/* Link wraps image and overlay */}
       <Image 

@@ -1,18 +1,14 @@
 import RootLayoutContent from '../components/RootLayoutContent';
-import MoviesClientPage from '../components/client/MoviesClientPage';
+
 import HeroCarousel from '../components/HeroCarousel';
 import UserWatchHistory from '../components/UserWatchHistory';
 import Top20Week from '../components/Top20Week';
 import MediaFetcherList from '../components/MediaFetcherList';
-import { getPopularMovies, getTrendingMovies, getPopularTvShows, discoverMovies, discoverTvShows } from '../lib/tmdb';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '../lib/auth';
+import { getPopularMovies, getTrendingDay, getPopularTvShows, discoverMovies, discoverTvShows } from '../lib/tmdb';
 import { GENRE_MAP } from '../lib/genreMap';
 
 export default async function HomePage() {
-  const session = await getServerSession(authOptions);
-
-  let trendingMovies = [];
+  let trendingItems: any[] = [];
   let popularMovies = [];
   let popularTvShows = [];
   let actionMovies = [];
@@ -21,11 +17,10 @@ export default async function HomePage() {
   let comedyTvShows = [];
   let dramaMovies = [];
   let dramaTvShows = [];
-  let error = null;
 
   try {
-    const [trendingMoviesData, popularMoviesData, popularTvData, actionMoviesData, actionTvData, comedyMoviesData, comedyTvData, dramaMoviesData, dramaTvData] = await Promise.all([
-      getTrendingMovies(),
+const [trendingData, popularMoviesData, popularTvData, actionMoviesData, actionTvData, comedyMoviesData, comedyTvData, dramaMoviesData, dramaTvData] = await Promise.all([
+      getTrendingDay(),
       getPopularMovies(),
       getPopularTvShows(),
       discoverMovies({ with_genres: GENRE_MAP['action'] }),
@@ -36,7 +31,8 @@ export default async function HomePage() {
       discoverTvShows({ with_genres: GENRE_MAP['drama'] }),
     ]);
 
-    trendingMovies = trendingMoviesData?.results || [];
+    // Use the top 10 trending items for the day in the hero carousel
+    trendingItems = (trendingData?.results || []).slice(0, 10);
     popularMovies = popularMoviesData?.results || [];
     popularTvShows = popularTvData?.results || [];
     actionMovies = actionMoviesData?.results || [];
@@ -46,14 +42,13 @@ export default async function HomePage() {
     dramaMovies = dramaMoviesData?.results || [];
     dramaTvShows = dramaTvData?.results || [];
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to fetch content:", err);
-    error = err.message || "Failed to load content.";
   }
 
   return (
     <RootLayoutContent>
-      <HeroCarousel items={trendingMovies} />
+      <HeroCarousel items={trendingItems} />
       <UserWatchHistory />
       <Top20Week />
       

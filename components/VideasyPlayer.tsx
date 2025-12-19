@@ -7,22 +7,22 @@ interface VideasyPlayerProps {
   mediaId: number;
   mediaType: 'movie' | 'tv';
   title?: string;
-  posterPath?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
+  posterPath?: string;
 }
 
 const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
   mediaId,
   mediaType,
   title = 'Video Player',
-  posterPath = '',
   seasonNumber,
   episodeNumber,
   initialTime = 0,
   onTimeUpdate,
+  posterPath,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -32,10 +32,13 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
   const lastSavedTimeRef = useRef(0);
   const messageReceivedRef = useRef(false);
 
-  // Log when component mounts with initialTime
+  // Log when component mounts with the initial start time (mount-only)
   useEffect(() => {
-    console.log(`🎬 [VideasyPlayer] Mounted with initialTime: ${initialTime}s, mediaId: ${mediaId}`);
-  }, [mediaId, initialTime]);
+    console.log(`🎬 [VideasyPlayer] Mounted with initialTime: ${initialStartRef.current}s, mediaId: ${mediaId}`);
+  }, [mediaId]);
+
+  // Capture the initial start time once on mount to avoid remounting the iframe if the parent updates saved progress
+  const initialStartRef = useRef<number>(initialTime);
 
   // Construct VIDEASY embed URL
   const embedUrl = useMemo(() => {
@@ -45,9 +48,9 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
       // For movies: https://player.videasy.net/movie/movie_id
       let url = `https://player.videasy.net/movie/${mediaId}?color=${colorParam}&overlay=true&autoplay=true`;
       
-      // Add progress parameter if user has saved progress
-      if (initialTime > 0) {
-        url += `&progress=${Math.floor(initialTime)}`;
+      // Add progress parameter if user has saved progress (only the initial value)
+      if (initialStartRef.current > 0) {
+        url += `&progress=${Math.floor(initialStartRef.current)}`;
       }
       
       return url;
@@ -59,19 +62,19 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
       
       let url = `https://player.videasy.net/tv/${mediaId}/${seasonNumber}/${episodeNumber}?color=${colorParam}&overlay=true&autoplay=true`;
       
-      // Add progress parameter if user has saved progress
-      if (initialTime > 0) {
-        url += `&progress=${Math.floor(initialTime)}`;
+      // Add progress parameter if user has saved progress (only the initial value)
+      if (initialStartRef.current > 0) {
+        url += `&progress=${Math.floor(initialStartRef.current)}`;
       }
       
       return url;
     }
-  }, [mediaId, mediaType, seasonNumber, episodeNumber, initialTime]);
+  }, [mediaId, mediaType, seasonNumber, episodeNumber]);
 
   // Handle iframe load
   const handleLoad = useCallback(() => {
     setIsLoading(false);
-    console.log(`🎬 [VideasyPlayer] Iframe loaded. Initial time: ${initialTime}s`);
+    console.log(`🎬 [VideasyPlayer] Iframe loaded. Initial time: ${initialStartRef.current}s`);
     
     // Try to send autoplay/play message to VIDEASY iframe after it loads
     if (iframeRef.current) {
@@ -92,7 +95,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
     }
     
     // Try to send seek message to VIDEASY iframe after it loads
-    if (initialTime > 0 && iframeRef.current) {
+    if (initialStartRef.current > 0 && iframeRef.current) {
       setTimeout(() => {
         try {
           if (iframeRef.current?.contentWindow) {
@@ -100,18 +103,18 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
             const seekMessage = {
               type: 'SEEK',
               data: {
-                time: initialTime,
+                time: initialStartRef.current,
               }
             };
             iframeRef.current.contentWindow.postMessage(JSON.stringify(seekMessage), 'https://player.videasy.net');
-            console.log(`📍 [VideasyPlayer] Sent SEEK message to VIDEASY: ${initialTime}s`);
+            console.log(`📍 [VideasyPlayer] Sent SEEK message to VIDEASY: ${initialStartRef.current}s`);
           }
         } catch (error) {
           console.log('[VideasyPlayer] Could not send seek message:', error);
         }
       }, 1000); // Wait 1 second for iframe to be fully ready
     }
-  }, [initialTime]);
+  }, []);
 
   // Listen for real-time progress messages from VIDEASY player
   useEffect(() => {
@@ -141,7 +144,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
             onTimeUpdate(currentTime);
           }
         }
-      } catch (error) {
+      } catch {
         // Silently ignore non-JSON or non-player messages
       }
     };
@@ -181,8 +184,8 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
   // to ensure progress is being saved even if the player doesn't support postMessage
   useEffect(() => {
     let heartbeatInterval: NodeJS.Timeout | null = null;
-    let startTime = Date.now();
-    let initialPlaybackTime = initialTime || 0;
+    const startTime = Date.now();
+    const initialPlaybackTime = initialTime || 0;
 
     // Wait 5 seconds to see if we get any messages from VIDEASY
     const waitTimer = setTimeout(() => {

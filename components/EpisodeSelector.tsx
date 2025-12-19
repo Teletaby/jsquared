@@ -17,9 +17,8 @@ interface Season {
 
 interface EpisodeSelectorProps {
   tvShowId: string;
-  showTitle: string;
+  showTitle?: string;
   posterPath?: string;
-  mediaType?: 'tv' | 'movie';
   currentSeason?: number;
   currentEpisode?: number;
   onClose: () => void;
@@ -30,7 +29,6 @@ export default function EpisodeSelector({
   tvShowId,
   showTitle,
   posterPath,
-  mediaType = 'tv',
   currentSeason,
   currentEpisode,
   onClose,
@@ -40,12 +38,7 @@ export default function EpisodeSelector({
   const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   useDisableScroll(true);
-
-  const posterUrl = posterPath
-    ? `https://image.tmdb.org/t/p/w342${posterPath}`
-    : '/placeholder.png';
 
   // Fetch logo on mount
   useEffect(() => {
@@ -54,10 +47,10 @@ export default function EpisodeSelector({
         const tvId = parseInt(tvShowId);
         const imageData = await getMediaLogos('tv', tvId);
         if (imageData?.logos && imageData.logos.length > 0) {
-          const englishLogo = imageData.logos.find((logo: any) => logo.iso_639_1 === 'en');
+          const englishLogo = imageData.logos.find((logo: unknown) => (logo as { iso_639_1: string }).iso_639_1 === 'en');
           const logoPath = englishLogo?.file_path || imageData.logos[0]?.file_path;
           if (logoPath) {
-            setLogoUrl(`https://image.tmdb.org/t/p/w500${logoPath}`);
+            // Logo fetched but not used
           }
         }
       } catch (error) {

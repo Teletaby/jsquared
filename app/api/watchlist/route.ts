@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
 
     const watchlist = await Watchlist.find({ userId: user._id }).sort({ addedAt: -1 });
     return NextResponse.json(watchlist);
-  } catch (error) {
-
+  } catch (err: unknown) {
+    console.error('Error fetching watchlist:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

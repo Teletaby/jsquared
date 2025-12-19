@@ -1,20 +1,16 @@
 // j-squared-cinema/components/RootLayoutContent.tsx
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { ReactNode, useState, useEffect } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import Chatbot from './Chatbot';
 import ConditionalLayout from './ConditionalLayout';
-import { Providers } from '@/app/providers';
 import MaintenancePage from '@/app/maintenance/page';
 import { useSession } from 'next-auth/react';
 import LoadingSpinner from './LoadingSpinner'; // Assuming you have a LoadingSpinner component
-import { disableConsoleInProduction } from '@/lib/disableConsole';
 
 export default function RootLayoutContent({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   const { data: session, status } = useSession();
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isLoadingMaintenanceStatus, setIsLoadingMaintenanceStatus] = useState(true);

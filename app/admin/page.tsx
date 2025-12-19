@@ -7,6 +7,21 @@ import LoadingSpinner from '@/components/LoadingSpinner'; // Assuming you have a
 import Header from '@/components/Header';
 import UserManagement from '@/components/UserManagement';
 
+// Typed visitor log entry to avoid use of `any`
+type VisitorLog = {
+  ipAddress?: string;
+  browser?: string;
+  os?: string;
+  url?: string;
+  timestamp?: string | number;
+};
+
+// Safe helper to extract an error message from unknown errors
+const getErrorMessage = (err: unknown) => {
+  if (err instanceof Error) return err.message;
+  try { return String(err); } catch { return 'Unknown error'; }
+};
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -22,7 +37,7 @@ export default function AdminPage() {
   const [togglingChatbotMaintenance, setTogglingChatbotMaintenance] = useState(false);
   const [togglingLogging, setTogglingLogging] = useState(false);
   const [togglingVideoSource, setTogglingVideoSource] = useState(false);
-  const [visitorLogs, setVisitorLogs] = useState<any[]>([]);
+  const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
   const [visitorLogsCount, setVisitorLogsCount] = useState(0);
   const [clearingLogs, setClearingLogs] = useState(false);
 
@@ -50,9 +65,10 @@ export default function AdminPage() {
       setIsMaintenanceMode(data.isMaintenanceMode);
       setIsChatbotMaintenanceMode(data.isChatbotMaintenanceMode || false);
       setVideoSource(data.videoSource || 'videasy');
-    } catch (error: any) {
-      setErrorMaintenance(error.message);
-      console.error('Failed to fetch maintenance status:', error);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      setErrorMaintenance(msg);
+      console.error('Failed to fetch maintenance status:', err);
     } finally {
       setLoadingMaintenance(false);
     }
@@ -76,9 +92,10 @@ export default function AdminPage() {
       }
       const data = await res.json();
       setIsMaintenanceMode(data.isMaintenanceMode);
-    } catch (error: any) {
-      setErrorMaintenance(error.message);
-      console.error('Failed to toggle maintenance mode:', error);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      setErrorMaintenance(msg);
+      console.error('Failed to toggle maintenance mode:', err);
     } finally {
       setTogglingMaintenance(false);
     }
@@ -102,9 +119,10 @@ export default function AdminPage() {
       }
       const data = await res.json();
       setIsChatbotMaintenanceMode(data.isChatbotMaintenanceMode);
-    } catch (error: any) {
-      setErrorMaintenance(error.message);
-      console.error('Failed to toggle chatbot maintenance mode:', error);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      setErrorMaintenance(msg);
+      console.error('Failed to toggle chatbot maintenance mode:', err);
     } finally {
       setTogglingChatbotMaintenance(false);
     }
@@ -138,9 +156,10 @@ export default function AdminPage() {
       }
       const data = await res.json();
       setVideoSource(data.videoSource);
-    } catch (error: any) {
-      setErrorMaintenance(error.message);
-      console.error('Failed to toggle video source:', error);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      setErrorMaintenance(msg);
+      console.error('Failed to toggle video source:', err);
     } finally {
       setTogglingVideoSource(false);
     }
@@ -155,7 +174,8 @@ export default function AdminPage() {
       }
       const data = await res.json();
       setIsLoggingEnabled(data.isLoggingEnabled);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      console.error('Failed to fetch logging status:', err);
       setIsLoggingEnabled(true); // Default to enabled
     } finally {
       setLoadingLogging(false);
@@ -179,7 +199,8 @@ export default function AdminPage() {
       }
       const data = await res.json();
       setIsLoggingEnabled(data.isLoggingEnabled);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      console.error('Failed to toggle logging:', err);
     } finally {
       setTogglingLogging(false);
     }
@@ -195,7 +216,8 @@ export default function AdminPage() {
       const data = await res.json();
       setVisitorLogs(data.logs || []);
       setVisitorLogsCount(data.pagination?.totalCount || 0);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      console.error('Failed to fetch visitor logs:', err);
       setVisitorLogs([]);
       setVisitorLogsCount(0);
     } finally {
@@ -220,7 +242,8 @@ export default function AdminPage() {
       setVisitorLogs([]);
       setVisitorLogsCount(0);
       alert(`Successfully deleted ${data.deletedCount} logs`);
-    } catch (error: any) {
+    } catch (err: unknown) {
+      console.error('Failed to clear logs:', err);
       alert('Failed to clear logs');
     } finally {
       setClearingLogs(false);
@@ -422,7 +445,7 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {visitorLogs.map((log: any, index: number) => (
+                          {visitorLogs.map((log: VisitorLog, index: number) => (
                             <tr key={index} className="border-b border-gray-700 hover:bg-gray-800 transition-colors">
                               <td className="px-4 py-3 font-mono text-gray-400">{log.ipAddress || 'N/A'}</td>
                               <td className="px-4 py-3">{log.browser || 'Unknown'}</td>

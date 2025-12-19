@@ -5,7 +5,7 @@ import { User } from '@/lib/models/index';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
@@ -24,9 +24,9 @@ export async function GET(req: Request) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-  } catch (error: any) {
-    console.error('Error fetching users:', error);
-    return new Response(JSON.stringify({ message: 'Internal Server Error', error: error.message }), {
+  } catch (err: unknown) {
+    console.error('Error fetching users:', err);
+    return new Response(JSON.stringify({ message: 'Internal Server Error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

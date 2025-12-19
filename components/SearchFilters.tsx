@@ -61,7 +61,7 @@ const SearchFilters = () => {
         {/* Phobia Filter */}
         <div>
           <h3 className="text-xl mb-2">Trigger / Phobia Filter</h3>
-          <p className="text-gray-400 mb-2 text-sm">Exclude content you don't want to see.</p>
+          <p className="text-gray-400 mb-2 text-sm">Exclude content you don&apos;t want to see.</p>
           <div className="flex flex-wrap gap-2">
             {Object.keys(phobiaKeywords).map(phobia => (
               <button

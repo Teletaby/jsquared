@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get current video source setting
-    let settings = await Settings.findOne({ key: 'app_settings' });
+    const settings = await Settings.findOne({ key: 'app_settings' });
     const videoSource = settings?.videoSource || 'vidking';
 
     // Handle both JSON and form-encoded data (sendBeacon uses form-encoded)

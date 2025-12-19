@@ -5,7 +5,7 @@ import { connectToDatabase } from './visitorLogging';
 const BATCH_SIZE = 20; // Write after collecting 20 logs
 const BATCH_TIMEOUT = 30 * 1000; // Write after 30 seconds regardless
 
-interface BatchedLog extends VisitorLog {}
+type BatchedLog = VisitorLog;
 
 let logBatch: BatchedLog[] = [];
 let batchTimeout: NodeJS.Timeout | null = null;
