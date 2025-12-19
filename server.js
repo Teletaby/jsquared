@@ -1,5 +1,9 @@
 console.log('Server script started.');
 
+// Disable Next.js telemetry/network telemetry during local dev to avoid blocking app.prepare()
+process.env.NEXT_TELEMETRY_DISABLED = process.env.NEXT_TELEMETRY_DISABLED || '1';
+process.env.__NEXT_TELEMETRY_DISABLED = process.env.__NEXT_TELEMETRY_DISABLED || '1';
+
 process.on('uncaughtException', (err) => {
   console.error('Unhandled exception caught:', err);
   process.exit(1);
@@ -16,6 +20,48 @@ const handle = app.getRequestHandler();
 
 console.log('Attempting to prepare Next.js app...');
 console.log('Calling app.prepare() now...');
+// Enable Next debug logs for startup diagnostics
+process.env.DEBUG = process.env.DEBUG || 'next:*';
+
+// Instrument async resources to help find blocking async ops during app.prepare()
+try {
+  const async_hooks = require('async_hooks');
+  const activeAsync = new Map();
+
+  const asyncHook = async_hooks.createHook({
+    init(asyncId, type, triggerAsyncId, resource) {
+      // Capture a short stack to trace where the async resource was created
+      const stack = (new Error()).stack?.split('\n').slice(3, 10).join('\n') || '';
+      activeAsync.set(asyncId, { type, stack, ts: Date.now() });
+    },
+    destroy(asyncId) {
+      activeAsync.delete(asyncId);
+    }
+  });
+  asyncHook.enable();
+
+  // Periodically print a summary of active async resources (first 30)
+  setInterval(() => {
+    try {
+      const map = Array.from(activeAsync.values());
+      const byType = map.reduce((acc, v) => {
+        acc[v.type] = (acc[v.type] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('Diagnostic (async_hooks): activeAsyncCount=', map.length, 'byType=', byType);
+      const sample = map.slice(0, 20).map((v, i) => ({ idx: i, type: v.type, ageMs: Date.now() - v.ts }));
+      console.log('Diagnostic (async_hooks) sample=', sample);
+      if (map.length > 0) {
+        console.log('Diagnostic (async_hooks) sample stacks:\n', map.slice(0,3).map(v => `----- ${v.type} -----\n${v.stack}`).join('\n\n'));
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, 5000);
+} catch (err) {
+  console.log('Async hooks not available:', err);
+}
+
 let _prepareStart = Date.now();
 const _prepareInterval = setInterval(() => {
   const s = Math.round((Date.now() - _prepareStart) / 1000);
@@ -29,6 +75,26 @@ const _prepareInterval = setInterval(() => {
     const types = handles.map(h => (h && h.constructor && h.constructor.name) ? h.constructor.name : typeof h);
     console.log('Diagnostic: handleTypes=', types.slice(0, 30).join(', '));
 
+    // Environment snapshot for debugging
+    const envSnapshot = {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      TMDB_API_KEY: !!process.env.TMDB_API_KEY,
+      MONGODB_URI: !!process.env.MONGODB_URI,
+      YOUTUBE_API_KEY: !!process.env.YOUTUBE_API_KEY,
+      NEXT_PUBLIC_YOUTUBE_API_KEY: !!process.env.NEXT_PUBLIC_YOUTUBE_API_KEY,
+      NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+    };
+    console.log('Diagnostic: envSnapshot=', envSnapshot);
+
+    // List a few loaded modules to see what's been required so far
+    try {
+      const cacheKeys = Object.keys(require.cache || {});
+      console.log(`Diagnostic: require.cache size=${cacheKeys.length}, sample keys=`, cacheKeys.slice(0, 30));
+    } catch (e) {
+      console.log('Diagnostic: error reading require.cache', e);
+    }
+
     handles.slice(0, 20).forEach((h, idx) => {
       try {
         if (h && h.constructor && h.constructor.name === 'ChildProcess') {
@@ -36,6 +102,9 @@ const _prepareInterval = setInterval(() => {
         }
         if (h && h.constructor && h.constructor.name === 'Socket') {
           console.log(`Socket[${idx}] remote=${h.remoteAddress}:${h.remotePort}`);
+        }
+        if (h && h.constructor && h.constructor.name === 'Timeout') {
+          console.log(`Timeout[${idx}] (likely setInterval/setTimeout) detected`);
         }
       } catch (e) {
         // ignore

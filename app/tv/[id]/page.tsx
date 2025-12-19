@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
-import { Download } from 'lucide-react';
+import { Download, Play } from 'lucide-react';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
@@ -18,6 +18,7 @@ import SourceWarningDialog from '@/components/SourceWarningDialog';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
 import VidLinkPlayer from '@/components/VidLinkPlayer';
+import MoreInfoModal from '@/components/MoreInfoModal';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 
 
@@ -77,6 +78,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
   const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
+  const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -101,6 +103,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       return () => clearTimeout(timer);
     }
   }, [showResumePrompt, notificationVisible]);
+
+  
 
   // Effect to reset state when media ID or episode changes
   useEffect(() => {
@@ -340,13 +344,13 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
-      {/* Preload VIDEASY, VidLink and VIDNEST for faster loading */}
-      <link rel="dns-prefetch" href="https://player.videasy.net" />
-      <link rel="preconnect" href="https://player.videasy.net" />
-      <link rel="dns-prefetch" href="https://vidlink.pro" />
-      <link rel="preconnect" href="https://vidlink.pro" />
-      <link rel="dns-prefetch" href="https://vidnest.fun" />
-      <link rel="preconnect" href="https://vidnest.fun" />
+      {/* Preload VIDEASY, VidLink and VIDNEST for faster loading (temporarily commented out during debug) */}
+      {/* <link rel="dns-prefetch" href="https://player.videasy.net" /> */}
+      {/* <link rel="preconnect" href="https://player.videasy.net" /> */}
+      {/* <link rel="dns-prefetch" href="https://vidlink.pro" /> */}
+      {/* <link rel="preconnect" href="https://vidlink.pro" /> */}
+      {/* <link rel="dns-prefetch" href="https://vidnest.fun" /> */}
+      {/* <link rel="preconnect" href="https://vidnest.fun" /> */}
 
       {/* Source Warning Dialog */}
       <SourceWarningDialog
@@ -402,7 +406,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
             {/* Content Overlay */}
             <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
-              <div className="max-w-2xl">
+                <div className="max-w-2xl">
                 {/* Logo or Title */}
                 {logoUrl ? (
                   <img
@@ -498,10 +502,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'hover:brightness-110'
                     }`}
                   >
-                    <span>▶</span> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
+                    <Play size={16} /> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
                   </button>
                   <button
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => setShowMoreInfoModal(true)}
                     className="text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl"
                   >
                     More Info
@@ -655,7 +659,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       )}
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16">
-        {/* Player Section - Appears at top when watching */}
+        {view !== 'info' && (
+          <>
+          {/* Player Section - Appears at top when watching */}
           <div className="space-y-8 mb-8">
             {/* Video Player - embedded players used directly */}
             {videoSource === 'videasy' ? (
@@ -756,6 +762,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               </div>
             )}
           </div>
+          </>
+        )}
 
         {view !== 'info' && (
         <div className="grid grid-cols-1 gap-6">
@@ -1002,6 +1010,13 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             onEpisodeSelect={handleEpisodeSelect}
           />
         )}
+        <MoreInfoModal
+          isOpen={showMoreInfoModal}
+          onClose={() => setShowMoreInfoModal(false)}
+          title={mediaTitle}
+          tagline={(tvShow as any)?.tagline}
+          description={tvShow?.overview}
+        />
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
-import { Download } from 'lucide-react';
+import { Download, Play } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -22,6 +22,7 @@ import VideasyPlayer from '@/components/VideasyPlayer';
 import VidLinkPlayer from '@/components/VidLinkPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
+import MoreInfoModal from '@/components/MoreInfoModal';
 
 interface MovieDetailPageProps {
   params: {
@@ -80,6 +81,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
   const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
+  const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
   
   const { id } = params;
   const tmdbId = parseInt(id);
@@ -484,10 +486,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'hover:brightness-110'
                     }`}
                   >
-                    <span>▶</span> {movie.release_date && new Date(movie.release_date) > new Date() ? 'Coming Soon' : 'Play'}
+                    <Play size={16} /> {movie.release_date && new Date(movie.release_date) > new Date() ? 'Coming Soon' : 'Play'}
                   </button>
                   <button
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => setShowMoreInfoModal(true)}
                     className="text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl"
                   >
                     More Info
@@ -1008,6 +1010,13 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             </div>
           </div>
         )}
+        <MoreInfoModal
+          isOpen={showMoreInfoModal}
+          onClose={() => setShowMoreInfoModal(false)}
+          title={mediaTitle}
+          tagline={movie.tagline}
+          description={movie.overview}
+        />
       </div>
   );
 };
