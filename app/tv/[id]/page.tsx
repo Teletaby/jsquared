@@ -625,20 +625,20 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       {view === 'info' && (
         <>
           {/* Hero Section */}
-          <div className="relative h-screen flex flex-col justify-center overflow-hidden mt-16">
-            {/* Backdrop Image - always shown first as base layer */}
+          <div className="relative h-screen flex flex-col justify-center overflow-hidden">
+            {/* Backdrop Image - always shown first as base layer (touches navbar and sits behind it) */}
             {tvShow?.backdrop_path && (
               <img
                 src={`https://image.tmdb.org/t/p/w1280${tvShow.backdrop_path}`}
                 alt="backdrop"
-                className="absolute top-0 left-0 w-full h-full object-cover"
+                className="absolute top-0 left-0 w-full h-full object-cover z-0"
               />
             )}
 
-            {/* Trailer Video Background - fades in on top of backdrop */}
+            {/* Trailer Video Background - fades in on top of backdrop (touches navbar and sits behind it) */}
             {trailerKey && !trailerError && (
               <div 
-                className="absolute top-0 left-0 w-screen h-full overflow-hidden"
+                className="absolute top-0 left-0 w-screen h-full overflow-hidden z-0"
                 style={{ 
                   opacity: trailerLoaded ? 1 : 0, 
                   pointerEvents: trailerLoaded ? 'auto' : 'none',
@@ -662,11 +662,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               </div>
             )}
             
-            {/* Fade Overlay */}
-            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none"></div>
+            {/* Fade Overlay - sits above backdrop/trailer but below content */}
+            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none z-10"></div>
 
             {/* Content Overlay */}
-            <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
+            <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
                 <div className="max-w-2xl">
                 {/* Logo or Title */}
                 {logoUrl ? (
