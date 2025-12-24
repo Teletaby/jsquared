@@ -34,7 +34,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
 
   // Log when component mounts with the initial start time (mount-only)
   useEffect(() => {
-    console.log(`🎬 [VideasyPlayer] Mounted with initialTime: ${initialStartRef.current}s, mediaId: ${mediaId}`);
+    console.log(`🎬 [Player 1] Mounted with initialTime: ${initialStartRef.current}s, mediaId: ${mediaId}`);
   }, [mediaId]);
 
   // Capture the initial start time once on mount to avoid remounting the iframe if the parent updates saved progress
@@ -74,7 +74,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
   // Handle iframe load
   const handleLoad = useCallback(() => {
     setIsLoading(false);
-    console.log(`🎬 [VideasyPlayer] Iframe loaded. Initial time: ${initialStartRef.current}s`);
+    console.log(`🎬 [Player 1] Iframe loaded. Initial time: ${initialStartRef.current}s`);
     
     // Try to send autoplay/play message to VIDEASY iframe after it loads
     if (iframeRef.current) {
@@ -86,10 +86,10 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
               type: 'PLAY',
             };
             iframeRef.current.contentWindow.postMessage(JSON.stringify(playMessage), 'https://player.videasy.net');
-            console.log(`▶️ [VideasyPlayer] Sent PLAY message to VIDEASY`);
+            console.log(`▶️ [Player 1] Sent PLAY message to Source 1`);
           }
         } catch (error) {
-          console.log('[VideasyPlayer] Could not send play message:', error);
+          console.log('▶️ [Player 1] Could not send play message to Source 1:', error);
         }
       }, 500); // Wait 500ms for iframe to be fully ready
     }
@@ -107,10 +107,10 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
               }
             };
             iframeRef.current.contentWindow.postMessage(JSON.stringify(seekMessage), 'https://player.videasy.net');
-            console.log(`📍 [VideasyPlayer] Sent SEEK message to VIDEASY: ${initialStartRef.current}s`);
+            console.log(`📍 [Player 1] Sent SEEK message to Source 1: ${initialStartRef.current}s`);
           }
         } catch (error) {
-          console.log('[VideasyPlayer] Could not send seek message:', error);
+          console.log('📍 [Player 1] Could not send seek message to Source 1:', error);
         }
       }, 1000); // Wait 1 second for iframe to be fully ready
     }
@@ -139,7 +139,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
           if (currentTime !== undefined && onTimeUpdate) {
             messageReceivedRef.current = true;
             lastSavedTimeRef.current = currentTime;
-            console.log(`📍 [VideasyPlayer] Message received - ${Math.floor(currentTime)}s / ${playerData.duration}s`);
+            console.log(`📍 [Player 1] Message received - ${Math.floor(currentTime)}s / ${playerData.duration}s`);
             // Call callback on every message - let the hook handle debouncing
             onTimeUpdate(currentTime);
           }
@@ -149,12 +149,12 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
       }
     };
 
-    console.log('🔌 [VideasyPlayer] Setting up message listener');
+    console.log('🔌 [Player 1] Setting up message listener');
     window.addEventListener('message', handleMessage);
     
     // Save progress before leaving (page unload, not tab switch)
     const handleBeforeUnload = () => {
-      console.log('⏹️ [VideasyPlayer] Page unloading, saving final progress:', lastSavedTimeRef.current);
+      console.log('⏹️ [Player 1] Page unloading, saving final progress:', lastSavedTimeRef.current);
       if (lastSavedTimeRef.current > 0 && onTimeUpdate) {
         onTimeUpdate(lastSavedTimeRef.current);
       }
@@ -163,7 +163,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
     // Save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
       if (document.hidden && lastSavedTimeRef.current > 0 && onTimeUpdate) {
-        console.log('👁️ [VideasyPlayer] Page hidden, saving progress:', lastSavedTimeRef.current);
+        console.log('👁️ [Player 1] Page hidden, saving progress:', lastSavedTimeRef.current);
         onTimeUpdate(lastSavedTimeRef.current);
         // Note: We do NOT unmount or reload the player here - it stays alive in the background
       }
@@ -173,13 +173,47 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      console.log('🔌 [VideasyPlayer] Cleaning up listeners');
+      console.log('🔌 [Player 1] Cleaning up listeners');
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [onTimeUpdate]);
+    // React to changes in initialTime prop (e.g., resume link supplied time after player mounted)
+    useEffect(() => {
+      if (!iframeRef.current) return;
+      const t = Math.floor(initialTime || 0);
+      if (!(t > 0 && Math.abs(t - lastSavedTimeRef.current) > 1)) return;
 
+      const doSeek = () => {
+        try {
+          if (iframeRef.current?.contentWindow) {
+            const seekMessage = { type: 'SEEK', data: { time: t } };
+            iframeRef.current.contentWindow.postMessage(JSON.stringify(seekMessage), 'https://player.videasy.net');
+            console.log(`📍 [Player 1] SEEK sent due to initialTime prop change: ${t}s`);
+            lastSavedTimeRef.current = t;
+            if (onTimeUpdate) onTimeUpdate(t);
+          }
+        } catch (e) {
+          console.warn('[Player 1] SEEK failed on initialTime change', e);
+        }
+      };
+
+      // If page is hidden, defer the seek until visible to avoid reloading/playing in background
+      if (document.visibilityState !== 'visible') {
+        console.log('[Player 1] Page hidden - deferring SEEK until visible');
+        const onVis = () => {
+          if (document.visibilityState === 'visible') {
+            document.removeEventListener('visibilitychange', onVis);
+            doSeek();
+          }
+        };
+        document.addEventListener('visibilitychange', onVis);
+        return;
+      }
+
+      doSeek();
+    }, [initialTime, onTimeUpdate]);
   // Fallback: If VIDEASY doesn't send postMessage events, use a periodic heartbeat
   // to ensure progress is being saved even if the player doesn't support postMessage
   useEffect(() => {
@@ -190,7 +224,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
     // Wait 5 seconds to see if we get any messages from VIDEASY
     const waitTimer = setTimeout(() => {
       if (!messageReceivedRef.current) {
-        console.warn('⚠️ [VideasyPlayer] No postMessage from VIDEASY detected - using heartbeat fallback');
+        console.warn('⚠️ [Player 1] No postMessage from Source 1 detected - using heartbeat fallback');
         
         // Start heartbeat - assume constant playback and send updates
         heartbeatInterval = setInterval(() => {
@@ -198,13 +232,13 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
           const currentTime = initialPlaybackTime + elapsedSeconds;
           
           if (onTimeUpdate) {
-            console.log(`📊 [VideasyPlayer] Heartbeat: ${currentTime}s`);
+            console.log(`📊 [Player 1] Heartbeat: ${currentTime}s`);
             onTimeUpdate(currentTime);
             lastSavedTimeRef.current = currentTime;
           }
         }, 10000); // Send heartbeat every 10 seconds
       } else {
-        console.log('✅ [VideasyPlayer] postMessage working - heartbeat not needed');
+        console.log('✅ [Player 1] postMessage working - heartbeat not needed');
       }
     }, 5000);
 

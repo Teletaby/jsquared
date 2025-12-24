@@ -255,6 +255,16 @@ export async function getTvShowVideos(tvShowId: number) {
   return fetchFromTMDB(`/tv/${tvShowId}/videos`);
 }
 
+// Get recommendations for a movie
+export async function getMovieRecommendations(movieId: number) {
+  return fetchFromTMDB(`/movie/${movieId}/recommendations`);
+}
+
+// Get recommendations for a TV show
+export async function getTvRecommendations(tvId: number) {
+  return fetchFromTMDB(`/tv/${tvId}/recommendations`);
+}
+
 // Search multi (movies, TV shows, and people)
 export async function searchMulti(query: string, withGenres: string = '', page: string = '1') {
   const params: Record<string, string> = {

@@ -14,6 +14,8 @@ interface SourceInfo {
 
 interface VideoSourceSelectorProps {
   currentSource: 'videasy' | 'vidlink' | 'vidnest';
+  /** Optional: the pending/selected candidate (separate from currentSource) */
+  selectedSource?: 'videasy' | 'vidlink' | 'vidnest' | null;
   onSourceChange: (source: 'videasy' | 'vidlink' | 'vidnest') => void;
   onConfirm: () => void;
   showWarning?: boolean;
@@ -21,6 +23,7 @@ interface VideoSourceSelectorProps {
 
 const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
   currentSource,
+  selectedSource = null,
   onSourceChange,
   onConfirm,
   showWarning = false,
@@ -88,12 +91,12 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
                 onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest');
               }}
               className={`relative p-4 rounded-lg border-2 transition text-left ${
-                currentSource === key
+                ((selectedSource ?? currentSource) === key)
                   ? 'border-blue-500 bg-blue-900/20'
                   : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
               }`}
             >
-              {currentSource === key && (
+              {(selectedSource ?? currentSource) === key && (
                 <div className="absolute top-2 right-2">
                   <CheckCircle size={20} className="text-blue-500" />
                 </div>
@@ -132,11 +135,13 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       </div>
 
       <div className="flex gap-3">
+        {/* Disable confirm until user chooses a different source */}
         <button
           onClick={onConfirm}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition"
+          disabled={!selectedSource || selectedSource === currentSource}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg transition"
         >
-          Confirm & Continue
+          {(!selectedSource || selectedSource === currentSource) ? 'Select a source' : 'Confirm & Continue'}
         </button>
       </div>
     </div>

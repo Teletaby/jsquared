@@ -4,6 +4,7 @@ import HeroCarousel from '../components/HeroCarousel';
 import UserWatchHistory from '../components/UserWatchHistory';
 import Top20Week from '../components/Top20Week';
 import MediaFetcherList from '../components/MediaFetcherList';
+import LastWatchedSummary from '../components/LastWatchedSummary';
 import { getPopularMovies, getTrendingDay, getPopularTvShows, discoverMovies, discoverTvShows } from '../lib/tmdb';
 import { GENRE_MAP } from '../lib/genreMap';
 
@@ -51,6 +52,11 @@ const [trendingData, popularMoviesData, popularTvData, actionMoviesData, actionT
       <HeroCarousel items={trendingItems} />
       <UserWatchHistory />
       <Top20Week />
+
+      {/* One-line carousel "Since you watched" placed below Top 20 */}
+      <div className="px-4 md:px-0">
+        <LastWatchedSummary />
+      </div>
       
       {/* Popular Movies */}
       <MediaFetcherList title="Popular Movies" items={popularMovies.slice(0, 12)} />

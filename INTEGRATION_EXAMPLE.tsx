@@ -161,6 +161,7 @@ export default function TVPageIntegrationExample({
         <div className="flex justify-center">
           <VideoSourceSelector
             currentSource={videoSource}
+            selectedSource={pendingSource}
             onSourceChange={setPendingSource}
             onConfirm={handleSourceConfirm}
             showWarning={true}
@@ -171,7 +172,11 @@ export default function TVPageIntegrationExample({
       {/* ===== VIDEO SOURCE BUTTON ===== */}
       <div className="flex gap-4">
         <button
-          onClick={() => setShowSourceSelector(!showSourceSelector)}
+          onClick={() => {
+            // Initialize pending selection to current source when opening selector
+            if (!showSourceSelector) setPendingSource(videoSource);
+            setShowSourceSelector(!showSourceSelector);
+          }}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition"
         >
           📺 Switch Source: {videoSource === 'videasy' ? 'Videasy' : videoSource === 'vidlink' ? 'VidLink' : 'VIDNEST'}

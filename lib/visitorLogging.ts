@@ -40,6 +40,11 @@ export interface VisitorLog {
   city?: string;
   pageLoadTime?: number;
   userId?: string; // If user is logged in
+  // Optional visit tracking fields
+  visitId?: string;
+  startTime?: Date;
+  endTime?: Date;
+  durationSeconds?: number;
 }
 
 export async function logVisitor(visitorData: VisitorLog) {
@@ -51,11 +56,54 @@ export async function logVisitor(visitorData: VisitorLog) {
     // Create index on timestamp for efficient querying
     await visitorLogsCollection.createIndex({ timestamp: -1 });
     await visitorLogsCollection.createIndex({ ipAddress: 1 });
+    await visitorLogsCollection.createIndex({ visitId: 1 });
 
     const result = await visitorLogsCollection.insertOne({
       ...visitorData,
       timestamp: new Date(),
     });
+
+    return result;
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Update an existing visit entry with an end time and duration. If no document exists, do an upsert.
+export async function finalizeVisit(visitId: string, endTime: Date, durationSeconds?: number) {
+  try {
+    if (!visitId) return;
+    const { db } = await connectToDatabase();
+    const visitorLogsCollection: Collection<VisitorLog> = db.collection('visitor_logs');
+
+    // Attempt to calculate duration from stored startTime if none provided
+    let duration = durationSeconds;
+    if (duration === undefined) {
+      const existing = await visitorLogsCollection.findOne({ visitId });
+      if (existing?.startTime) {
+        const st = new Date(existing.startTime);
+        duration = Math.max(0, Math.round((endTime.getTime() - st.getTime()) / 1000));
+      } else {
+        duration = undefined;
+      }
+    }
+
+    // Update the existing start record if present; otherwise insert a short record representing the visit end
+    const result: any = await visitorLogsCollection.findOneAndUpdate(
+      { visitId },
+      {
+        $set: {
+          endTime,
+          durationSeconds: duration,
+        }
+      },
+      { returnDocument: 'after' }
+    );
+
+    if (!result || !result.value) {
+      // No existing visit found; insert a minimal document
+      await visitorLogsCollection.insertOne({ visitId, endTime, durationSeconds: duration, timestamp: new Date() } as any);
+    }
 
     return result;
   } catch (error) {
@@ -71,12 +119,50 @@ export async function getVisitorLogs(
     const { db } = await connectToDatabase();
     const visitorLogsCollection: Collection<VisitorLog> = db.collection('visitor_logs');
 
-    const logs = await visitorLogsCollection
-      .find({})
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .skip(skip)
-      .toArray();
+    // Aggregate by visitId when available, otherwise treat each document as its own visit
+    // We sort newest timestamp first so $first after $sort picks the most recent doc for each visit
+    const pipeline = [
+      {
+        $addFields: {
+          visitKey: {
+            $cond: [ { $ifNull: ["$visitId", false] }, "$visitId", { $toString: "$_id" } ]
+          }
+        }
+      },
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$visitKey",
+          latestDoc: { $first: "$$ROOT" },
+          startTime: { $min: "$startTime" },
+          endTime: { $max: "$endTime" },
+          durationSeconds: { $max: "$durationSeconds" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          visitId: "$_id",
+          ipAddress: "$latestDoc.ipAddress",
+          userAgent: "$latestDoc.userAgent",
+          browser: "$latestDoc.browser",
+          os: "$latestDoc.operatingSystem",
+          url: "$latestDoc.url",
+          timestamp: { $ifNull: [ "$startTime", "$latestDoc.timestamp" ] },
+          startTime: "$startTime",
+          endTime: "$endTime",
+          durationSeconds: { $ifNull: [ "$durationSeconds", { $cond: [ { $and: [ { $ifNull: ["$startTime", false] }, { $ifNull: ["$endTime", false] } ] }, { $divide: [ { $subtract: [ "$endTime", "$startTime" ] }, 1000 ] }, null ] } ] },
+          entries: "$count",
+        }
+      },
+      { $sort: { timestamp: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    const cursor = await visitorLogsCollection.aggregate(pipeline);
+    const logs = await cursor.toArray();
 
     return logs;
   } catch (error) {
@@ -89,7 +175,25 @@ export async function getVisitorLogsCount() {
     const { db } = await connectToDatabase();
     const visitorLogsCollection: Collection<VisitorLog> = db.collection('visitor_logs');
 
-    const count = await visitorLogsCollection.countDocuments();
+    // Count unique visits (grouped by visitId when present, otherwise by doc _id)
+    const pipeline = [
+      {
+        $addFields: {
+          visitKey: {
+            $cond: [ { $ifNull: ["$visitId", false] }, "$visitId", { $toString: "$_id" } ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: "$visitKey"
+        }
+      },
+      { $count: "count" }
+    ];
+
+    const res = await visitorLogsCollection.aggregate(pipeline).toArray();
+    const count = (res && res[0] && res[0].count) ? res[0].count : 0;
     return count;
   } catch (error) {
     throw error;

@@ -5,8 +5,8 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, AlertCircle, Trash2, X } from 'lucide-react';
-import { getVideoSourceSetting } from '@/lib/utils';
+import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
+import { getVideoSourceSetting, sourceNameToId, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
 
 interface WatchHistoryItem {
   _id: string;
@@ -21,6 +21,8 @@ interface WatchHistoryItem {
   seasonNumber?: number;
   episodeNumber?: number;
   lastWatchedAt: string;
+  // Optional: the video source used when this history entry was recorded
+  source?: 'videasy' | 'vidlink' | 'vidnest' | string;
 }
 
 export default function UserWatchHistory() {
@@ -29,7 +31,7 @@ export default function UserWatchHistory() {
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; title: string } | null>(null);
   const scrollContainerRef: any = React.useRef(null);
 
@@ -62,20 +64,38 @@ export default function UserWatchHistory() {
 
     const fetchData = async () => {
       try {
-        // Fetch watch history
-        const historyResponse = await fetch('/api/watch-history?limit=10');
+        // Prefer per-user saved source if available; fetch this first so resume links can include it
+        try {
+          const res = await fetch('/api/user/source');
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.source) {
+              setVideoSource(data.source);
+            } else {
+              // If user has no preference, fall back to app default
+              const source = await getVideoSourceSetting();
+              setVideoSource(source);
+            }
+          } else {
+            const source = await getVideoSourceSetting();
+            setVideoSource(source);
+          }
+        } catch (e) {
+          console.warn('[Watch History] Error fetching user source:', e);
+          const source = await getVideoSourceSetting();
+          setVideoSource(source);
+        }
+
+        // Fetch watch history after we have the user's source to avoid race conditions when building resume links
+        const historyResponse = await fetch('/api/watch-history?limit=20');
         if (historyResponse.ok) {
           const data = await historyResponse.json();
-          console.log('📺 [Watch History] Initial load:', data.length, 'items');
+          console.log('📺 [Watch History] Initial load (limit=20):', data.length, 'items');
           setWatchHistory(data);
         } else {
           console.log('📺 [Watch History] API returned status:', historyResponse.status);
           setWatchHistory([]);
         }
-
-        // Fetch video source setting
-        const source = await getVideoSourceSetting();
-        setVideoSource(source);
       } catch (error) {
         console.error('Error fetching data:', error);
         setWatchHistory([]);
@@ -92,7 +112,60 @@ export default function UserWatchHistory() {
     checkScrollability();
     // Re-check on window resize
     window.addEventListener('resize', checkScrollability);
-    return () => window.removeEventListener('resize', checkScrollability);
+
+    // Listen for playtime updates so we can move the corresponding item to the top immediately
+    const handleUpdate = (e: any) => {
+      const d = e?.detail;
+      if (!d || !d.mediaId) return;
+      setWatchHistory((prev) => {
+        // Remove any existing entry for the same media+episode
+        const filtered = prev.filter((item) => {
+          if (item.mediaId !== d.mediaId || item.mediaType !== d.mediaType) return true;
+          // For TV, require matching season/episode to consider the same entry
+          if (d.mediaType === 'tv') {
+            return !(item.seasonNumber === d.seasonNumber && item.episodeNumber === d.episodeNumber);
+          }
+          return false;
+        });
+
+        // Build a new entry (best-effort) and put it at the front
+        const newItem: any = {
+          _id: `local-${d.mediaId}-${d.mediaType}-${Date.now()}`,
+          mediaId: d.mediaId,
+          mediaType: d.mediaType,
+          title: d.title || '(Untitled)',
+          posterPath: d.posterPath || '',
+          progress: d.progress ?? 0,
+          currentTime: d.currentTime ?? 0,
+          totalDuration: d.totalDuration ?? 0,
+          seasonNumber: d.seasonNumber,
+          episodeNumber: d.episodeNumber,
+          lastWatchedAt: d.lastWatchedAt || new Date().toISOString(),
+          source: d.source || undefined,
+        };
+
+        return [newItem, ...filtered];
+      });
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== 'lastPlayed' || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue);
+        window.dispatchEvent(new CustomEvent('watchtime:update', { detail: parsed }));
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    window.addEventListener('watchtime:update', handleUpdate as any);
+    window.addEventListener('storage', handleStorage as any);
+
+    return () => {
+      window.removeEventListener('resize', checkScrollability);
+      window.removeEventListener('watchtime:update', handleUpdate as any);
+      window.removeEventListener('storage', handleStorage as any);
+    };
   }, [watchHistory]);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -141,7 +214,7 @@ export default function UserWatchHistory() {
 
     const refreshWatchHistory = async () => {
       try {
-        const response = await fetch('/api/watch-history?limit=10');
+        const response = await fetch('/api/watch-history?limit=20');
         if (response.ok && isMounted) {
           const data = await response.json();
           
@@ -228,15 +301,6 @@ export default function UserWatchHistory() {
           <span className="w-1 h-6 bg-accent rounded-full"></span>
           Continue Watching
         </h2>
-        {videoSource === 'vidnest' && (
-          <div className="ml-auto flex items-center gap-2 bg-yellow-500/20 border border-yellow-500/50 px-4 py-2 rounded-lg">
-            <AlertCircle size={18} className="text-yellow-400 flex-shrink-0" />
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-yellow-300 font-semibold">Progress saving will be back soon</span>
-              <span className="text-xs text-yellow-200">Primary source is currently not available</span>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="relative px-2"> {/* Added px-2 here */}
@@ -262,9 +326,22 @@ export default function UserWatchHistory() {
         >
           {consolidatedHistory.map((item) => {
             // Build href - for TV shows, include season and episode; for movies, just use the ID
-            const href = item.mediaType === 'tv' && item.seasonNumber !== undefined && item.episodeNumber !== undefined
-              ? `/${item.mediaType}/${item.mediaId}?season=${item.seasonNumber}&episode=${item.episodeNumber}`
-              : `/${item.mediaType}/${item.mediaId}`;
+            const base = `/${item.mediaType}/${item.mediaId}`;
+            const params: string[] = [];
+            if (item.mediaType === 'tv' && item.seasonNumber !== undefined && item.episodeNumber !== undefined) {
+              params.push(`season=${item.seasonNumber}`, `episode=${item.episodeNumber}`);
+            }
+            // We no longer include `source` or `time` in the URL for privacy.
+            // Instead we persist the preferred source via a background POST when the user clicks the link
+            // and rely on server-side watch-history for the resume timestamp.
+            const allowedSources = ['videasy', 'vidlink', 'vidnest'];
+            // Prefer the user's server-stored preference (`videoSource`) over a history item's recorded source.
+            // History items may have older sources; user preference should take precedence for resume behavior.
+            const resumeSourceName = (videoSource && allowedSources.includes(String(videoSource))) ? String(videoSource) : (item.source && allowedSources.includes(item.source) ? item.source : undefined);
+            const href = `${base}${params.length > 0 ? '?' + params.join('&') : ''}`;
+
+            // Debug: log the resolved resume source when links are built (helps diagnose source overrides)
+            console.log('[UserWatchHistory] Built resume href', href, 'resumeSourceName=', resumeSourceName, 'resumeSourceId=', resumeSourceName ? sourceNameToId(resumeSourceName) : undefined);
 
             return (
             <div
@@ -273,6 +350,82 @@ export default function UserWatchHistory() {
             >
               <Link
                 href={href}
+                onClick={() => {
+                  // Persist the resume source immediately (best-effort, non-blocking) — only when logged in.
+                  // If the history item doesn't have a source, fall back to the user's current preferred source.
+                  const allowedSources = ['videasy', 'vidlink', 'vidnest'];
+                  let resumeSource: string | undefined = undefined;
+                  try {
+                    const perMedia = getExplicitSourceForMedia(item.mediaId, false);
+                    if (perMedia) resumeSource = perMedia;
+                  } catch (e) { /* ignore */ }
+                  if (!resumeSource) {
+                    // Prefer the current user/server preference first, then fall back to the history item's recorded source
+                    if (videoSource && allowedSources.includes(String(videoSource))) {
+                      resumeSource = String(videoSource);
+                    } else if (item.source && allowedSources.includes(item.source)) {
+                      resumeSource = item.source;
+                    } else {
+                      resumeSource = undefined;
+                    }
+                  }
+                  if (resumeSource && session?.user) {
+                    try {
+                      // Persist per-media explicit source so it applies only to this selection
+                      try {
+                        // Persist per-media explicit source synchronously so it exists before navigation
+                        try {
+                          setExplicitSourceForMedia(item.mediaId, resumeSource);
+                          console.log('[UserWatchHistory] Set per-media explicit source (sync)', { mediaId: item.mediaId, source: resumeSource });
+
+                          // Fire-and-forget: persist to server as immediate explicit write (async)
+                          (async () => {
+                            try {
+                              const payload: any = {
+                                mediaId: item.mediaId,
+                                mediaType: item.mediaType,
+                                currentTime: item.currentTime ?? 0,
+                                totalDuration: item.totalDuration ?? 0,
+                                progress: item.progress ?? 0,
+                                immediate: true,
+                                source: resumeSource,
+                                explicit: true,
+                                title: item.title || '',
+                                posterPath: item.posterPath || '',
+                              };
+                              if (item.seasonNumber !== undefined) payload.seasonNumber = item.seasonNumber;
+                              if (item.episodeNumber !== undefined) payload.episodeNumber = item.episodeNumber;
+                              await fetch('/api/watch-history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                              console.log('[UserWatchHistory] Persisted explicit source to watch-history (async)', { mediaId: item.mediaId, source: resumeSource });
+                            } catch (e) {
+                              console.warn('[UserWatchHistory] Failed to persist explicit source', e);
+                            }
+                          })();
+
+                              // Also persist the user's last-used source to their profile
+                              // so future navigations (server-side) remember this choice.
+                              (async () => {
+                                try {
+                                  await fetch('/api/user/source', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ source: resumeSource, explicit: true, at: new Date().toISOString() }),
+                                  });
+                                  console.log('[UserWatchHistory] Persisted user last-used source (async)', { mediaId: item.mediaId, source: resumeSource });
+                                } catch (e) {
+                                  console.warn('[UserWatchHistory] Failed to persist user source', e);
+                                }
+                              })();
+
+                        } catch (e) { /* ignore */ }
+                      } catch (e) { /* ignore */ }
+                    } catch (e) {
+                      // ignore
+                    }
+                  } else {
+                    // logged out: do not persist explicit choice
+                  }
+                }}
                 className="block hover:scale-105 transition-transform duration-300 h-full"
               >
                 <div className="relative w-full bg-gray-900 flex flex-col h-full rounded-lg shadow-lg">
@@ -289,6 +442,9 @@ export default function UserWatchHistory() {
                       <span className="text-gray-500 text-sm text-center px-2">No Image Available</span>
                     </div>
                   )}
+
+
+
                   {/* Play Button Overlay */}
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-white">

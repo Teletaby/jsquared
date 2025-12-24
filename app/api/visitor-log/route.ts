@@ -12,20 +12,56 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
+    // Be defensive: some clients (sendBeacon) may send no body or invalid JSON. Accept empty body gracefully.
+    let body: any = {};
+    try {
+      const text = await request.text();
+      if (text && text.trim().length > 0) {
+        try {
+          body = JSON.parse(text);
+        } catch (parseErr) {
+          console.warn('[Visitor Log API] Failed to parse JSON body, treating as empty payload:', parseErr);
+          body = {};
+        }
+      } else {
+        // Empty body — treat as a minimal request where visitId/action may be set via headers or be absent
+        body = {};
+      }
+    } catch (readErr) {
+      console.warn('[Visitor Log API] Error reading request body, treating as empty payload:', readErr);
+      body = {};
+    }
+
     const {
       userAgent,
       referer,
       url,
       pageLoadTime,
       userId,
-    } = body;
+      visitId,
+      action,
+      startTime,
+      endTime,
+      durationSeconds,
+    } = body || {};
 
     // Get IP address
     const ipAddress =
       request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
       request.headers.get('x-real-ip') ||
       'unknown';
+
+    // If this is an 'end' event, finalize the visit immediately (not queued)
+    if (action === 'end' && visitId) {
+      try {
+        const endTs = endTime ? new Date(endTime) : new Date();
+        await (await import('@/lib/visitorLogging')).finalizeVisit(visitId, endTs, durationSeconds);
+        return NextResponse.json({ message: 'Visit finalized' }, { status: 200 });
+      } catch (err) {
+        console.error('[Visitor Log API] Error finalizing visit:', err);
+        return NextResponse.json({ message: 'Processed' }, { status: 200 });
+      }
+    }
 
     // Simple browser detection from user agent
     const getBrowserInfo = (ua: string) => {
@@ -72,11 +108,13 @@ export async function POST(request: Request) {
       browser: browserName,
       browserVersion: browserVersion,
       operatingSystem: operatingSystem,
-      timestamp: new Date(),
+      timestamp: startTime ? new Date(startTime) : new Date(),
       url: url || '/',
       referer: referer || undefined,
       pageLoadTime: pageLoadTime || undefined,
       userId: userId || undefined,
+      visitId: visitId || undefined,
+      startTime: startTime ? new Date(startTime) : undefined,
     };
 
     // Queue visitor log for batch writing (async, non-blocking)

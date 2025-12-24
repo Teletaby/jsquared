@@ -8,7 +8,7 @@ import Header from '@/components/Header';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
-import { formatDuration, getVideoSourceSetting } from '@/lib/utils';
+import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
 import { Download, Play } from 'lucide-react';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
@@ -55,7 +55,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const [, setCurrentPlaybackTime] = useState<number>(0);
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
-  const [, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
+  const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLoaded, setTrailerLoaded] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
@@ -69,7 +69,46 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest'>('videasy');
+  // videoSource starts from localStorage when available to avoid flashes
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(() => {
+    try {
+      const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
+      const allowed = ['videasy', 'vidlink', 'vidnest'];
+      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest';
+    } catch (e) {
+      // ignore storage errors
+    }
+    return null;
+  });
+
+    // Defensive: revert accidental automatic switches to 'videasy' back to client's saved source
+    useEffect(() => {
+      try {
+        const local = localStorage.getItem('lastUsedSource');
+        const allowed = ['videasy', 'vidlink', 'vidnest'];
+        if (local && allowed.includes(local) && videoSource === 'videasy' && local !== 'videasy') {
+          console.log('[Client][DEFENSE] Reverting automatic videasy fallback to local lastUsedSource (TV page):', local);
+          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, [videoSource]);
+  const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
+
+  const timeAgo = (iso?: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+  const [recommendations, setRecommendations] = useState<any[]>([]); // Fallback recs when details fail
+  const [retrying, setRetrying] = useState(false);
 
 
   const [showSourceWarning, setShowSourceWarning] = useState(false);
@@ -108,10 +147,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
   // Effect to reset state when media ID or episode changes
   useEffect(() => {
-    if (lastMediaIdRef.current !== null && lastMediaIdRef.current !== tmdbId) {
-      // Media has changed, reset to default source
-      setVideoSource('videasy');
-    }
+    // Do not force-reset the user's chosen source when media changes.
+    // Users expect their preferred source to persist across content navigation.
     // Reset resume choice for new media or episode
     setResumeChoice('pending');
     setShowResumePrompt(false);
@@ -244,6 +281,63 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             setSavedProgress(tvHistory.currentTime); // Keep full precision, no rounding
             setSavedDuration(tvHistory.totalDuration || 0);
             setCurrentPlaybackTime(tvHistory.currentTime);
+
+            // Prefer the user's stored profile source over a watch-history item's recorded source.
+            // Only fall back to the history item's source when no per-user preference exists and no explicit local selection is present.
+            const qsSource = searchParams.get('source');
+            if (!qsSource && tvHistory.source) {
+              // Make a best-effort check with the server's stored user source (avoid race where history loads before server preference)
+              let serverSource: string | undefined = userLastSourceInfo?.source;
+              if (session?.user && !serverSource) {
+                try {
+                  const srcRes = await fetch('/api/user/source');
+                  if (srcRes.ok) {
+                    const sdata = await srcRes.json();
+                    if (sdata?.source) {
+                      serverSource = sdata.source;
+                      setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
+                      console.log('[Client] Fetched server user source while applying history fallback (tv):', serverSource);
+                    }
+                  }
+                } catch (e) {
+                  console.warn('[Client] Failed to fetch server user source during history handling (tv)', e);
+                }
+              }
+
+              // If server has a stored source, prefer it over the history item's recorded source
+              if (serverSource) {
+                console.log('[Client] Server has preferred source; skipping watch-history source (tv):', serverSource);
+              } else {
+                const _id = sourceNameToId(tvHistory.source);
+                console.log('[Client] No server/user profile source; using source from watch-history (tv):', _id ? `Source ${_id}` : 'unknown', { tvHistorySource: tvHistory.source, userLastSourceInfo });
+
+                // Only use watch-history source if the user hasn't explicitly selected a source for THIS media in this tab
+                let explicit = false;
+                try {
+                  explicit = !!getExplicitSourceForMedia(tmdbId, false);
+                } catch (e) { explicit = false; }
+
+                if (!explicit) {
+                  console.log('[Client][DEBUG] Setting video source from history (tv)', { setTo: tvHistory.source, mediaId: tvHistory.mediaId });
+                  setVideoSource(tvHistory.source);
+                  setUserLastSourceInfo({ source: tvHistory.source, at: tvHistory.lastWatchedAt || null });
+
+                  // Best-effort persist so future navigations pick this up in the user profile
+                  try {
+                    fetch('/api/user/source', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      /* intentionally not persisting automatic watch-history source to avoid overwriting explicit user preferences */
+                      keepalive: true,
+                    }).catch(() => {});
+                  } catch (e) {
+                    // ignore persistence failures
+                  }
+                } else {
+                  console.log('[Client] Skipping applying/persisting watch-history source because explicit local selection exists (tv)');
+                }
+              }
+            }
           } else {
             console.log('❌ NOT FOUND! Looking for S', currentSeason, 'E', currentEpisode, 'mediaId:', tmdbId);
             console.log('Available episodes:', data.filter((h: any) => h.mediaId === tmdbId && h.mediaType === 'tv').map((h: any) => `S${h.seasonNumber}E${h.episodeNumber}`));
@@ -259,14 +353,76 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchWatchProgress();
   }, [session, tmdbId, currentSeason, currentEpisode]);
 
-  // Fetch video source setting
+  // Fetch video source setting (but honor `?source=` query param if present)
   useEffect(() => {
     const fetchVideoSource = async () => {
+      // If we've already got an explicit selection (and the user is logged in), use it and do not overwrite it
+      try {
+        if (session?.user) {
+          const explicit = getExplicitSourceForMedia(tmdbId, false);
+          if (explicit) {
+            // explicit per-media selection exists; respect it and set the source immediately
+            const name = explicit as 'videasy' | 'vidlink' | 'vidnest';
+            const explicitAt = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
+            setVideoSource(name);
+            setUserLastSourceInfo({ source: name, at: explicitAt || null });
+            return;
+          }
+        }
+      } catch (e) {
+        // ignore storage errors
+      }
+
+      // If the URL includes a source override, trust it and do not fetch/overwrite from server
+      const qsSource = searchParams.get('source');
+      if (qsSource) {
+        // Accept numeric ids as well as names
+        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest'].includes(qsSource) ? qsSource : undefined);
+        if (name) {
+          const qsId = sourceNameToId(name);
+          console.log('[Client] Source query param detected on TV page; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
+          setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest');
+          setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
+          return;
+        }
+      }
+
+      // Prefer per-user saved source if available (only when logged in), otherwise fall back to global setting
+      if (session?.user) {
+        try {
+          const res = await fetch('/api/user/source');
+          if (res.ok) {
+            const data = await res.json();
+            console.log('[Client] /api/user/source returned:', data);
+            if (data?.source) {
+              // Only set if we don't have an explicit selection saved locally for this media
+              try {
+                const explicit = getExplicitSourceForMedia(tmdbId, false);
+                if (!explicit) {
+                  setVideoSource(data.source);
+                  setUserLastSourceInfo({ source: data.source, at: data.lastUsedSourceAt || null });
+                } else {
+                  console.log('[Client] Skipping server source because explicit local selection exists for this media');
+                }
+              } catch (e) {
+                setVideoSource(data.source);
+                setUserLastSourceInfo({ source: data.source, at: data.lastUsedSourceAt || null });
+              }
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Error fetching user source:', e);
+          // ignore and fall back
+        }
+      }
+
       const source = await getVideoSourceSetting();
       setVideoSource(source);
     };
+    // Re-run when session changes or query params change (so a resume link can override)
     fetchVideoSource();
-  }, []);
+  }, [session?.user?.email, searchParams]);
 
   // Automatically resume if saved progress exists (no prompt needed)
   useEffect(() => {
@@ -301,7 +457,87 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   };
 
 
-  if (loading) {
+  // Define change source handler BEFORE conditional returns so buttons and capture-useEffect can call it safely
+  const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest') => {
+    try {
+      const reqId = sourceNameToId(source);
+      const curId = sourceNameToId(videoSource);
+      console.log('[Client] handleChangeSource called', { requested: reqId ? `Source ${reqId}` : 'unknown', current: curId ? `Source ${curId}` : 'unknown' });
+    } catch (e) {
+      // ignore logging errors
+    }
+
+    if (videoSource === source) return; // Already on this source
+
+    const prev = videoSource;
+    setPendingSource(source);
+    setVideoSource(source);
+    setUserLastSourceInfo({ source, at: new Date().toISOString() });
+    // Only persist when user is logged in. If not logged in, behave like normal player (no persistence).
+    if (session?.user) {
+      try { sessionStorage.setItem('jsc_explicit_source', source); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch (e) { /* ignore */ }
+
+      try {
+        const res = await fetch('/api/user/source', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, explicit: true, at: new Date().toISOString() }),
+        });
+        if (!res.ok) {
+          console.warn('Failed to persist user source selection (status)', res.status);
+          setPendingSource(null);
+          setVideoSource(prev);
+        } else {
+          const persistedId = sourceNameToId(source);
+          console.log('[Client] Source persisted on server:', persistedId ? `Source ${persistedId}` : 'unknown');
+        }
+      } catch (e) {
+        console.warn('Failed to persist user source selection', e);
+        setPendingSource(null);
+        setVideoSource(prev);
+      }
+
+      try { localStorage.setItem('lastUsedSource', source); } catch (e) {}
+    } else {
+      // Not logged in: do not persist; keep change in-memory only
+      console.log('[Client] User not logged in — applying source change in-memory only');
+      setPendingSource(null);
+    }
+  };
+
+  // Capture-phase fallback for TV page as well
+  // Placed before conditional returns to avoid hook-order mismatches
+  useEffect(() => {
+    const onCaptureClick = (e: MouseEvent) => {
+      try {
+        const x = e.clientX;
+        const y = e.clientY;
+        const el = document.elementFromPoint(x, y);
+        if (el && (el as Element).closest && (el as Element).closest('button[data-source-button]')) return;
+        const buttons = Array.from(document.querySelectorAll('button[data-source-button]')) as HTMLButtonElement[];
+        for (const b of buttons) {
+          const r = b.getBoundingClientRect();
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+            const src = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | null;
+            if (src && src !== videoSource) {
+              const cfId = sourceNameToId(src);
+              console.log('[Client] TV page capture fallback triggered for source:', cfId ? `Source ${cfId}` : 'unknown');
+              void handleChangeSource(src);
+            }
+            break;
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    document.addEventListener('click', onCaptureClick, true);
+    return () => document.removeEventListener('click', onCaptureClick, true);
+  }, [videoSource]);
+
+  // If still loading data OR we haven't resolved which source to use yet, show a loading state
+  if (loading || videoSource === null) {
     return <LoadingSpinner />;
   }
 
@@ -322,16 +558,31 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
 
 
-  const handleChangeSource = (source: 'videasy' | 'vidlink' | 'vidnest') => {
-    if (videoSource === source) return; // Already on this source
-    
-    setPendingSource(source);
-    setVideoSource(source);
-  };
 
-  const handleConfirmSourceChange = () => {
+
+
+
+  const handleConfirmSourceChange = async () => {
     if (pendingSource) {
       setVideoSource(pendingSource);
+      if (session?.user) {
+        try {
+          const res = await fetch('/api/user/source', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: pendingSource, explicit: true, at: new Date().toISOString() }),
+          });
+          if (res.ok) {
+            setUserLastSourceInfo({ source: pendingSource, at: new Date().toISOString() });
+            try { sessionStorage.setItem('jsc_explicit_source', pendingSource); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch(e){}
+          }
+        } catch (e) {
+          console.warn('Failed to persist user source selection on confirm', e);
+        }
+      } else {
+        // Not logged in: do not persist anything, keep change in-memory only
+        console.log('[Client] Confirmed source change (logged out) — not persisting');
+      }
       setPendingSource(null);
     }
     setShowSourceWarning(false);
@@ -360,6 +611,16 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       />
 
       <Header />
+      {/* Show last-used source badge if available (helps confirm persistence) */}
+      {userLastSourceInfo?.source && (
+        <div className="container mx-auto px-4 mt-3">
+          <div className="inline-flex items-center gap-3 bg-white/3 text-sm rounded-full px-3 py-1">
+            <span className="text-gray-300">Last used source</span>
+            <span className="font-semibold text-white">{userLastSourceInfo.source}</span>
+            {userLastSourceInfo.at && <span className="text-gray-400">• {timeAgo(userLastSourceInfo.at)}</span>}
+          </div>
+        </div>
+      )}
 
       {view === 'info' && (
         <>
@@ -491,7 +752,74 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-3 items-center">
                   <button
-                    onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
+                    onClick={() => {
+                      // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
+                      (async () => {
+                        try {
+                          // Prefer server-stored user source to avoid accidentally persisting a transient history source
+                          let serverSource = userLastSourceInfo?.source;
+                          if (session?.user && !serverSource) {
+                            try {
+                              const srcRes = await fetch('/api/user/source');
+                              if (srcRes.ok) {
+                                const sdata = await srcRes.json();
+                                if (sdata?.source) {
+                                  serverSource = sdata.source;
+                                  setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
+                                  console.log('[Client] Click handler fetched server user source:', serverSource);
+                                }
+                              }
+                            } catch (e) {
+                              console.warn('[Client] Click handler failed fetching server source', e);
+                            }
+                          }
+
+                          const resolvedSource = serverSource ?? videoSource ?? (userLastSourceInfo?.source as ('videasy' | 'vidlink' | 'vidnest') | undefined);
+                          if (resolvedSource && session?.user) {
+                            try {
+                              // Persist per-media explicit source (do not change global user preference when clicking Play)
+                              try { setExplicitSourceForMedia(tmdbId, resolvedSource); console.log('[Client] Set per-media explicit source from click (tv):', { mediaId: tmdbId, source: resolvedSource }); } catch(e) {}
+
+                              console.log('[Client] Persisted explicit user source for media (per-media) from click:', resolvedSource);
+
+                              // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
+                              try {
+                                if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
+                                  console.log('[Client] Persisting savedProgress to watch-history for VIDNEST (tv):', savedProgress);
+                                  fetch('/api/watch-history', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: resolvedSource, title: mediaTitle, posterPath: tvShow?.poster_path, seasonNumber: currentSeason, episodeNumber: currentEpisode }),
+                                    keepalive: true,
+                                  }).catch(() => {});
+                                }
+                              } catch (e) {
+                                // ignore failures to persist watch-history from click
+                              }
+                            } catch (e) {
+                              // ignore
+                            }
+                          }
+                        } catch (e) {
+                          console.warn('[Client] Error persisting resolved source on click', e);
+                        }
+                      })();
+
+                      // include current season/episode in the watch link (but not source/time)
+                      try {
+                        const s = Number(currentSeason || 1);
+                        const e = Number(currentEpisode || 1);
+                        const params = new URLSearchParams();
+                        if (!Number.isNaN(s)) params.set('season', String(s));
+                        if (!Number.isNaN(e)) params.set('episode', String(e));
+                        const query = params.toString();
+                        // Navigate to the watch page without exposing source/time in the URL
+                        router.push(`/${mediaType}/${tmdbId}${query ? '?' + query : ''}`);
+                      } catch (err) {
+                        // Fallback navigation if something goes wrong
+                        router.push(`/${mediaType}/${tmdbId}`);
+                      }
+                    }}
                     disabled={tvShow.first_air_date ? new Date(tvShow.first_air_date) > new Date() : false}
                     style={{ 
                       backgroundColor: tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? '#666666' : '#E50914'
@@ -690,6 +1018,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     posterPath: tvShow?.poster_path,
                     seasonNumber: currentSeason,
                     episodeNumber: currentEpisode,
+                    source: videoSource,
                   });
                 }}
               />
@@ -719,6 +1048,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     posterPath: tvShow?.poster_path,
                     seasonNumber: currentSeason,
                     episodeNumber: currentEpisode,
+                    source: videoSource,
                   });
                 }}
               />
@@ -750,6 +1080,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     posterPath: tvShow?.poster_path,
                     seasonNumber: currentSeason,
                     episodeNumber: currentEpisode,
+                    source: videoSource,
                   });
                 }}
               />
@@ -801,8 +1132,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Select Episode (S{currentSeason}E{currentEpisode})
                   </button>
                   <button
+                    data-source-button="videasy"
                     onClick={() => handleChangeSource('videasy')}
-                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
                       videoSource === 'videasy'
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
@@ -811,8 +1143,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Source 1 {videoSource === 'videasy' && '✓'}
                   </button>
                   <button
+                    data-source-button="vidlink"
                     onClick={() => handleChangeSource('vidlink')}
-                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
                       videoSource === 'vidlink'
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
@@ -821,8 +1154,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     Source 2 {videoSource === 'vidlink' && '✓'}
                   </button>
                   <button
+                    data-source-button="vidnest"
                     onClick={() => handleChangeSource('vidnest')}
-                    className={`font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
                       videoSource === 'vidnest'
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
@@ -833,7 +1167,30 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 </>
               ) : (
                 <button
-                  onClick={() => router.push(`/${mediaType}/${tmdbId}`)}
+                  onClick={() => {
+                    // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
+                    if (videoSource && session?.user) {
+                      try { sessionStorage.setItem('jsc_explicit_source', videoSource); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch(e){}
+                      fetch('/api/user/source', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ source: videoSource, explicit: true, at: new Date().toISOString() }),
+                        keepalive: true,
+                      }).catch(() => {});
+                    }
+
+                    try {
+                      const s = Number(currentSeason || 1);
+                      const e = Number(currentEpisode || 1);
+                      const params = new URLSearchParams();
+                      if (!Number.isNaN(s)) params.set('season', String(s));
+                      if (!Number.isNaN(e)) params.set('episode', String(e));
+                      const query = params.toString();
+                      router.push(`/${mediaType}/${tmdbId}${query ? '?' + query : ''}`);
+                    } catch (e) {
+                      router.push(`/${mediaType}/${tmdbId}`);
+                    }
+                  }}
                   style={{ backgroundColor: '#E50914' }}
                   className="text-white font-bold py-2 sm:py-3 px-3 sm:px-6 text-sm sm:text-base rounded transition-all duration-300 hover:brightness-110"
                 >

@@ -31,6 +31,17 @@ const userSchema = new Schema(
       default: 'credentials',
     },
     googleId: String,
+    // Keep track of the user's last chosen video source so we can resume it the next time
+    lastUsedSource: {
+      type: String,
+      enum: ['videasy', 'vidlink', 'vidnest'],
+      sparse: true,
+    },
+    // Timestamp when the user last used their chosen video source
+    lastUsedSourceAt: {
+      type: Date,
+      sparse: true,
+    },
     createdAt: {
       type: Date,
       default: Date.now,
@@ -87,6 +98,17 @@ const watchHistorySchema = new Schema(
     lastWatchedAt: {
       type: Date,
       default: Date.now,
+    },
+    // Which source the user used when this history entry was saved
+    source: {
+      type: String,
+      enum: ['videasy', 'vidlink', 'vidnest'],
+      sparse: true,
+    },
+    // Timestamp when the `source` field was last set (helps distinguish automated heartbeats)
+    sourceSetAt: {
+      type: Date,
+      sparse: true,
     },
     finished: {
       type: Boolean,
@@ -158,6 +180,25 @@ watchHistorySchema.index(
   { unique: true, sparse: true } // sparse allows null seasonNumber/episodeNumber for movies
 );
 watchlistSchema.index({ userId: 1, mediaId: 1, mediaType: 1 }, { unique: true });
+
+// Add debug hooks to surface any writes to lastUsedSource
+userSchema.post('findOneAndUpdate', function(doc: any) {
+  try {
+    console.log('[User Hook][findOneAndUpdate] user updated via findOneAndUpdate:', { _id: doc?._id, lastUsedSource: doc?.lastUsedSource, lastUsedSourceAt: doc?.lastUsedSourceAt });
+  } catch (e) { console.error('[User Hook] error in findOneAndUpdate hook', e); }
+});
+
+userSchema.post('updateOne', function(res: any) {
+  try {
+    console.log('[User Hook][updateOne] updateOne executed on User model');
+  } catch (e) { console.error('[User Hook] error in updateOne hook', e); }
+});
+
+userSchema.post('save', function(doc: any) {
+  try {
+    console.log('[User Hook][save] user saved:', { _id: doc?._id, lastUsedSource: doc?.lastUsedSource, lastUsedSourceAt: doc?.lastUsedSourceAt });
+  } catch (e) { console.error('[User Hook] error in save hook', e); }
+});
 
 // Models
 export const User = mongoose.models.User || mongoose.model('User', userSchema);

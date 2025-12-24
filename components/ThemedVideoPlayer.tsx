@@ -412,6 +412,16 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     if (user && mediaId && currentMediaType) { // Use currentMediaType here
       try {
         lastUpdateTimeRef.current = now;
+        // Map the current stableSrc/url to a short source id we store in DB
+        const mapSrcToSource = (s: string) => {
+          if (!s) return undefined;
+          if (s.includes('vidnest')) return 'vidnest';
+          if (s.includes('vidlink')) return 'vidlink';
+          if (s.includes('vidking') || s.includes('videasy') || s.includes('vidsrc')) return 'videasy';
+          return undefined;
+        };
+        const source = mapSrcToSource(stableSrc || src || '');
+
         console.log('Sending watch history update:', { 
           mediaId, 
           mediaType: currentMediaType, 
@@ -420,7 +430,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           currentTotalDuration,
           totalPlayedSeconds,
           seasonNumber,
-          episodeNumber
+          episodeNumber,
+          source
         });
         
         const response = await fetch('/api/watch-history', {
@@ -440,6 +451,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             seasonNumber: seasonNumber || undefined,
             episodeNumber: episodeNumber || undefined,
             finished: false,
+            source,
           }),
         });
         
@@ -503,6 +515,10 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
               // For embed players, send to database
               if (user && mediaId && eventMediaType) {
                 console.log('Saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
+                // Determine source for embed messages
+                const mapEmbedToSource = (s: string) => (s.includes('vidnest') ? 'vidnest' : s.includes('vidking') ? 'videasy' : undefined);
+                const embedSource = mapEmbedToSource(stableSrc || src || '');
+
                 fetch('/api/watch-history', {
                   method: 'POST',
                   headers: {
@@ -521,12 +537,13 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                     episodeNumber: effectiveEpisodeNumber,
                     finished: playerEvent === 'ended',
                     immediate: isImportantEvent, // Write immediately for important events
+                    source: embedSource,
                   }),
                 }).then(response => {
                   if (!response.ok) {
                     console.error('Watch history API error:', response.status);
                   } else {
-                    console.log('Embed player progress saved to database', isImportantEvent ? '(immediate)' : '(batched)');
+                    console.log('Embed player progress saved to database', isImportantEvent ? '(immediate)' : '(batched)', 'source:', embedSource);
                   }
                 }).catch(error => {
                   console.error('Failed to save embed player progress:', error);
@@ -559,6 +576,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           episodeNumber: episodeNumber || undefined,
           finished: false,
           immediate: true,
+          source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : (stableSrc.includes('vidking') || stableSrc.includes('videasy') || stableSrc.includes('vidsrc')) ? 'videasy' : undefined,
         });
         
         // Try sendBeacon first (more reliable for page unload)
@@ -615,14 +633,15 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     if (!isEmbedPlayer || !iframeRef.current) return;
     
     const currentSource = stableSrc.includes('vidnest') ? 'vidnest' : 'vidking';
+    const maskedSource = currentSource === 'vidnest' ? 'Source 3' : currentSource === 'vidking' ? 'Source 3' : 'Source unknown';
     
     // DISABLED: Skip fallback polling for VidKing due to timestamp glitching
     if (currentSource === 'vidking') {
-      console.log('[Fallback Polling] DISABLED for VidKing - preventing timestamp glitches');
+      console.log('[Fallback Polling] DISABLED for Source 3 - preventing timestamp glitches');
       return;
     }
     
-    console.log(`[Fallback Polling] Starting for source: ${currentSource}`);
+    console.log(`[Fallback Polling] Starting for source: ${maskedSource}`);
     
     // For vidnest and other embeds that may not send messages, use a periodic save
     const fallbackInterval = setInterval(() => {
@@ -631,8 +650,9 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       // Store the latest embed data and send it to DB periodically
       if (latestEmbedDataRef.current) {
         const { progress, currentTime, duration } = latestEmbedDataRef.current;
-        console.log(`[Fallback Polling] Sending periodic update for ${currentSource}:`, { progress, currentTime, duration });
+        console.log(`[Fallback Polling] Sending periodic update for ${maskedSource}:`, { progress, currentTime, duration });
         
+        const fpSource = currentSource === 'vidnest' ? 'vidnest' : currentSource === 'vidking' ? 'videasy' : undefined;
         fetch('/api/watch-history', {
           method: 'POST',
           headers: {
@@ -651,12 +671,13 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             episodeNumber,
             finished: false,
             immediate: false, // Use batch for periodic updates
+            source: fpSource,
           }),
         }).then(response => {
           if (!response.ok) {
-            console.error(`[Fallback Polling] API error for ${currentSource}:`, response.status);
+            console.error(`[Fallback Polling] API error for ${maskedSource}:`, response.status);
           } else {
-            console.log(`[Fallback Polling] Progress saved for ${currentSource}`, { progress, currentTime, duration });
+            console.log(`[Fallback Polling] Progress saved for ${maskedSource}`, { progress, currentTime, duration, source: fpSource });
           }
         }).catch(error => {
           console.error(`[Fallback Polling] Error saving progress for ${currentSource}:`, error);
@@ -820,7 +841,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             
             // Send initial watch history entry when embed loads
             if (user && mediaId && mediaType) {
-              console.log('Sending initial watch history entry for embed player');
+              const initSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : (stableSrc.includes('vidking') || stableSrc.includes('videasy') || stableSrc.includes('vidsrc')) ? 'videasy' : undefined;
+              console.log('Sending initial watch history entry for embed player', { mediaId, mediaType, source: initSource });
               fetch('/api/watch-history', {
                 method: 'POST',
                 headers: {
@@ -838,6 +860,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                   seasonNumber: seasonNumber || undefined,
                   episodeNumber: episodeNumber || undefined,
                   finished: false,
+                  source: initSource,
+                  immediate: true,
                 }),
               }).then(response => {
                 if (!response.ok) {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Play, Info, Tv, Film } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getVideoSourceSetting, setExplicitSourceForMedia } from '@/lib/utils';
 import WatchlistButton from './WatchlistButton';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
@@ -35,6 +36,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   const [logoMap, setLogoMap] = useState<Map<number, string>>(new Map());
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
+  const [userSource, setUserSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const { data: session } = useSession();
   const { checkMultipleWatchlistStatuses } = useWatchlist();
   const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatusMap>({});
@@ -128,6 +130,20 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
     };
   }, [items.length]);
 
+  // Fetch user's preferred video source (best-effort) so the Play button can preserve it
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const s = await getVideoSourceSetting();
+        if (mounted) setUserSource(s);
+      } catch (e) {
+        // ignore
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const handlePrev = () => {
     setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
     startAutoPlay();
@@ -143,7 +159,39 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
     startAutoPlay();
   };
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
+    // Do NOT include source in the URL. Persist user's preferred source only when logged in.
+    if (userSource && session?.user) {
+      try {
+        // For hero play, prefer per-media explicit source (do not update global)
+        try { setExplicitSourceForMedia(currentItem.id, userSource); console.log('[HeroCarousel] Set per-media explicit source', { mediaId: currentItem.id, source: userSource }); } catch(e){}
+
+        // Persist to server as an immediate watch-history write so the selection is durable
+        try {
+          const payload: any = {
+            mediaId: currentItem.id,
+            mediaType,
+            currentTime: 0,
+            totalDuration: 0,
+            progress: 0,
+            immediate: true,
+            source: userSource,
+            explicit: true,
+            title: currentItem.title || '',
+            posterPath: (currentItem as any).poster_path || '',
+          };
+          fetch('/api/watch-history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            .then(() => console.log('[HeroCarousel] Persisted per-media explicit source to watch-history', { mediaId: currentItem.id, source: userSource }))
+            .catch(err => console.warn('[HeroCarousel] Failed to persist explicit source', err));
+        } catch (e) {
+          console.warn('[HeroCarousel] Error persisting explicit source', e);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Navigate to the watch page without exposing the source in the URL
     router.push(`/${mediaType}/${currentItem.id}`);
   };
 

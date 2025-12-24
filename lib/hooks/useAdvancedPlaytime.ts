@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { sourceNameToId } from '@/lib/utils';
 
 interface PlaytimeData {
   mediaId: number;
@@ -12,6 +13,11 @@ interface PlaytimeData {
   episodeNumber?: number;
   quality?: string;
   playbackRate?: number;
+  // Optional source identifier (videasy, vidlink, vidnest)
+  source?: string;
+  // If true, indicates this update was an explicit user action and may be
+  // used to persist last-used source to localStorage as a client-side fallback.
+  explicit?: boolean;
 }
 
 /**
@@ -40,10 +46,46 @@ export function useAdvancedPlaytime() {
       formData.append('immediate', 'true');
       if (data.seasonNumber !== undefined) formData.append('seasonNumber', String(data.seasonNumber));
       if (data.episodeNumber !== undefined) formData.append('episodeNumber', String(data.episodeNumber));
+      if (data.source) formData.append('source', data.source);
+
+      // Persist last used source to localStorage as a fallback for resume links
+      try {
+        // Only persist lastUsedSource to localStorage when this save is from an
+        // explicit user action. This prevents automated heartbeats from
+        // overwriting the user's explicit preference.
+        if (data.source && data.explicit) {
+          localStorage.setItem('lastUsedSource', data.source);
+          const _id = sourceNameToId(data.source);
+          console.log('[Playtime] localStorage lastUsedSource set (beacon explicit):', _id ? `Source ${_id}` : 'unknown');
+        }
+      } catch (e) {
+        // ignore
+      }
 
       // Use sendBeacon for reliable delivery on page unload
       navigator.sendBeacon('/api/watch-history', formData);
       console.log('[Playtime] 🔔 Beacon sent with final progress:', Math.floor(data.currentTime), 's');
+
+      // Also dispatch local notification and localStorage for other windows to pick up
+      try {
+        const payload = {
+          mediaId: data.mediaId,
+          mediaType: data.mediaType,
+          currentTime: data.currentTime,
+          totalDuration: data.totalDuration,
+          progress: data.progress,
+          seasonNumber: data.seasonNumber,
+          episodeNumber: data.episodeNumber,
+          title: data.title,
+          posterPath: data.posterPath,
+          source: data.source || null,
+          lastWatchedAt: new Date().toISOString(),
+        };
+        window.dispatchEvent(new CustomEvent('watchtime:update', { detail: payload }));
+        try { localStorage.setItem('lastPlayed', JSON.stringify(payload)); } catch (e) {}
+      } catch (e) {
+        // ignore
+      }
     } catch (error) {
       console.error('[Playtime] Beacon send error:', error);
     }
@@ -74,6 +116,20 @@ export function useAdvancedPlaytime() {
     isSavingRef.current = true;
     lastSaveTimeRef.current = { time: data.currentTime, timestamp: now };
 
+    // Persist last used source to localStorage as a fast client-side fallback
+    try {
+      // Only persist lastUsedSource to localStorage when this update is explicit
+      // (for example, triggered by a user action). Automated periodic saves
+      // should not change the client-side fallback.
+      if (data.source && data.explicit) {
+        localStorage.setItem('lastUsedSource', data.source);
+        const _id = sourceNameToId(data.source);
+        console.log('[Playtime] localStorage lastUsedSource set (explicit):', _id ? `Source ${_id}` : 'unknown');
+      }
+    } catch (e) {
+      // ignore errors
+    }
+
     fetch('/api/watch-history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,6 +143,29 @@ export function useAdvancedPlaytime() {
           console.error('[Playtime] Save failed with status:', res.status);
         } else {
           console.log('[Playtime] ✅ Saved:', Math.floor(data.currentTime), 's, progress:', data.progress.toFixed(1) + '%');
+
+          // Dispatch a client-side event so Continue Watching lists can move the item to the top immediately
+          try {
+            const payload = {
+              mediaId: data.mediaId,
+              mediaType: data.mediaType,
+              currentTime: data.currentTime,
+              totalDuration: data.totalDuration,
+              progress: data.progress,
+              seasonNumber: data.seasonNumber,
+              episodeNumber: data.episodeNumber,
+              title: data.title,
+              posterPath: data.posterPath,
+              source: data.source || null,
+              lastWatchedAt: new Date().toISOString(),
+            };
+            window.dispatchEvent(new CustomEvent('watchtime:update', { detail: payload }));
+
+            // Also write a storage key so other tabs pick up the change
+            try { localStorage.setItem('lastPlayed', JSON.stringify(payload)); } catch (e) {}
+          } catch (e) {
+            // ignore errors
+          }
         }
       })
       .catch((error) => {

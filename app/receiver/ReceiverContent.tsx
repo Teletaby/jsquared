@@ -231,7 +231,7 @@ const ReceiverContent = () => {
 
       // For Watch TV remote feature, convert Vidking URLs to VIDNEST for better quality and support
       if (videoSource.includes('vidking.net')) {
-        console.log('Converting Vidking URL to VIDNEST for Watch TV feature...');
+        console.log('Converting Vidking URL to Source 3 for Watch TV feature...');
         
         if (videoData.type === 'tv') {
           // Extract season and episode from Vidking URL
@@ -240,15 +240,16 @@ const ReceiverContent = () => {
           const season = urlParts[urlParts.indexOf('tv') + 2] || '1';
           const episode = urlParts[urlParts.indexOf('tv') + 3]?.split('?')[0] || '1';
           videoSource = `https://vidnest.fun/tv/${videoData.id}/${season}/${episode}`;
-          console.log('Converted TV to VIDNEST:', videoSource);
+          console.log('Converted TV to Source 3:', videoSource);
         } else if (videoData.type === 'movie') {
           // Convert movie Vidking to VIDNEST
           videoSource = `https://vidnest.fun/movie/${videoData.id}`;
-          console.log('Converted movie to VIDNEST:', videoSource);
+          console.log('Converted movie to Source 3:', videoSource);
         }
       }
 
-      console.log('Setting video source to:', videoSource);
+      const maskedSource = videoSource.includes('vidnest.fun') ? 'Source 3' : videoSource.includes('vidlink.pro') ? 'Source 2' : videoSource.includes('player.videasy.net') ? 'Source 1' : 'Direct/Unknown';
+      console.log('Setting video source to:', maskedSource);
       setCurrentVideo({
         title: videoData.title,
         type: videoData.type,
@@ -258,7 +259,7 @@ const ReceiverContent = () => {
       // Determine video type and notify remote
       const isIframe = videoSource.includes('vidking.net/embed') || videoSource.includes('vidnest.fun');
       const videoType = isIframe ? 'iframe' : 'direct';
-      console.log('Video source:', videoSource);
+      console.log('Video source (masked):', maskedSource);
       console.log('Is Iframe player:', isIframe);
       console.log('Video type determined:', videoType);
       

@@ -72,3 +72,49 @@ export async function getVideoSourceSetting(): Promise<'videasy' | 'vidlink' | '
     return 'videasy'; // Default to videasy on error
   }
 }
+
+/**
+ * Map source name to numeric id used in URLs: videasy=1, vidlink=2, vidnest=3
+ */
+export function sourceNameToId(source?: string | null): string | undefined {
+  if (!source) return undefined;
+  const map: Record<string, string> = { videasy: '1', vidlink: '2', vidnest: '3' };
+  return map[source] || undefined;
+}
+
+/**
+ * Map numeric id back to source name
+ */
+export function sourceIdToName(id?: string | null): 'videasy' | 'vidlink' | 'vidnest' | undefined {
+  if (!id) return undefined;
+  const map: Record<string, 'videasy' | 'vidlink' | 'vidnest'> = { '1': 'videasy', '2': 'vidlink', '3': 'vidnest' };
+  return map[id] || undefined;
+}
+
+/**
+ * Manage per-media explicit source in sessionStorage to avoid global overrides when the user clicks
+ * a resume link for a specific item. Falls back to the global `jsc_explicit_source` for backward compatibility.
+ */
+export function setExplicitSourceForMedia(mediaId: number | string, source: string) {
+  try {
+    const key = `jsc_explicit_source_${mediaId}`;
+    const atKey = `jsc_explicit_source_at_${mediaId}`;
+    sessionStorage.setItem(key, source);
+    sessionStorage.setItem(atKey, new Date().toISOString());
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+export function getExplicitSourceForMedia(mediaId: number | string, fallbackToGlobal: boolean = true): string | null {
+  try {
+    const key = `jsc_explicit_source_${mediaId}`;
+    const val = sessionStorage.getItem(key);
+    if (val) return val;
+    // Backwards-compatibility: fall back to global key if requested
+    if (fallbackToGlobal) return sessionStorage.getItem('jsc_explicit_source');
+    return null;
+  } catch (e) {
+    return null;
+  }
+}

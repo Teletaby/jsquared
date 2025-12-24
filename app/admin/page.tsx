@@ -441,7 +441,8 @@ export default function AdminPage() {
                             <th className="px-4 py-3 text-left font-semibold">Browser</th>
                             <th className="px-4 py-3 text-left font-semibold">Operating System</th>
                             <th className="px-4 py-3 text-left font-semibold">Page URL</th>
-                            <th className="px-4 py-3 text-left font-semibold">Timestamp</th>
+                            <th className="px-4 py-3 text-left font-semibold">Duration</th>
+                            <th className="px-4 py-3 text-left font-semibold">Start Time</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -451,9 +452,10 @@ export default function AdminPage() {
                               <td className="px-4 py-3">{log.browser || 'Unknown'}</td>
                               <td className="px-4 py-3">{log.os || 'Unknown'}</td>
                               <td className="px-4 py-3 truncate max-w-xs">{log.url || 'N/A'}</td>
+                              <td className="px-4 py-3 text-gray-400">{typeof (log as any).durationSeconds === 'number' ? `${Math.round((log as any).durationSeconds)}s` : '—'}</td>
                               <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
-                                {log.timestamp 
-                                  ? new Date(log.timestamp).toLocaleString()
+                                {(log as any).startTime || (log as any).timestamp
+                                  ? new Date((log as any).startTime || (log as any).timestamp).toLocaleString()
                                   : 'N/A'
                                 }
                               </td>

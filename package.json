@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "NODE_ENV=production node server.js",
     "lint": "next lint",
+    "test:explicit": "ts-node scripts/test-explicit-source.ts",
     "seed:admin": "ts-node --project tsconfig.json --compilerOptions \"{\\\"module\\\":\\\"CommonJS\\\"}\" lib/seedAdmin.ts"
   },
   "dependencies": {

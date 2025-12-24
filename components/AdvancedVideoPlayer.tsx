@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 
 import { useAuth } from '@/lib/hooks/useAuth';
+import { sourceNameToId } from '@/lib/utils';
 
 interface AdvancedVideoPlayerProps {
   embedUrl: string; // VIDNEST embed URL
@@ -99,6 +100,8 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     if (!user || !embedUrl) return;
 
     try {
+      const masked = sourceNameToId(videoSource);
+      console.log('[AdvancedVideoPlayer] Saving playtime', { mediaId, mediaType, time, source: masked ? `Source ${masked}` : 'unknown' });
       const response = await fetch('/api/watch-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,6 +114,8 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
           posterPath,
           seasonNumber,
           episodeNumber,
+          source: videoSource, // ensure source is recorded for embed saves
+          immediate: true, // persist immediately for accuracy
         }),
       });
 
@@ -154,26 +159,57 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
 
 
-  // Load iframe
+  // Load iframe and listen for messages (VIDNEST can post progress events)
   useEffect(() => {
     const handleLoad = () => {
       embedLoadedRef.current = true;
 
       // DISABLED: VidKing auto-resume disabled to prevent timestamp glitching
       if (initialTime > 0 && embedUrl.includes('vidking')) {
-        console.log('VidKing: Auto-resume DISABLED - preventing timestamp glitches');
+        console.log('Source 3: Auto-resume DISABLED - preventing timestamp glitches');
+      }
+    };
+
+    const handleMessage = (evt: MessageEvent) => {
+      // Only consider messages that look like VIDNEST progress events
+      try {
+        const data = evt.data;
+        if (!data) return;
+
+        // VIDNEST may send different message shapes; handle common ones defensively
+        const progress = typeof data.currentTime === 'number' ? data.currentTime : (typeof data.progress === 'number' ? data.progress : undefined);
+        const type = (typeof data.type === 'string' ? data.type.toLowerCase() : undefined);
+
+        if ((type === 'vidnest:progress' || type === 'progress' || type === 'timeupdate') && typeof progress === 'number') {
+          // Throttle saves: only save if delta > 5s since last save
+          const delta = Math.abs(progress - (initialStartRef.current + elapsedRef.current));
+          if (delta > 5) {
+            console.log('[AdvancedVideoPlayer] VIDNEST postMessage progress received', { mediaId, progress });
+            // Update local elapsedRef so future autosave math makes sense
+            // Note: Do not mutate initialStartRef here (it's mount-only), instead compute a best-effort totalTime
+            const totalTime = progress;
+            // Save immediately for embed players
+            savePlaytime(totalTime);
+            // Also update elapsedRef roughly so unload/save handlers have a good baseline
+            elapsedRef.current = Math.max(elapsedRef.current, Math.floor(totalTime - initialStartRef.current));
+          }
+        }
+      } catch (e) {
+        // ignore malformed postMessage data
       }
     };
 
     const iframe = iframeRef.current;
     if (iframe) {
       iframe.addEventListener('load', handleLoad);
+      window.addEventListener('message', handleMessage);
 
       return () => {
         iframe.removeEventListener('load', handleLoad);
+        window.removeEventListener('message', handleMessage);
       };
     }
-  }, [initialTime, embedUrl]);
+  }, [initialTime, embedUrl, mediaId, savePlaytime]);
 
   // Memoize embed URL - append VIDNEST resume params (mount-only) so iframe auto-resumes
   const stableEmbedUrl = useMemo(() => {
@@ -185,10 +221,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       // For movies use startAt, for TV use progress (per VIDNEST docs)
       const param = mediaType === 'movie' ? `startAt=${Math.floor(initialStartRef.current)}` : `progress=${Math.floor(initialStartRef.current)}`;
       const urlWithParam = `${embedUrl}${separator}${param}`;
-      console.log('[AdvancedVideoPlayer] Using VIDNEST resume URL:', urlWithParam);
+      console.log('[AdvancedVideoPlayer] Using Source 3 resume URL:', urlWithParam);
       return urlWithParam;
     }
-
     return embedUrl;
   }, [embedUrl, mediaType]);
 
