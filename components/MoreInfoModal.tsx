@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 type Props = {
   isOpen: boolean;
@@ -48,8 +49,8 @@ export default function MoreInfoModal({ isOpen, onClose, title, tagline, descrip
 
   if (!isOpen && !visible) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+  const modal = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       {/* Backdrop */}
       <div
         className={`absolute inset-0 bg-black/70 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
@@ -60,7 +61,7 @@ export default function MoreInfoModal({ isOpen, onClose, title, tagline, descrip
       <div
         aria-modal="true"
         role="dialog"
-        className={`relative z-10 w-full max-w-3xl mx-auto transform transition-all duration-300 ease-out ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        className={`relative z-[10000] w-full max-w-3xl mx-auto transform transition-all duration-300 ease-out ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
       >
         <div className="rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-[#E50914] to-[#b31217] px-6 py-4">
@@ -96,4 +97,10 @@ export default function MoreInfoModal({ isOpen, onClose, title, tagline, descrip
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modal, document.body);
+  }
+
+  return modal;
 }

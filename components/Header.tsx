@@ -32,9 +32,9 @@ const Header = () => {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-2xl text-white shadow-2xl border-b border-white/20">
-        <div className="flex justify-between items-center p-3 sm:p-4 px-4 sm:px-8 max-w-full">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl font-bold text-blue-500 tracking-wider hover:opacity-80 transition-opacity">
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-black/20 backdrop-blur-2xl text-white shadow-2xl border-b border-white/20">
+        <div className="w-full px-4 sm:px-8 h-16 flex items-center justify-between relative">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 text-lg sm:text-2xl font-bold text-blue-500 tracking-wider hover:opacity-80 transition-opacity pl-1 sm:pl-2">
             <Image
               src="/jsquare.png"
               alt="J-Squared Cinema Logo"
@@ -46,13 +46,18 @@ const Header = () => {
             <span className="sm:hidden">J²</span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-6 items-center">
-            {navItems.map((item) => (
-              <Link key={item.name} href={item.href} className={`text-lg transition-colors duration-200 ${pathname === item.href ? 'text-blue-500 font-semibold' : 'text-gray-300 hover:text-blue-500'}`}>
-                {item.name}
-              </Link>
-            ))}
+
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-6">
+            {/* Desktop Navigation (moved to the right) */}
+            <nav className="hidden md:flex items-center gap-6">
+              {navItems.map((item) => (
+                <Link key={item.name} href={item.href} className={`text-lg transition-colors duration-200 ${pathname === item.href ? 'text-blue-500 font-semibold' : 'text-gray-300 hover:text-blue-500'}`}>
+                  {item.name}
+                </Link>
+              ))}
+            </nav>
             {!loading && (
               <>
                 {user ? (
@@ -180,162 +185,61 @@ const Header = () => {
                 <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
               </>
             )}
-          </nav>
 
-          {/* Mobile Menu Button and Dropdown */}
-          <div className="md:hidden">
-            <Menu as="div" className="relative inline-block text-left">
-              <div>
-                <Menu.Button className="inline-flex w-full justify-center rounded-md p-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75">
-                  <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-                </Menu.Button>
-              </div>
+            {/* Mobile Menu Button and Dropdown */}
+            <div className="md:hidden">
+              <Menu as="div" className="relative inline-block text-left">
+                <div>
+                  <Menu.Button className="inline-flex w-full justify-center rounded-md p-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75">
+                    <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+                  </Menu.Button>
+                </div>
 
-              <Transition
-                as={Fragment}
-                enter="transition ease-out duration-150"
-                enterFrom="transform opacity-0 scale-95"
-                enterTo="transform opacity-100 scale-100"
-                leave="transition ease-in duration-100"
-                leaveFrom="transform opacity-100 scale-100"
-                leaveTo="transform opacity-0 scale-95"
-              >
-                <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none">
-                  <div className="px-1 py-1">
-                    {navItems.map((item) => (
-                      <Menu.Item key={item.name}>
-                        {({ active }) => (
-                          <Link
-                            href={item.href}
-                            className={`${
-                              active ? 'bg-blue-500 text-white' : pathname === item.href ? 'bg-blue-500/50 text-white' : 'text-gray-200'
-                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                          >
-                            {item.name}
-                          </Link>
-                        )}
-                      </Menu.Item>
-                    ))}
-                    {user?.role === 'admin' && (
-                      <Menu.Item>
-                        {({ active }) => (
-                          <Link
-                            href="/admin"
-                            className={`${
-                              active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                          >
-                            <Settings size={24} className="mr-2" />
-                            Admin Panel
-                          </Link>
-                        )}
-                      </Menu.Item>
-                    )}
-                    {/* Mobile TV Remote Menu - Admin Only */}
-                    {user?.role === 'admin' ? (
-                      <>
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-150"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-100"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                    <div className="px-1 py-1">
+                      {navItems.map((item) => (
+                        <Menu.Item key={item.name}>
+                          {({ active }) => (
+                            <Link
+                              href={item.href}
+                              className={`${
+                                active ? 'bg-blue-500 text-white' : pathname === item.href ? 'bg-blue-500/50 text-white' : 'text-gray-200'
+                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                            >
+                              {item.name}
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      ))}
+                      {user?.role === 'admin' && (
                         <Menu.Item>
                           {({ active }) => (
                             <Link
-                              href="/receiver"
+                              href="/admin"
                               className={`${
                                 active ? 'bg-blue-500 text-white' : 'text-gray-200'
                               } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
                             >
-                              <Tv size={20} className="mr-2" />
-                              Get Code
+                              <Settings size={24} className="mr-2" />
+                              Admin Panel
                             </Link>
                           )}
                         </Menu.Item>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              href="/remote"
-                              className={`${
-                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                            >
-                              <Tv size={20} className="mr-2" />
-                              Enter Code
-                            </Link>
-                          )}
-                        </Menu.Item>
-                      </>
-                    ) : (
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            disabled
-                            className={`${
-                              active ? 'bg-gray-700 text-gray-400' : 'text-gray-500'
-                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150 cursor-not-allowed opacity-50`}
-                          >
-                            <Tv size={20} className="mr-2" />
-                            TV Remote (Coming Soon)
-                          </button>
-                        )}
-                      </Menu.Item>
-                    )}
-                    {user ? (
-                      <>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link href="/dashboard"
-                              className={`${
-                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                            >
-                              <UserCircle2 size={24} className="mr-2" />
-                              Dashboard
-                            </Link>
-                          )}
-                        </Menu.Item>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <button
-                              onClick={logout}
-                              className={`${
-                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                            >
-                              <UserCircle2 size={24} className="mr-2" />
-                              Logout
-                            </button>
-                          )}
-                        </Menu.Item>
-                      </>
-                    ) : (
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={handleAuthClick}
-                            className={`${
-                              active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                            } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                          >
-                            <UserCircle2 size={24} className="mr-2" />
-                            Sign In / Sign Up
-                          </button>
-                        )}
-                      </Menu.Item>
-                    )}
-                    <Menu.Item>
-                      {({ active }) => (
-                        <button
-                          onClick={() => setIsSearchOpen(true)}
-                          className={`${
-                            active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                          } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                        >
-                          <Search size={24} className="mr-2" />
-                          Search
-                        </button>
                       )}
-                    </Menu.Item>
-                  </div>
-                </Menu.Items>
-              </Transition>
-            </Menu>
+                    </div>
+                  </Menu.Items>
+                </Transition>
+              </Menu>
+            </div>
           </div>
         </div>
       </header>

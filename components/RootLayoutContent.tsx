@@ -58,7 +58,7 @@ export default function RootLayoutContent({ children }: { children: ReactNode })
   return (
     <>
       <Header />
-      <main className="flex-grow container mx-auto px-4 pt-20">
+      <main className="flex-grow container mx-auto px-4 pt-16">
         <ConditionalLayout>{children}</ConditionalLayout>
       </main>
       <Footer />
