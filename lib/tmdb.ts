@@ -233,8 +233,17 @@ export async function getCastDetails(mediaType: 'movie' | 'tv', id: number): Pro
 
   // For TV shows, the aggregate_credits response has a different structure
   if (mediaType === 'tv') {
+    // TV aggregate_credits returns cast with roles array, need to extract the character name from the first role
+    const processedCast = (data.cast || []).map((member: any) => ({
+      id: member.id,
+      name: member.name,
+      character: member.roles?.[0]?.character || member.character || '', // Try roles first, then character field
+      profile_path: member.profile_path || null,
+      order: member.order || 0,
+    }));
+    
     return {
-      cast: data.cast?.slice(0, 50) || [],
+      cast: processedCast.slice(0, 50),
       crew: data.crew || [],
     };
   }

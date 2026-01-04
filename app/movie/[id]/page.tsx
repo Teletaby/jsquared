@@ -59,7 +59,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [movie, setMovie] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [, setCurrentPlaybackTime] = useState<number>(0);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0); // Track current playback time for cross-source switching
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
   const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -77,11 +77,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   // videoSource starts from localStorage when available to avoid flashes
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(() => {
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(() => {
     try {
       const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
-      const allowed = ['videasy', 'vidlink', 'vidnest'];
-      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest';
+      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
     } catch (e) {
       // ignore storage errors
     }
@@ -101,7 +101,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     return `${Math.floor(h / 24)}d ago`;
   };
   const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
@@ -277,7 +277,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               if (!serverSource) {
                 try {
                   const local = localStorage.getItem('lastUsedSource');
-                  const allowed = ['videasy', 'vidlink', 'vidnest'];
+                  const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
                   if (local && allowed.includes(local)) {
                     serverSource = local;
                     console.log('[Client] Using localStorage lastUsedSource as fallback while applying history:', serverSource);
@@ -337,18 +337,19 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   // Defensive: if an automatic process sets the source to 'videasy' but the
   // client has a different saved preference, revert to the saved preference.
-  useEffect(() => {
-    try {
-      const local = localStorage.getItem('lastUsedSource');
-      const allowed = ['videasy', 'vidlink', 'vidnest'];
-      if (local && allowed.includes(local) && videoSource === 'videasy' && local !== 'videasy') {
-        console.log('[Client][DEFENSE] Reverting automatic videasy fallback to local lastUsedSource:', local);
-        setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
-      }
-    } catch (e) {
-      // ignore
-    }
-  }, [videoSource]);
+  // DISABLED: This defense mechanism was reverting manual source selections
+  // useEffect(() => {
+  //   try {
+  //     const local = localStorage.getItem('lastUsedSource');
+  //     const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+  //     if (local && allowed.includes(local) && videoSource === 'videasy' && local !== 'videasy') {
+  //       console.log('[Client][DEFENSE] Reverting automatic videasy fallback to local lastUsedSource:', local);
+  //       setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
+  //     }
+  //   } catch (e) {
+  //     // ignore
+  //   }
+  // }, [videoSource]);
 
   // Fetch video source setting (but honor `?source=` query param if present)
   useEffect(() => {
@@ -357,7 +358,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       try {
         const explicit = getExplicitSourceForMedia(tmdbId, false);
         if (explicit) {
-          const name = explicit as 'videasy' | 'vidlink' | 'vidnest';
+          const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
           const explicitAt = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
           setVideoSource(name);
           setUserLastSourceInfo({ source: name, at: explicitAt || null });
@@ -370,12 +371,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       // If the URL includes a source override, trust it and do not fetch/overwrite from server
       const qsSource = searchParams.get('source');
       if (qsSource) {
-        // Accept either numeric ids (1,2,3) or names ('videasy','vidlink','vidnest') for backward compatibility
-        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest'].includes(qsSource) ? qsSource : undefined);
+        // Accept either numeric ids (1,2,3,4) or names ('videasy','vidlink','vidnest','vidsrc') for backward compatibility
+        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc'].includes(qsSource) ? qsSource : undefined);
         if (name) {
           const qsId = sourceNameToId(name);
           console.log('[Client] Source query param detected; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
-          setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest');
+          setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
           setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
           return;
         }
@@ -411,9 +412,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       // If server didn't provide a user preference, prefer a client-local saved preference
       try {
         const local = localStorage.getItem('lastUsedSource');
-        const allowed = ['videasy', 'vidlink', 'vidnest'];
+        const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
         if (local && allowed.includes(local)) {
-          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
+          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
           setUserLastSourceInfo({ source: local, at: null });
           return;
         }
@@ -433,15 +434,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   useEffect(() => {
     const qsSource = searchParams.get('source');
     if (!qsSource) return;
-    const valid = ['videasy', 'vidlink', 'vidnest'];
+    const valid = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
     if (!valid.includes(qsSource)) return;
 
     // Map numeric query values back to names when necessary
     const name = sourceIdToName(qsSource) || qsSource;
-    if (name !== videoSource && (name === 'videasy' || name === 'vidlink' || name === 'vidnest')) {
+    if (name !== videoSource && (name === 'videasy' || name === 'vidlink' || name === 'vidnest' || name === 'vidsrc')) {
       const overrideId = sourceNameToId(name);
       console.log('[Client] Overriding video source from query param:', overrideId ? `Source ${overrideId}` : 'unknown');
-      setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest');
+      setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
       setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
 
       // Persist user's preference so future navigations remember this choice
@@ -496,12 +497,19 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     setShowResumePrompt(false);
   };
 
+  // Centralize title logic to handle optional properties and provide a fallback.
+  // Moved here before handleSelectSource so it can be used in the callback
+  const mediaTitle = movie?.title || 'Untitled Movie';
+
   // Define the select source handler and capture fallback BEFORE any conditional returns
-  const handleSelectSource = useCallback(async (source: 'videasy' | 'vidlink' | 'vidnest') => {
+  const handleSelectSource = useCallback(async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => {
     const reqId = sourceNameToId(source);
     const curId = sourceNameToId(videoSource);
-    console.log('[Client] handleSelectSource called', { requested: reqId ? `Source ${reqId}` : 'unknown', current: curId ? `Source ${curId}` : 'unknown' });
-    if (videoSource === source) return; // Already on this source
+    console.log('[handleSelectSource] Called with:', { requested: reqId ? `Source ${reqId}` : 'unknown', current: curId ? `Source ${curId}` : 'unknown', source });
+    if (videoSource === source) {
+      console.log('[handleSelectSource] Already on this source, returning early');
+      return;
+    }
     
     // Optimistically set in UI
     const prev = videoSource;
@@ -525,7 +533,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         // that to watch-history immediately as before.
         try {
           if (source === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-            console.log('[Client] Persisting savedProgress to watch-history for VIDNEST (click):', savedProgress);
+            console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
             fetch('/api/watch-history', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -543,10 +551,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       // Not logged in: do not persist anywhere. Keep the UI change in-memory only.
       console.log('[Client] User not logged in — applying source change in-memory only');
     }
-  }, [videoSource]);
+  }, [videoSource, session?.user, tmdbId, mediaType, savedProgress, savedDuration, mediaTitle, movie?.poster_path]);
 
   // Capture-phase fallback: if an overlay is intercepting clicks above the source buttons,
   // detect clicks within button bounding rects and trigger the handler programmatically.
+  // DISABLED: This was causing double-clicks and incorrect source detection. The direct onClick handlers are sufficient.
+  /*
   useEffect(() => {
     const onCaptureClick = (e: MouseEvent) => {
       try {
@@ -560,7 +570,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         for (const b of buttons) {
           const r = b.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            const source = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | null;
+            const source = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
             if (source && source !== videoSource) {
               const capId = sourceNameToId(source);
               console.log('[Client] Capture fallback triggered for source:', capId ? `Source ${capId}` : 'unknown');
@@ -578,18 +588,21 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     document.addEventListener('click', onCaptureClick, true);
     return () => document.removeEventListener('click', onCaptureClick, true);
   }, [videoSource, handleSelectSource]);
+  */
 
   // Construct embed URL with useMemo to prevent unnecessary changes
   const embedUrl = useMemo(
     () => {
       if (videoSource === 'vidnest') {
         return `https://vidnest.fun/movie/${tmdbId}`;
+      } else if (videoSource === 'vidsrc') {
+        return `https://vidsrc.icu/embed/movie/${tmdbId}`;
       } else {
         // For videasy and vidlink sources, we use dedicated player components
         return null; // We'll use VideasyPlayer or VidLinkPlayer instead
       }
     },
-    [tmdbId, videoSource, resumeChoice, savedProgress]
+    [tmdbId, videoSource]
   );
   const videoSrc = embedUrl;
 
@@ -613,12 +626,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   if (!movie) {
     return null; // Or a "Not Found" component
   }
-
-
-  // Centralize title logic to handle optional properties and provide a fallback.
-  const mediaTitle = movie.title || 'Untitled Movie';
-
-
 
   const handleConfirmSourceChange = async () => {
     if (pendingSource) {
@@ -839,7 +846,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                               // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
                               try {
                                 if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-                                  console.log('[Client] Persisting savedProgress to watch-history for VIDNEST:', savedProgress);
+                                  console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
                                   fetch('/api/watch-history', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -1073,7 +1080,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 mediaType={mediaType}
                 title={mediaTitle}
                 posterPath={movie.poster_path}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
                   // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
@@ -1104,7 +1111,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 mediaType={mediaType}
                 title={mediaTitle}
                 posterPath={movie.poster_path}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
                   // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
@@ -1136,7 +1143,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 mediaId={tmdbId}
                 mediaType={mediaType}
                 posterPath={movie.poster_path}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 videoSource={videoSource}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
@@ -1207,12 +1214,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 </div>
 
                 {/* Source Selector Buttons */}
-                <div className="flex flex-wrap gap-2 sm:gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3 relative z-50 pointer-events-auto">
                   {/* Developer click debugger (dev only) */}
 
                   <button
                     data-source-button="videasy"
-                    onClick={() => handleSelectSource('videasy')}
+                    onClick={() => {
+                      console.log('[Button Click] Source 1 clicked directly');
+                      handleSelectSource('videasy');
+                    }}
                     className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
                       videoSource === 'videasy'
                         ? 'bg-blue-600 hover:bg-blue-700 text-white'
@@ -1243,6 +1253,17 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   >
                     Source 3 {videoSource === 'vidnest' && '✓'}
                   </button>
+                  <button
+                    data-source-button="vidsrc"
+                    onClick={() => handleSelectSource('vidsrc')}
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidsrc'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 4 {videoSource === 'vidsrc' && '✓'}
+                  </button>
                   <WatchlistButton
                     mediaId={tmdbId}
                     mediaType={mediaType}
@@ -1258,6 +1279,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   <div className="bg-blue-900 bg-opacity-40 border border-blue-600 rounded p-3 mt-4">
                     <p className="text-blue-300 text-xs sm:text-sm">
                       💡 <strong>Tip:</strong> Source 3 may have more ads. Please enable an adblocker for a better viewing experience.
+                    </p>
+                  </div>
+                )}
+
+                {/* VIDSRC Warning */}
+                {videoSource === 'vidsrc' && (
+                  <div className="bg-yellow-900 bg-opacity-40 border border-yellow-600 rounded p-3 mt-4">
+                    <p className="text-yellow-300 text-xs sm:text-sm">
+                      ⚠️ <strong>Note:</strong> Some selections may not be accurate. If you encounter issues, try switching to another source. {session?.user && 'Timestamps are not stored for this source.'}
                     </p>
                   </div>
                 )}

@@ -31,7 +31,7 @@ export default function UserWatchHistory() {
   const [loading, setLoading] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ id: string; title: string } | null>(null);
   const scrollContainerRef: any = React.useRef(null);
 
@@ -341,7 +341,9 @@ export default function UserWatchHistory() {
             const href = `${base}${params.length > 0 ? '?' + params.join('&') : ''}`;
 
             // Debug: log the resolved resume source when links are built (helps diagnose source overrides)
-            console.log('[UserWatchHistory] Built resume href', href, 'resumeSourceName=', resumeSourceName, 'resumeSourceId=', resumeSourceName ? sourceNameToId(resumeSourceName) : undefined);
+            const sourceId = resumeSourceName ? sourceNameToId(resumeSourceName) : undefined;
+            const displaySourceName = sourceId ? `Source ${sourceId}` : 'unknown';
+            console.log('[UserWatchHistory] Built resume href', href, 'resumeSourceName=', displaySourceName, 'resumeSourceId=', sourceId);
 
             return (
             <div
@@ -353,7 +355,7 @@ export default function UserWatchHistory() {
                 onClick={() => {
                   // Persist the resume source immediately (best-effort, non-blocking) — only when logged in.
                   // If the history item doesn't have a source, fall back to the user's current preferred source.
-                  const allowedSources = ['videasy', 'vidlink', 'vidnest'];
+                  const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
                   let resumeSource: string | undefined = undefined;
                   try {
                     const perMedia = getExplicitSourceForMedia(item.mediaId, false);

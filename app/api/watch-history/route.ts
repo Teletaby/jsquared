@@ -296,9 +296,13 @@ export async function POST(request: NextRequest) {
 
       // Only set source on immediate writes if the client explicitly indicated a user action.
       // This prevents automated playback beacons from overwriting an explicit per-media choice.
+      // For VidSrc (when logged in), don't count any timestamp
       if (explicitUpdateFlag) {
         updateFields.source = source || undefined;
-        updateFields.sourceSetAt = now; // record when source was explicitly set
+        // Don't set timestamp for VidSrc when logged in
+        if (source !== 'vidsrc') {
+          updateFields.sourceSetAt = now; // record when source was explicitly set
+        }
       } else if (source) {
         console.log('[WatchHistory] Skipping source on immediate automated write (not explicit)', { mediaId, incomingSource: source });
       }

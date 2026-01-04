@@ -36,7 +36,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   const [logoMap, setLogoMap] = useState<Map<number, string>>(new Map());
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
-  const [userSource, setUserSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
+  const [userSource, setUserSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(null);
   const { data: session } = useSession();
   const { checkMultipleWatchlistStatuses } = useWatchlist();
   const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatusMap>({});

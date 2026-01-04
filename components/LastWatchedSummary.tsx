@@ -38,6 +38,7 @@ export default function LastWatchedSummary() {
 
     const fetchLatestAndRecs = async () => {
       try {
+        console.log('[LastWatchedSummary] Starting fetch, session:', session?.user?.email);
         // Fetch user's preferred source first so resume links can include it immediately (only when logged in)
         if (session?.user) {
           try {
@@ -62,9 +63,16 @@ export default function LastWatchedSummary() {
         }
 
         const res = await fetch('/api/watch-history?limit=1');
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.log('[LastWatchedSummary] Watch history fetch failed:', res.status);
+          return;
+        }
         const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) return;
+        console.log('[LastWatchedSummary] Watch history fetched, count:', data?.length);
+        if (!Array.isArray(data) || data.length === 0) {
+          console.log('[LastWatchedSummary] No watch history data returned');
+          return;
+        }
 
         const item = data[0];
         if (!isMounted) return;
@@ -81,28 +89,41 @@ export default function LastWatchedSummary() {
           // ignore failures to fetch details
         }
 
-        // Fetch recommendations server-side and prioritize those that share genres
+        // Fetch recommendations and filter by genre if possible, fallback to all if no genre matches
         try {
-          const recRes = await fetch(`/api/tmdb/recommendations?mediaType=${item.mediaType}&id=${item.mediaId}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          const recRes = await fetch(`/api/tmdb/recommendations?mediaType=${item.mediaType}&id=${item.mediaId}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
           if (recRes.ok) {
             const recData = await recRes.json();
+            console.log('[LastWatchedSummary] Recommendations fetched:', recData?.results?.length || 0, 'items');
             if (recData?.results && Array.isArray(recData.results)) {
-              // Prefer recs that share genres with the last-watched item
-              let preferred: any[] = [];
-              const others: any[] = []; 
+              // Try to filter by genres if we have them
+              let resToShow: any[] = [];
               if (lastGenreIds && lastGenreIds.length > 0) {
+                console.log('[LastWatchedSummary] Filtering by genres:', lastGenreIds);
+                // First try genre-filtered
                 for (const r of recData.results) {
                   const gids = r.genre_ids || [];
                   const overlap = gids.some((id: number) => lastGenreIds!.includes(id));
-                  if (overlap) preferred.push(r);
-                  else others.push(r);
+                  if (overlap) resToShow.push(r);
                 }
-              } else {
-                // If we don't have genres, fall back to the original ordering
-                preferred = recData.results.slice();
+                console.log('[LastWatchedSummary] Genre-filtered results:', resToShow.length);
+              }
+              
+              // If genre filtering produced no results, use all recommendations
+              if (resToShow.length === 0) {
+                console.log('[LastWatchedSummary] No genre matches, using all recommendations');
+                resToShow = recData.results;
               }
 
-              const chosen = [...preferred, ...others].slice(0, 6);
+              const chosen = resToShow.slice(0, 6);
+              console.log('[LastWatchedSummary] Final recommendations to display:', chosen.length);
               const mapped = chosen.map((r: any) => ({
                 id: `rec-${r.id}`,
                 mediaId: r.id,
@@ -110,13 +131,15 @@ export default function LastWatchedSummary() {
                 title: r.title || r.name,
                 posterPath: r.poster_path,
                 genre_ids: r.genre_ids,
-                relatedToLast: lastGenreIds ? (r.genre_ids || []).some((id: number) => lastGenreIds!.includes(id)) : false,
+                relatedToLast: true,
               }));
               setRecs(mapped);
             }
+          } else {
+            console.warn('[LastWatchedSummary] Failed to fetch recommendations:', recRes.status);
           }
         } catch (e) {
-          // ignore
+          console.error('[LastWatchedSummary] Error fetching recommendations:', e);
         }
       } catch (e) {
         // ignore
@@ -169,9 +192,12 @@ export default function LastWatchedSummary() {
     setTimeout(checkScroll, 350);
   };
 
-  if (loading || !lastItem) return null;
+  if (loading || !lastItem) {
+    console.log('[LastWatchedSummary] Returning null - loading:', loading, 'lastItem:', !!lastItem);
+    return null;
+  }
 
-  // Build carousel items: last watched first, then recommendations
+  console.log('[LastWatchedSummary] Rendering with lastItem:', lastItem?.title, 'recs:', recs.length);
   const items = [
     {
       id: `last-${lastItem._id}`,

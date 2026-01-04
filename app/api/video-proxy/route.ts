@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Video Proxy API - Handles Videasy, VidLink, and VIDNEST video extraction
+ * Video Proxy API - Handles Videasy, VidLink, VIDNEST, and VidSrc video extraction
  * This allows us to:
  * 1. Get direct video URLs (if available)
  * 2. Track playback without iframe limitations
@@ -78,6 +78,23 @@ export async function POST(request: NextRequest) {
       };
     }
 
+    // Handle VidSrc (Source 4)
+    if (source === 'vidsrc') {
+      const embedUrl = mediaType === 'movie'
+        ? `https://vidsrc.icu/embed/movie/${tmdbId}`
+        : `https://vidsrc.icu/embed/tv/${tmdbId}/${season}/${episode}`;
+      videoUrl = embedUrl;
+      metadata = {
+        source: 'vidsrc',
+        embedUrl,
+        features: {
+          supportsProgress: false, // VidSrc is a simple embed without progress tracking
+          supportsSubtitles: true,
+          supportsQualitySelect: true,
+        },
+      };
+    }
+
     if (!videoUrl) {
       return NextResponse.json({ error: 'Unsupported video source' }, { status: 400 });
     }
@@ -138,6 +155,14 @@ export async function GET(request: NextRequest) {
         supportsQuality: true,
         supportsSubtitles: true,
         latency: 'low',
+      },
+      vidsrc: {
+        name: 'VidSrc',
+        supportsProgress: false,
+        supportsAutoResume: false,
+        supportsQuality: true,
+        supportsSubtitles: true,
+        latency: 'medium',
       },
     };
 

@@ -417,7 +417,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           if (!s) return undefined;
           if (s.includes('vidnest')) return 'vidnest';
           if (s.includes('vidlink')) return 'vidlink';
-          if (s.includes('vidking') || s.includes('videasy') || s.includes('vidsrc')) return 'videasy';
+          if (s.includes('vidsrc')) return 'vidsrc';
+          if (s.includes('vidking') || s.includes('videasy')) return 'videasy';
           return undefined;
         };
         const source = mapSrcToSource(stableSrc || src || '');
@@ -576,7 +577,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           episodeNumber: episodeNumber || undefined,
           finished: false,
           immediate: true,
-          source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : (stableSrc.includes('vidking') || stableSrc.includes('videasy') || stableSrc.includes('vidsrc')) ? 'videasy' : undefined,
+          source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined,
         });
         
         // Try sendBeacon first (more reliable for page unload)
@@ -841,7 +842,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             
             // Send initial watch history entry when embed loads
             if (user && mediaId && mediaType) {
-              const initSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : (stableSrc.includes('vidking') || stableSrc.includes('videasy') || stableSrc.includes('vidsrc')) ? 'videasy' : undefined;
+              const initSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined;
               console.log('Sending initial watch history entry for embed player', { mediaId, mediaType, source: initSource });
               fetch('/api/watch-history', {
                 method: 'POST',

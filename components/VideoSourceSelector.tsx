@@ -13,10 +13,10 @@ interface SourceInfo {
 }
 
 interface VideoSourceSelectorProps {
-  currentSource: 'videasy' | 'vidlink' | 'vidnest';
+  currentSource: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
   /** Optional: the pending/selected candidate (separate from currentSource) */
-  selectedSource?: 'videasy' | 'vidlink' | 'vidnest' | null;
-  onSourceChange: (source: 'videasy' | 'vidlink' | 'vidnest') => void;
+  selectedSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
+  onSourceChange: (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => void;
   onConfirm: () => void;
   showWarning?: boolean;
 }
@@ -59,6 +59,16 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       description: 'Premium source with full progress tracking, auto-resume, and quality selection',
       icon: '🎯',
     } as SourceInfo & { description: string; icon: string },
+    vidsrc: {
+      name: 'VidSrc',
+      supportsProgress: false,
+      supportsAutoResume: false,
+      supportsQuality: true,
+      supportsSubtitles: true,
+      latency: 'medium',
+      description: 'Minimal ads, seamless streaming. When logged in, watch history is recorded but timestamps are not tracked.',
+      icon: '📺',
+    } as SourceInfo & { description: string; icon: string },
   };
 
   return (
@@ -88,7 +98,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
               onClick={() => {
                 // Clear any text selection when switching sources
                 window.getSelection?.()?.removeAllRanges();
-                onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest');
+                onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
               }}
               className={`relative p-4 rounded-lg border-2 transition text-left ${
                 ((selectedSource ?? currentSource) === key)

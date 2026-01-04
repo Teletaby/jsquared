@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { sourceNameToId } from '@/lib/utils';
 
 interface AdvancedVideoPlayerProps {
-  embedUrl: string; // VIDNEST embed URL
+  embedUrl: string; // VIDNEST, VIDSRC embed URL
   title?: string;
   mediaId: number;
   mediaType: 'movie' | 'tv';
@@ -15,7 +15,7 @@ interface AdvancedVideoPlayerProps {
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
-  videoSource?: 'videasy' | 'vidlink' | 'vidnest'; // Which video source to display counter for
+  videoSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'; // Which video source to display counter for
 }
 
 const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
@@ -34,33 +34,34 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  // Track playtime by periodic saves (since we can't access iframe's currentTime due to CORS)
-  const elapsedRef = useRef(0); // Track ONLY new time watched in THIS session (starts at 0, not initialTime)
-
-  // Capture the initial resume timestamp on mount so changes later won't remount the iframe
-  const initialStartRef = useRef<number>(initialTime);
+  // Track elapsed time with real-time updates
+  const elapsedRef = useRef<number>(0); // Track ONLY new time watched in THIS session (starts at 0, not initialTime)
+  const sessionStartRef = useRef<number>(Date.now()); // Track when the player started
+  const initialStartRef = useRef<number>(initialTime); // Capture the initial resume timestamp on mount
 
   useEffect(() => {
-    // Reset elapsed time to 0 when initialTime changes (new video/episode)
+    // Reset elapsed time and session start when initialTime changes (new video/episode)
     elapsedRef.current = 0;
+    sessionStartRef.current = Date.now();
+    initialStartRef.current = initialTime;
   }, [initialTime]);
 
   useEffect(() => {
-    // Update every 5 seconds for better accuracy (was 10 seconds)
+    // Update every 1 second for real-time accuracy
     const interval = setInterval(() => {
-      elapsedRef.current += 5; // Increment by 5 seconds every interval
-      
-      // Only call onTimeUpdate if it exists AND we're using videasy/vidlink source
-      // (embed sources don't support progress tracking via postMessage)
-      if (onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
+      // Call onTimeUpdate for all sources (including embed sources like vidnest/vidsrc)
+      // to ensure currentPlaybackTime is tracked for accurate cross-source switching
+      if (onTimeUpdate) {
         const totalTime = initialTime + elapsedRef.current;
         onTimeUpdate(totalTime);
       }
-    }, 5000); // Fires every 5 seconds (more frequent for accuracy)
+      // Increment by 1 second for real-time tracking
+      elapsedRef.current += 1;
+    }, 1000); // Fires every 1 second for real-time updates
 
     // Capture time immediately before page unload
     const handleBeforeUnload = () => {
-      if (elapsedRef.current > 0 && onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
+      if (elapsedRef.current > 0 && onTimeUpdate) {
         const totalTime = initialTime + elapsedRef.current;
         console.log('[AdvancedVideoPlayer] Unload event - saving final time:', totalTime, 's');
         onTimeUpdate(totalTime);
@@ -69,7 +70,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     // Also save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
-      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate && (videoSource === 'videasy' || videoSource === 'vidlink')) {
+      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate) {
         const totalTime = initialTime + elapsedRef.current;
         console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's (player stays alive)');
         onTimeUpdate(totalTime);
@@ -184,7 +185,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
           // Throttle saves: only save if delta > 5s since last save
           const delta = Math.abs(progress - (initialStartRef.current + elapsedRef.current));
           if (delta > 5) {
-            console.log('[AdvancedVideoPlayer] VIDNEST postMessage progress received', { mediaId, progress });
+            console.log('[AdvancedVideoPlayer] Source 3 postMessage progress received', { mediaId, progress });
             // Update local elapsedRef so future autosave math makes sense
             // Note: Do not mutate initialStartRef here (it's mount-only), instead compute a best-effort totalTime
             const totalTime = progress;
@@ -216,6 +217,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     if (!embedUrl) return embedUrl;
 
     // Only append params for VIDNEST (source 3) and only use the initial start time captured on mount
+    // VidSrc (source 4) doesn't support resume parameters
     if (embedUrl.includes('vidnest') && initialStartRef.current > 0) {
       const separator = embedUrl.includes('?') ? '&' : '?';
       // For movies use startAt, for TV use progress (per VIDNEST docs)

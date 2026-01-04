@@ -34,7 +34,7 @@ const userSchema = new Schema(
     // Keep track of the user's last chosen video source so we can resume it the next time
     lastUsedSource: {
       type: String,
-      enum: ['videasy', 'vidlink', 'vidnest'],
+      enum: ['videasy', 'vidlink', 'vidnest', 'vidsrc'],
       sparse: true,
     },
     // Timestamp when the user last used their chosen video source
@@ -102,7 +102,7 @@ const watchHistorySchema = new Schema(
     // Which source the user used when this history entry was saved
     source: {
       type: String,
-      enum: ['videasy', 'vidlink', 'vidnest'],
+      enum: ['videasy', 'vidlink', 'vidnest', 'vidsrc'],
       sparse: true,
     },
     // Timestamp when the `source` field was last set (helps distinguish automated heartbeats)

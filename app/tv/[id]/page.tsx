@@ -53,7 +53,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [tvShow, setTvShow] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [, setCurrentPlaybackTime] = useState<number>(0);
+  const [currentPlaybackTime, setCurrentPlaybackTime] = useState<number>(0); // Track current playback time for cross-source switching
   const [savedProgress, setSavedProgress] = useState<number>(0); // Track saved progress from history
   const [savedDuration, setSavedDuration] = useState<number>(0); // Track saved duration to clamp resume time
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -70,30 +70,30 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   // videoSource starts from localStorage when available to avoid flashes
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(() => {
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(() => {
     try {
       const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
-      const allowed = ['videasy', 'vidlink', 'vidnest'];
-      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest';
+      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
     } catch (e) {
       // ignore storage errors
     }
     return null;
   });
 
-    // Defensive: revert accidental automatic switches to 'videasy' back to client's saved source
-    useEffect(() => {
-      try {
-        const local = localStorage.getItem('lastUsedSource');
-        const allowed = ['videasy', 'vidlink', 'vidnest'];
-        if (local && allowed.includes(local) && videoSource === 'videasy' && local !== 'videasy') {
-          console.log('[Client][DEFENSE] Reverting automatic videasy fallback to local lastUsedSource (TV page):', local);
-          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
-        }
-      } catch (e) {
-        // ignore
-      }
-    }, [videoSource]);
+    // DISABLED: This defense mechanism was reverting manual source selections on TV page
+    // useEffect(() => {
+    //   try {
+    //     const local = localStorage.getItem('lastUsedSource');
+    //     const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+    //     if (local && allowed.includes(local) && videoSource === 'videasy' && local !== 'videasy') {
+    //       console.log('[Client][DEFENSE] Reverting automatic videasy fallback to local lastUsedSource (TV page):', local);
+    //       setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
+    //     }
+    //   } catch (e) {
+    //     // ignore
+    //   }
+    // }, [videoSource]);
   const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
 
   const timeAgo = (iso?: string | null) => {
@@ -109,15 +109,13 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   };
   const [recommendations, setRecommendations] = useState<any[]>([]); // Fallback recs when details fail
   const [retrying, setRetrying] = useState(false);
-
-
-  const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
   const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
   const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
+  const [episodeData, setEpisodeData] = useState<{ overview: string; name: string } | null>(null); // Store current episode data
+  const [showEpisodeSynopsis, setShowEpisodeSynopsis] = useState(false); // Toggle episode synopsis display
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -362,7 +360,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           const explicit = getExplicitSourceForMedia(tmdbId, false);
           if (explicit) {
             // explicit per-media selection exists; respect it and set the source immediately
-            const name = explicit as 'videasy' | 'vidlink' | 'vidnest';
+            const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
             const explicitAt = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
             setVideoSource(name);
             setUserLastSourceInfo({ source: name, at: explicitAt || null });
@@ -377,7 +375,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       const qsSource = searchParams.get('source');
       if (qsSource) {
         // Accept numeric ids as well as names
-        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest'].includes(qsSource) ? qsSource : undefined);
+        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc'].includes(qsSource) ? qsSource : undefined);
         if (name) {
           const qsId = sourceNameToId(name);
           console.log('[Client] Source query param detected on TV page; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
@@ -438,6 +436,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     () => {
       if (videoSource === 'vidnest') {
         return `https://vidnest.fun/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
+      } else if (videoSource === 'vidsrc') {
+        return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
       } else {
         // For videasy and vidlink sources, we use dedicated player components
         // This is handled by the VideasyPlayer component
@@ -447,6 +447,33 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     [tmdbId, currentSeason, currentEpisode, videoSource]
   );
   const videoSrc = embedUrl; // Use videoSrc for ThemedVideoPlayer
+
+  // Fetch episode data for episode synopsis display
+  useEffect(() => {
+    const fetchEpisodeData = async () => {
+      try {
+        const res = await fetch(`/api/tv/${tmdbId}/seasons`);
+        if (res.ok) {
+          const data = await res.json();
+          const season = data.seasons?.find((s: any) => s.season_number === currentSeason);
+          const episode = season?.episodes?.find((e: any) => e.episode_number === currentEpisode);
+          
+          if (episode) {
+            setEpisodeData({
+              overview: episode.overview || 'No synopsis available for this episode.',
+              name: episode.name || `Episode ${currentEpisode}`
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching episode data:', error);
+      }
+    };
+
+    if (tmdbId) {
+      fetchEpisodeData();
+    }
+  }, [tmdbId, currentSeason, currentEpisode]);
 
   const handleEpisodeSelect = (seasonNum: number, episodeNum: number) => {
     const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -458,7 +485,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
 
   // Define change source handler BEFORE conditional returns so buttons and capture-useEffect can call it safely
-  const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest') => {
+  const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => {
     try {
       const reqId = sourceNameToId(source);
       const curId = sourceNameToId(videoSource);
@@ -469,10 +496,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
     if (videoSource === source) return; // Already on this source
 
-    const prev = videoSource;
-    setPendingSource(source);
+    // Optimistically set the source immediately
     setVideoSource(source);
     setUserLastSourceInfo({ source, at: new Date().toISOString() });
+    
     // Only persist when user is logged in. If not logged in, behave like normal player (no persistence).
     if (session?.user) {
       try { sessionStorage.setItem('jsc_explicit_source', source); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch (e) { /* ignore */ }
@@ -485,28 +512,27 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         });
         if (!res.ok) {
           console.warn('Failed to persist user source selection (status)', res.status);
-          setPendingSource(null);
-          setVideoSource(prev);
+          // Don't revert the source - it's already been applied optimistically in the UI
         } else {
           const persistedId = sourceNameToId(source);
           console.log('[Client] Source persisted on server:', persistedId ? `Source ${persistedId}` : 'unknown');
         }
       } catch (e) {
         console.warn('Failed to persist user source selection', e);
-        setPendingSource(null);
-        setVideoSource(prev);
+        // Don't revert the source - it's already been applied optimistically in the UI
       }
 
       try { localStorage.setItem('lastUsedSource', source); } catch (e) {}
     } else {
       // Not logged in: do not persist; keep change in-memory only
       console.log('[Client] User not logged in — applying source change in-memory only');
-      setPendingSource(null);
     }
   };
 
   // Capture-phase fallback for TV page as well
+  // DISABLED: This was causing double-clicks and incorrect source detection. The direct onClick handlers are sufficient.
   // Placed before conditional returns to avoid hook-order mismatches
+  /*
   useEffect(() => {
     const onCaptureClick = (e: MouseEvent) => {
       try {
@@ -518,7 +544,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         for (const b of buttons) {
           const r = b.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            const src = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | null;
+            const src = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
             if (src && src !== videoSource) {
               const cfId = sourceNameToId(src);
               console.log('[Client] TV page capture fallback triggered for source:', cfId ? `Source ${cfId}` : 'unknown');
@@ -535,6 +561,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     document.addEventListener('click', onCaptureClick, true);
     return () => document.removeEventListener('click', onCaptureClick, true);
   }, [videoSource]);
+  */
 
   // If still loading data OR we haven't resolved which source to use yet, show a loading state
   if (loading || videoSource === null) {
@@ -554,44 +581,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     return null; // Or a "Not Found" component
   }
 
-  const mediaTitle = tvShow.name || 'Untitled Show';
+  const mediaTitle = tvShow?.name || 'Untitled Show';
 
 
 
 
 
-
-
-  const handleConfirmSourceChange = async () => {
-    if (pendingSource) {
-      setVideoSource(pendingSource);
-      if (session?.user) {
-        try {
-          const res = await fetch('/api/user/source', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: pendingSource, explicit: true, at: new Date().toISOString() }),
-          });
-          if (res.ok) {
-            setUserLastSourceInfo({ source: pendingSource, at: new Date().toISOString() });
-            try { sessionStorage.setItem('jsc_explicit_source', pendingSource); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch(e){}
-          }
-        } catch (e) {
-          console.warn('Failed to persist user source selection on confirm', e);
-        }
-      } else {
-        // Not logged in: do not persist anything, keep change in-memory only
-        console.log('[Client] Confirmed source change (logged out) — not persisting');
-      }
-      setPendingSource(null);
-    }
-    setShowSourceWarning(false);
-  };
-
-  const handleCancelSourceChange = () => {
-    setPendingSource(null);
-    setShowSourceWarning(false);
-  };
 
   return (
     <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
@@ -602,13 +597,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       {/* <link rel="preconnect" href="https://vidlink.pro" /> */}
       {/* <link rel="dns-prefetch" href="https://vidnest.fun" /> */}
       {/* <link rel="preconnect" href="https://vidnest.fun" /> */}
-
-      {/* Source Warning Dialog */}
-      <SourceWarningDialog
-        isOpen={showSourceWarning}
-        onConfirm={handleConfirmSourceChange}
-        onCancel={handleCancelSourceChange}
-      />
 
       <Header />
       {/* Show last-used source badge if available (helps confirm persistence) */}
@@ -785,7 +773,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                               // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
                               try {
                                 if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-                                  console.log('[Client] Persisting savedProgress to watch-history for VIDNEST (tv):', savedProgress);
+                                  console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
                                   fetch('/api/watch-history', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
@@ -1001,7 +989,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 posterPath={tvShow?.poster_path}
                 seasonNumber={currentSeason}
                 episodeNumber={currentEpisode}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
                   const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
@@ -1031,7 +1019,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 posterPath={tvShow?.poster_path}
                 seasonNumber={currentSeason}
                 episodeNumber={currentEpisode}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
                   const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
@@ -1062,7 +1050,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 posterPath={tvShow?.poster_path}
                 seasonNumber={currentSeason}
                 episodeNumber={currentEpisode}
-                initialTime={savedProgress}
+                initialTime={currentPlaybackTime || savedProgress}
                 videoSource={videoSource}
                 onTimeUpdate={(time) => {
                   setCurrentPlaybackTime(time);
@@ -1121,7 +1109,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-2 sm:gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3 relative z-50 pointer-events-auto">
               {view !== 'info' ? (
                 <>
                   <button
@@ -1163,6 +1151,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     }`}
                   >
                     Source 3 {videoSource === 'vidnest' && '✓'}
+                  </button>
+                  <button
+                    data-source-button="vidsrc"
+                    onClick={() => handleChangeSource('vidsrc')}
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidsrc'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 4 {videoSource === 'vidsrc' && '✓'}
                   </button>
                 </>
               ) : (
@@ -1212,6 +1211,15 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               <div className="bg-blue-900 bg-opacity-40 border border-blue-600 rounded p-3">
                 <p className="text-blue-300 text-xs sm:text-sm">
                   💡 <strong>Tip:</strong> Source 3 may have more ads. Please enable an adblocker for a better viewing experience.
+                </p>
+              </div>
+            )}
+
+            {/* VIDSRC Warning */}
+            {videoSource === 'vidsrc' && (
+              <div className="bg-yellow-900 bg-opacity-40 border border-yellow-600 rounded p-3">
+                <p className="text-yellow-300 text-xs sm:text-sm">
+                  ⚠️ <strong>Note:</strong> Some selections may not be accurate. If you encounter issues, try switching to another source. {session?.user && 'Timestamps are not stored for this source.'}
                 </p>
               </div>
             )}
@@ -1279,8 +1287,32 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {/* Overview */}
                 <div>
-                  <h2 className="text-xl font-bold mb-3 text-white">SYNOPSIS</h2>
-                  <p className="text-gray-400 leading-relaxed">{tvShow.overview}</p>
+                  <h2 className={`text-xl font-bold mb-3 text-white ${currentEpisode === 1 ? 'cursor-pointer hover:text-gray-300' : ''}`}
+                      onClick={() => currentEpisode === 1 && setShowEpisodeSynopsis(!showEpisodeSynopsis)}
+                  >
+                    {currentEpisode === 1 ? '📺 SYNOPSIS (Click to toggle episode info)' : `📺 SYNOPSIS FOR EPISODE ${currentEpisode}`}
+                  </h2>
+                  {/* Show episode synopsis if viewing episode 1 and synopsis is toggled on, or for any other episode */}
+                  {(currentEpisode === 1 && showEpisodeSynopsis) || currentEpisode !== 1 ? (
+                    <>
+                      {episodeData && (
+                        <div className="mb-4 p-4 border border-gray-700 rounded bg-gray-900/50">
+                          <p className="text-sm text-gray-400 font-semibold mb-2">Episode {currentEpisode}: {episodeData.name}</p>
+                          <p className="text-gray-400 leading-relaxed">{episodeData.overview}</p>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+                  {/* Show show synopsis for episode 1 when not toggled */}
+                  {currentEpisode === 1 && !showEpisodeSynopsis && (
+                    <p className="text-gray-400 leading-relaxed">{tvShow.overview}</p>
+                  )}
+                  {/* For other episodes, also show the show synopsis below */}
+                  {currentEpisode !== 1 && (
+                    <>
+                      <p className="text-gray-400 leading-relaxed mb-4">{tvShow.overview}</p>
+                    </>
+                  )}
                 </div>
 
                 {/* Reviews Section */}
