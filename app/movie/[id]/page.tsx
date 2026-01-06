@@ -77,11 +77,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   // videoSource starts from localStorage when available to avoid flashes
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(() => {
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null>(() => {
     try {
       const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
-      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
-      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
+      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
     } catch (e) {
       // ignore storage errors
     }
@@ -101,7 +101,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     return `${Math.floor(h / 24)}d ago`;
   };
   const [showSourceWarning, setShowSourceWarning] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(null);
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null>(null);
   const lastMediaIdRef = useRef<number | null>(null); // Track last viewed media for source reset
   const [showResumePrompt, setShowResumePrompt] = useState(false); // Show continue watching prompt
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
@@ -277,7 +277,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               if (!serverSource) {
                 try {
                   const local = localStorage.getItem('lastUsedSource');
-                  const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+                  const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
                   if (local && allowed.includes(local)) {
                     serverSource = local;
                     console.log('[Client] Using localStorage lastUsedSource as fallback while applying history:', serverSource);
@@ -358,7 +358,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       try {
         const explicit = getExplicitSourceForMedia(tmdbId, false);
         if (explicit) {
-          const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
+          const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
           const explicitAt = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
           setVideoSource(name);
           setUserLastSourceInfo({ source: name, at: explicitAt || null });
@@ -372,11 +372,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       const qsSource = searchParams.get('source');
       if (qsSource) {
         // Accept either numeric ids (1,2,3,4) or names ('videasy','vidlink','vidnest','vidsrc') for backward compatibility
-        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc'].includes(qsSource) ? qsSource : undefined);
+        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc','vidrock'].includes(qsSource) ? qsSource : undefined);
         if (name) {
           const qsId = sourceNameToId(name);
           console.log('[Client] Source query param detected; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
-          setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
+          setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
           setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
           return;
         }
@@ -412,9 +412,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       // If server didn't provide a user preference, prefer a client-local saved preference
       try {
         const local = localStorage.getItem('lastUsedSource');
-        const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+        const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
         if (local && allowed.includes(local)) {
-          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
+          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
           setUserLastSourceInfo({ source: local, at: null });
           return;
         }
@@ -434,15 +434,15 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   useEffect(() => {
     const qsSource = searchParams.get('source');
     if (!qsSource) return;
-    const valid = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
+    const valid = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
     if (!valid.includes(qsSource)) return;
 
     // Map numeric query values back to names when necessary
     const name = sourceIdToName(qsSource) || qsSource;
-    if (name !== videoSource && (name === 'videasy' || name === 'vidlink' || name === 'vidnest' || name === 'vidsrc')) {
+    if (name !== videoSource && (name === 'videasy' || name === 'vidlink' || name === 'vidnest' || name === 'vidsrc' || name === 'vidrock')) {
       const overrideId = sourceNameToId(name);
       console.log('[Client] Overriding video source from query param:', overrideId ? `Source ${overrideId}` : 'unknown');
-      setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
+      setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
       setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
 
       // Persist user's preference so future navigations remember this choice
@@ -502,7 +502,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const mediaTitle = movie?.title || 'Untitled Movie';
 
   // Define the select source handler and capture fallback BEFORE any conditional returns
-  const handleSelectSource = useCallback(async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => {
+  const handleSelectSource = useCallback(async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock') => {
     const reqId = sourceNameToId(source);
     const curId = sourceNameToId(videoSource);
     console.log('[handleSelectSource] Called with:', { requested: reqId ? `Source ${reqId}` : 'unknown', current: curId ? `Source ${curId}` : 'unknown', source });
@@ -570,7 +570,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         for (const b of buttons) {
           const r = b.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            const source = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
+            const source = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null;
             if (source && source !== videoSource) {
               const capId = sourceNameToId(source);
               console.log('[Client] Capture fallback triggered for source:', capId ? `Source ${capId}` : 'unknown');
@@ -597,6 +597,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         return `https://vidnest.fun/movie/${tmdbId}`;
       } else if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/movie/${tmdbId}`;
+      } else if (videoSource === 'vidrock') {
+        return `https://vidrock.net/movie/${tmdbId}`;
       } else {
         // For videasy and vidlink sources, we use dedicated player components
         return null; // We'll use VideasyPlayer or VidLinkPlayer instead
@@ -1263,6 +1265,17 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                     }`}
                   >
                     Source 4 {videoSource === 'vidsrc' && '✓'}
+                  </button>
+                  <button
+                    data-source-button="vidrock"
+                    onClick={() => handleSelectSource('vidrock')}
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidrock'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 5 {videoSource === 'vidrock' && '✓'}
                   </button>
                   <WatchlistButton
                     mediaId={tmdbId}

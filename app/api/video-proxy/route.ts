@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 /**
- * Video Proxy API - Handles Videasy, VidLink, VIDNEST, and VidSrc video extraction
+ * Video Proxy API - Handles Videasy, VidLink, VIDNEST, VidSrc, and VidRock video extraction
  * This allows us to:
  * 1. Get direct video URLs (if available)
  * 2. Track playback without iframe limitations
@@ -89,6 +89,23 @@ export async function POST(request: NextRequest) {
         embedUrl,
         features: {
           supportsProgress: false, // VidSrc is a simple embed without progress tracking
+          supportsSubtitles: true,
+          supportsQualitySelect: true,
+        },
+      };
+    }
+
+    // Handle VidRock (Source 5)
+    if (source === 'vidrock') {
+      const embedUrl = mediaType === 'movie'
+        ? `https://vidrock.net/movie/${tmdbId}`
+        : `https://vidrock.net/tv/${tmdbId}/${season}/${episode}`;
+      videoUrl = embedUrl;
+      metadata = {
+        source: 'vidrock',
+        embedUrl,
+        features: {
+          supportsProgress: true, // VidRock supports progress tracking via postMessage events
           supportsSubtitles: true,
           supportsQualitySelect: true,
         },

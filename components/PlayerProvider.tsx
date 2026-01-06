@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
-type VideoSource = 'videasy' | 'vidlink' | 'vidnest';
+type VideoSource = 'videasy' | 'vidlink' | 'vidnest' | 'vidrock';
 
 export type PlayOptions = {
   mediaId: number;

@@ -70,11 +70,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
   // videoSource starts from localStorage when available to avoid flashes
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null>(() => {
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null>(() => {
     try {
       const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
-      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc'];
-      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
+      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
     } catch (e) {
       // ignore storage errors
     }
@@ -360,7 +360,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           const explicit = getExplicitSourceForMedia(tmdbId, false);
           if (explicit) {
             // explicit per-media selection exists; respect it and set the source immediately
-            const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
+            const name = explicit as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
             const explicitAt = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
             setVideoSource(name);
             setUserLastSourceInfo({ source: name, at: explicitAt || null });
@@ -375,7 +375,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
       const qsSource = searchParams.get('source');
       if (qsSource) {
         // Accept numeric ids as well as names
-        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc'].includes(qsSource) ? qsSource : undefined);
+        const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc','vidrock'].includes(qsSource) ? qsSource : undefined);
         if (name) {
           const qsId = sourceNameToId(name);
           console.log('[Client] Source query param detected on TV page; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
@@ -438,6 +438,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         return `https://vidnest.fun/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
       } else if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
+      } else if (videoSource === 'vidrock') {
+        return `https://vidrock.net/tv/${tmdbId}/${currentSeason}/${currentEpisode}`;
       } else {
         // For videasy and vidlink sources, we use dedicated player components
         // This is handled by the VideasyPlayer component
@@ -485,7 +487,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
 
   // Define change source handler BEFORE conditional returns so buttons and capture-useEffect can call it safely
-  const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => {
+  const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock') => {
     try {
       const reqId = sourceNameToId(source);
       const curId = sourceNameToId(videoSource);
@@ -544,7 +546,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         for (const b of buttons) {
           const r = b.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            const src = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
+            const src = b.getAttribute('data-source-button') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null;
             if (src && src !== videoSource) {
               const cfId = sourceNameToId(src);
               console.log('[Client] TV page capture fallback triggered for source:', cfId ? `Source ${cfId}` : 'unknown');
@@ -1162,6 +1164,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     }`}
                   >
                     Source 4 {videoSource === 'vidsrc' && '✓'}
+                  </button>
+                  <button
+                    data-source-button="vidrock"
+                    onClick={() => handleChangeSource('vidrock')}
+                    className={`relative z-40 pointer-events-auto font-bold py-2 sm:py-3 px-4 sm:px-6 rounded text-xs sm:text-sm transition-all ${
+                      videoSource === 'vidrock'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                        : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    Source 5 {videoSource === 'vidrock' && '✓'}
                   </button>
                 </>
               ) : (

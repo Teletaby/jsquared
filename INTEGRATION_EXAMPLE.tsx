@@ -33,13 +33,13 @@ interface IntegrationExampleProps {
 /**
  * STEP 2: Add these state variables to your TV page component
  * 
- * const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'>('videasy');
+ * const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>('videasy');
  * const [savedProgress, setSavedProgress] = useState(0);
  * const [savedDuration, setSavedDuration] = useState(0);
  * const [showResumePrompt, setShowResumePrompt] = useState(false);
  * const [resumeChoice, setResumeChoice] = useState<'yes' | 'no'>('no');
  * const [showSourceSelector, setShowSourceSelector] = useState(false);
- * const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'>('videasy');
+ * const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>('videasy');
  * const { queueUpdate } = useAdvancedPlaytime();
  * const { data: session } = useSession();
  */
@@ -52,13 +52,13 @@ export default function TVPageIntegrationExample({
   episodePosterPath,
 }: IntegrationExampleProps) {
   // ===== VIDEO PLAYER STATE =====
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'>('videasy');
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>('videasy');
   const [savedProgress, setSavedProgress] = useState(0);
   const [savedDuration, setSavedDuration] = useState(0);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeChoice, setResumeChoice] = useState<'yes' | 'no'>('no');
   const [showSourceSelector, setShowSourceSelector] = useState(false);
-  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'>('videasy');
+  const [pendingSource, setPendingSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>('videasy');
   
   const { queueUpdate } = useAdvancedPlaytime();
   const { data: session } = useSession();

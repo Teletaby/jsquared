@@ -63,7 +63,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Preload iframe in the background for faster loading
   useEffect(() => {
-    if (!stableSrc.includes('vidking') && !stableSrc.includes('vidnest')) return;
+    if (!stableSrc.includes('vidking') && !stableSrc.includes('vidnest') && !stableSrc.includes('vidrock')) return;
     
     // Clear expired cache entries
     clearExpiredCache();
@@ -246,7 +246,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
 
   // Reset player state when episode/movie changes (for embed players)
   useEffect(() => {
-    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed')) {
       // Reset states for new content
       setIsLoading(true);
       embedLoadedRef.current = false;
@@ -265,7 +265,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     userHasInteractedRef.current = false;
 
     // Skip all video logic for embed URLs
-    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed')) {
       return;
     }
 
@@ -321,7 +321,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       }
       // Page is now visible
       // For embed players, immediately clear loading if it has loaded
-      if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
+      if (src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed')) {
         if (embedLoadedRef.current) {
           setIsLoading(false);
         }
@@ -362,8 +362,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   // Separate effect to apply initial time when metadata is loaded (only once per video)
   // NOTE: Skip this for embed players - they handle progress via URL parameters
   useEffect(() => {
-    // Skip for embed players - Vidking/VIDNEST handle progress via URL parameter
-    if (src.includes('vidking') || src.includes('vidnest') || src.includes('embed')) {
+    // Skip for embed players - Vidking/VIDNEST/VidRock handle progress via URL parameter
+    if (src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed')) {
       return;
     }
 
@@ -392,7 +392,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     }
   }, [initialTime, src]);
 
-  const isEmbedPlayer = src.includes('vidking') || src.includes('vidnest') || src.includes('embed');
+  const isEmbedPlayer = src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed');
 
   const sendWatchHistoryUpdate = useCallback(async (
     currentProgress: number,
@@ -418,6 +418,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           if (s.includes('vidnest')) return 'vidnest';
           if (s.includes('vidlink')) return 'vidlink';
           if (s.includes('vidsrc')) return 'vidsrc';
+          if (s.includes('vidrock')) return 'vidrock';
           if (s.includes('vidking') || s.includes('videasy')) return 'videasy';
           return undefined;
         };
@@ -476,7 +477,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
     if (!isEmbedPlayer) return;
 
     // Get the current source to validate messages
-    const currentSource = stableSrc.includes('vidnest') ? 'vidnest' : 'vidking';
+    const currentSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidrock') ? 'vidrock' : 'vidking';
     console.log(`[Watch History] Setting up message listener for source: ${currentSource}`);
 
     const handleMessage = (event: MessageEvent) => {
@@ -517,7 +518,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
               if (user && mediaId && eventMediaType) {
                 console.log('Saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
                 // Determine source for embed messages
-                const mapEmbedToSource = (s: string) => (s.includes('vidnest') ? 'vidnest' : s.includes('vidking') ? 'videasy' : undefined);
+                const mapEmbedToSource = (s: string) => (s.includes('vidnest') ? 'vidnest' : s.includes('vidrock') ? 'vidrock' : s.includes('vidking') ? 'videasy' : undefined);
                 const embedSource = mapEmbedToSource(stableSrc || src || '');
 
                 fetch('/api/watch-history', {
@@ -577,7 +578,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           episodeNumber: episodeNumber || undefined,
           finished: false,
           immediate: true,
-          source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined,
+          source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : stableSrc.includes('vidrock') ? 'vidrock' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined,
         });
         
         // Try sendBeacon first (more reliable for page unload)
@@ -773,8 +774,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       onMouseEnter={() => { setIsHovering(true); setShowControls(true); }}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {src.includes('vidking') || src.includes('vidnest') || src.includes('embed') ? (
-        // For embed URLs, use an iframe with vidking/vidnest controls
+      {src.includes('vidking') || src.includes('vidnest') || src.includes('vidrock') || src.includes('embed') ? (
+        // For embed URLs, use an iframe with vidking/vidnest/vidrock controls
         // Key includes full src URL to force remount when source/progress changes
         <iframe
           key={src}
@@ -842,7 +843,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             
             // Send initial watch history entry when embed loads
             if (user && mediaId && mediaType) {
-              const initSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined;
+              const initSource = stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : stableSrc.includes('vidrock') ? 'vidrock' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined;
               console.log('Sending initial watch history entry for embed player', { mediaId, mediaType, source: initSource });
               fetch('/api/watch-history', {
                 method: 'POST',

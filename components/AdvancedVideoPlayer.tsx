@@ -15,7 +15,7 @@ interface AdvancedVideoPlayerProps {
   episodeNumber?: number;
   initialTime?: number;
   onTimeUpdate?: (time: number) => void;
-  videoSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'; // Which video source to display counter for
+  videoSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'; // Which video source to display counter for
 }
 
 const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({

@@ -75,8 +75,8 @@ export async function POST(request: NextRequest) {
     // Parse client-provided timestamp to help avoid races; fall back to server time if not provided
     const clientAt = json.at ? new Date(json.at) : null;
 
-    // Accept either canonical names or numeric ids (1/2/3). Normalize to canonical names.
-    const valid = ['videasy', 'vidlink', 'vidnest'];
+    // Accept either canonical names or numeric ids (1/2/3/4/5). Normalize to canonical names.
+    const valid = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
     const normalized = sourceIdToName(source) || (valid.includes(source) ? source : undefined);
     if (!normalized) {
       console.warn('[API] Invalid source provided (after normalization):', source);

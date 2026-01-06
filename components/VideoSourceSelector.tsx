@@ -13,10 +13,10 @@ interface SourceInfo {
 }
 
 interface VideoSourceSelectorProps {
-  currentSource: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc';
+  currentSource: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
   /** Optional: the pending/selected candidate (separate from currentSource) */
-  selectedSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | null;
-  onSourceChange: (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc') => void;
+  selectedSource?: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null;
+  onSourceChange: (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock') => void;
   onConfirm: () => void;
   showWarning?: boolean;
 }
@@ -69,6 +69,16 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       description: 'Minimal ads, seamless streaming. When logged in, watch history is recorded but timestamps are not tracked.',
       icon: '📺',
     } as SourceInfo & { description: string; icon: string },
+    vidrock: {
+      name: 'VidRock',
+      supportsProgress: true,
+      supportsAutoResume: true,
+      supportsQuality: true,
+      supportsSubtitles: true,
+      latency: 'low',
+      description: 'Enterprise-ready streaming with seamless quality playback and full progress tracking',
+      icon: '🚀',
+    } as SourceInfo & { description: string; icon: string },
   };
 
   return (
@@ -90,7 +100,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         {(Object.entries(sources) as [keyof typeof sources, typeof sources['videasy']][]).map(
           ([key, source]) => (
             <button
@@ -98,7 +108,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
               onClick={() => {
                 // Clear any text selection when switching sources
                 window.getSelection?.()?.removeAllRanges();
-                onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc');
+                onSourceChange(key as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
               }}
               className={`relative p-4 rounded-lg border-2 transition text-left ${
                 ((selectedSource ?? currentSource) === key)

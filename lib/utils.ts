@@ -57,9 +57,9 @@ export function formatDuration(minutes: number): string {
 
 /**
  * Fetch the current video source setting from the server
- * @returns Promise<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'> The current video source
+ * @returns Promise<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'> The current video source
  */
-export async function getVideoSourceSetting(): Promise<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'> {
+export async function getVideoSourceSetting(): Promise<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'> {
   try {
     const res = await fetch('/api/admin/maintenance');
     if (!res.ok) {
@@ -74,20 +74,20 @@ export async function getVideoSourceSetting(): Promise<'videasy' | 'vidlink' | '
 }
 
 /**
- * Map source name to numeric id used in URLs: videasy=1, vidlink=2, vidnest=3, vidsrc=4
+ * Map source name to numeric id used in URLs: videasy=1, vidlink=2, vidnest=3, vidsrc=4, vidrock=5
  */
 export function sourceNameToId(source?: string | null): string | undefined {
   if (!source) return undefined;
-  const map: Record<string, string> = { videasy: '1', vidlink: '2', vidnest: '3', vidsrc: '4' };
+  const map: Record<string, string> = { videasy: '1', vidlink: '2', vidnest: '3', vidsrc: '4', vidrock: '5' };
   return map[source] || undefined;
 }
 
 /**
  * Map numeric id back to source name
  */
-export function sourceIdToName(id?: string | null): 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | undefined {
+export function sourceIdToName(id?: string | null): 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | undefined {
   if (!id) return undefined;
-  const map: Record<string, 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc'> = { '1': 'videasy', '2': 'vidlink', '3': 'vidnest', '4': 'vidsrc' };
+  const map: Record<string, 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'> = { '1': 'videasy', '2': 'vidlink', '3': 'vidnest', '4': 'vidsrc', '5': 'vidrock' };
   return map[id] || undefined;
 }
 

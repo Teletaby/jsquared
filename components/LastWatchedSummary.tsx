@@ -29,7 +29,7 @@ export default function LastWatchedSummary() {
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
   // Track user's preferred source (used as fallback when history item has no explicit source)
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null>(null);
 
   const { data: session } = useSession();
 
@@ -50,8 +50,8 @@ export default function LastWatchedSummary() {
                 // fallback to localStorage if server doesn't have it
                 try {
                   const local = localStorage.getItem('lastUsedSource');
-                  const allowedSources = ['videasy', 'vidlink', 'vidnest'];
-                  if (local && allowedSources.includes(local)) setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest');
+                  const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+                  if (local && allowedSources.includes(local)) setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
                 } catch (e) {
                   // ignore
                 }
@@ -260,7 +260,7 @@ export default function LastWatchedSummary() {
               // We no longer include source/time in the URL to avoid exposing them in query params.
               // Instead, we persist the user's preferred source on click and rely on server-stored history for resume time.
               // Prefer the user's current preferred source (server/local) over the history item's recorded source when persisting only.
-              const allowedSources = ['videasy', 'vidlink', 'vidnest'];
+              const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
               // Prefer per-media explicit source for this item, then the item's recorded source, then the page's current videoSource
               let resumeSource: string | undefined = undefined;
               try {
@@ -286,7 +286,7 @@ export default function LastWatchedSummary() {
                 href={href}
                 onClick={() => {
                   // Synchronously persist the per-media explicit source so it exists BEFORE navigation
-                  const allowedSources = ['videasy', 'vidlink', 'vidnest'];
+                  const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
                   const resolvedMediaId = it.mediaId ?? (typeof it.id === 'number' ? it.id : undefined);
                   const resumeSource = (allowedSources.includes(String(videoSource))) ? videoSource : (it.source && allowedSources.includes(it.source) ? it.source : undefined);
 
