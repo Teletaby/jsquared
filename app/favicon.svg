@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#0c0a18"/>
+  
+  <!-- Outer circle -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="#E50914" stroke-width="3"/>
+  
+  <!-- Film reel stripes -->
+  <g stroke="#E50914" stroke-width="2" opacity="0.3">
+    <line x1="100" y1="10" x2="100" y2="30"/>
+    <line x1="100" y1="170" x2="100" y2="190"/>
+    <line x1="30" y1="100" x2="10" y2="100"/>
+    <line x1="190" y1="100" x2="170" y2="100"/>
+  </g>
+  
+  <!-- J with cinema flair -->
+  <g fill="none" stroke="#E50914" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <!-- J shape -->
+    <path d="M 65 60 L 65 120 Q 65 145 85 145 Q 100 145 100 135"/>
+    
+    <!-- Superscript 2 (squared) -->
+    <text x="110" y="85" font-size="45" font-weight="bold" fill="#E50914" font-family="Arial, sans-serif">2</text>
+  </g>
+  
+  <!-- Film frames accent -->
+  <g stroke="#E50914" stroke-width="1.5" fill="none" opacity="0.6">
+    <rect x="35" y="35" width="15" height="15"/>
+    <rect x="150" y="35" width="15" height="15"/>
+    <rect x="35" y="150" width="15" height="15"/>
+    <rect x="150" y="150" width="15" height="15"/>
+  </g>
+  
+  <!-- Center dot (cinema lens) -->
+  <circle cx="100" cy="100" r="4" fill="#E50914"/>
+</svg>

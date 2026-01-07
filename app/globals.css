@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 html {
-  @apply overflow-x-hidden;
+  @apply overflow-x-hidden overflow-y-auto;
   /* Custom scrollbar styling */
   scrollbar-width: thin;
   scrollbar-color: #E50914 #1A1A1A;

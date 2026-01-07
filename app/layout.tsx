@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "J-Squared Cinema",
   description: "Your destination for movies and TV shows.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.svg",
   },
   viewport: "width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes",
   openGraph: {
@@ -39,11 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="overflow-hidden">
+    <html lang="en" className="overflow-x-hidden overflow-y-auto">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes" />
       </head>
-      <body className="overflow-hidden">
+      <body className="overflow-x-hidden">
         <Providers> {/* Wrap children with Providers */}
           {children}
         </Providers>

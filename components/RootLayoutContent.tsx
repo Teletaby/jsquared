@@ -56,13 +56,13 @@ export default function RootLayoutContent({ children }: { children: ReactNode })
   }
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <Header />
-      <main className="flex-grow container mx-auto px-4 pt-16">
+      <main className="flex-grow container mx-auto px-4 pt-16 w-full">
         <ConditionalLayout>{children}</ConditionalLayout>
       </main>
       <Footer />
       <Chatbot />
-    </>
+    </div>
   );
 }

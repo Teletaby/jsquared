@@ -13,6 +13,7 @@ export function useVisitorLogging() {
     }
 
     const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+    const fullUrl = typeof window !== 'undefined' ? window.location.pathname + window.location.search + window.location.hash : '/';
 
     // Skip logging for admin page
     if (pathname.startsWith('/admin')) {
@@ -40,15 +41,18 @@ export function useVisitorLogging() {
       // Send visitor start event
       const sendStart = async () => {
         try {
+          const ua = navigator.userAgent;
           const payload = {
-            userAgent: navigator.userAgent,
+            userAgent: ua,
             referer: document.referrer,
-            url: pathname,
+            url: fullUrl,
             userId: session?.user?.email || undefined,
             visitId,
             action: 'start',
             startTime,
           } as any;
+
+          console.log('[Visitor Logging] Sending start event with userAgent:', ua?.slice(0, 80));
 
           // slight delay so page can hydrate
           setTimeout(() => {

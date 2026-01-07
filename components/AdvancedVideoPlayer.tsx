@@ -34,35 +34,34 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  // Track elapsed time with real-time updates
-  const elapsedRef = useRef<number>(0); // Track ONLY new time watched in THIS session (starts at 0, not initialTime)
-  const sessionStartRef = useRef<number>(Date.now()); // Track when the player started
+  // Track elapsed time with real wall-clock time
+  const sessionStartRef = useRef<number>(Date.now()); // Track when the player started (wall-clock time)
   const initialStartRef = useRef<number>(initialTime); // Capture the initial resume timestamp on mount
 
   useEffect(() => {
-    // Reset elapsed time and session start when initialTime changes (new video/episode)
-    elapsedRef.current = 0;
+    // Reset session start when initialTime changes (new video/episode)
     sessionStartRef.current = Date.now();
     initialStartRef.current = initialTime;
   }, [initialTime]);
 
   useEffect(() => {
-    // Update every 1 second for real-time accuracy
+    // Update every 1 second for real-time accuracy using actual elapsed wall-clock time
     const interval = setInterval(() => {
       // Call onTimeUpdate for all sources (including embed sources like vidnest/vidsrc)
       // to ensure currentPlaybackTime is tracked for accurate cross-source switching
       if (onTimeUpdate) {
-        const totalTime = initialTime + elapsedRef.current;
+        // Calculate actual elapsed time from when player started (in milliseconds, convert to seconds)
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+        const totalTime = initialTime + elapsedSeconds;
         onTimeUpdate(totalTime);
       }
-      // Increment by 1 second for real-time tracking
-      elapsedRef.current += 1;
     }, 1000); // Fires every 1 second for real-time updates
 
     // Capture time immediately before page unload
     const handleBeforeUnload = () => {
-      if (elapsedRef.current > 0 && onTimeUpdate) {
-        const totalTime = initialTime + elapsedRef.current;
+      if (onTimeUpdate) {
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+        const totalTime = initialTime + elapsedSeconds;
         console.log('[AdvancedVideoPlayer] Unload event - saving final time:', totalTime, 's');
         onTimeUpdate(totalTime);
       }
@@ -70,10 +69,13 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     // Also save when user switches tabs - but keep player alive (don't reload)
     const handleVisibilityChange = () => {
-      if (document.hidden && elapsedRef.current > 0 && onTimeUpdate) {
-        const totalTime = initialTime + elapsedRef.current;
-        console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's (player stays alive)');
-        onTimeUpdate(totalTime);
+      if (document.hidden && onTimeUpdate) {
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+        const totalTime = initialTime + elapsedSeconds;
+        if (elapsedSeconds > 0) {
+          console.log('[AdvancedVideoPlayer] Tab hidden - saving time:', totalTime, 's (player stays alive)');
+          onTimeUpdate(totalTime);
+        }
         // Note: We do NOT unmount or reload the player here - it stays alive in the background
       }
     };
@@ -88,12 +90,9 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     };
   }, [onTimeUpdate, videoSource, initialTime]);
 
-  // Resume hint removed for VIDNEST — player auto-resumes from the saved timestamp
+  // Resume hint removed for VIDNEST and VIDROCK — players auto-resume from the saved timestamp
 
   const durationRef = useRef<number>(0);
-
-  // Auto-save refs
-  const lastSaveTimeRef = useRef(0);
   const embedLoadedRef = useRef(false);
 
   // Save playtime to database
@@ -128,75 +127,111 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }
   }, [user, embedUrl, mediaId, mediaType, posterPath, seasonNumber, episodeNumber]);
 
-  // Auto-save every 10 seconds (only for embed sources: videasy, vidlink)
+  // Auto-save frequently (every 3 seconds for vidrock, every 10 seconds for others)
   useEffect(() => {
-    if (!user || (videoSource !== 'videasy' && videoSource !== 'vidlink')) return;
+    if (!user || (videoSource !== 'videasy' && videoSource !== 'vidlink' && videoSource !== 'vidrock')) return;
 
+    let lastSaveTime = 0;
+    // VidRock needs more frequent saves for accuracy
+    const saveInterval = videoSource === 'vidrock' ? 3000 : 10000;
+    const minDelta = videoSource === 'vidrock' ? 3 : 10;
+    
     const interval = setInterval(() => {
-      if (elapsedRef.current > 0 && (elapsedRef.current - lastSaveTimeRef.current) > 10) {
-        const totalTime = initialTime + elapsedRef.current;
+      const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+      if (elapsedSeconds > 0 && (elapsedSeconds - lastSaveTime) > minDelta) {
+        const totalTime = initialTime + elapsedSeconds;
+        console.log(`[AdvancedVideoPlayer] Auto-save triggered for Source ${videoSource === 'vidrock' ? '5' : '1/2'}:`, totalTime, 's');
         savePlaytime(totalTime);
-        lastSaveTimeRef.current = elapsedRef.current;
+        lastSaveTime = elapsedSeconds;
       }
-    }, 10000);
+    }, saveInterval);
 
     return () => clearInterval(interval);
   }, [savePlaytime, user, videoSource, initialTime]);
 
-  // Save on page unload (only for embed sources: videasy, vidlink)
+  // Save on page unload (for embed sources: videasy, vidlink, vidrock)
   useEffect(() => {
-    if (videoSource !== 'videasy' && videoSource !== 'vidlink') return;
+    if (videoSource !== 'videasy' && videoSource !== 'vidlink' && videoSource !== 'vidrock') return;
 
     const handleBeforeUnload = async () => {
-      if (elapsedRef.current > 0) {
-        const totalTime = initialTime + elapsedRef.current;
+      const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+      if (elapsedSeconds > 0) {
+        const totalTime = initialTime + elapsedSeconds;
+        const sourceLabel = videoSource === 'vidrock' ? 'Source 5' : `Source ${videoSource === 'vidlink' ? '2' : '1'}`;
+        console.log(`[AdvancedVideoPlayer] Unload event - saving final time for ${sourceLabel}:`, totalTime, 's');
         await savePlaytime(totalTime);
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        const elapsedSeconds = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+        if (elapsedSeconds > 0) {
+          const totalTime = initialTime + elapsedSeconds;
+          const sourceLabel = videoSource === 'vidrock' ? 'Source 5' : `Source ${videoSource === 'vidlink' ? '2' : '1'}`;
+          console.log(`[AdvancedVideoPlayer] Tab hidden - saving time for ${sourceLabel}:`, totalTime, 's');
+          // Save immediately without awaiting to ensure it goes through
+          savePlaytime(totalTime);
+        }
+      }
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [savePlaytime, videoSource, initialTime]);
 
 
 
-  // Load iframe and listen for messages (VIDNEST can post progress events)
+  // Load iframe and listen for messages (VIDNEST and VIDROCK send progress events via postMessage)
   useEffect(() => {
     const handleLoad = () => {
       embedLoadedRef.current = true;
-
-      // DISABLED: VidKing auto-resume disabled to prevent timestamp glitching
-      if (initialTime > 0 && embedUrl.includes('vidking')) {
-        console.log('Source 3: Auto-resume DISABLED - preventing timestamp glitches');
-      }
+      console.log('[AdvancedVideoPlayer] Iframe loaded, ready for postMessage events');
     };
 
     const handleMessage = (evt: MessageEvent) => {
-      // Only consider messages that look like VIDNEST progress events
+      // Handle progress events from VIDNEST and VIDROCK
       try {
         const data = evt.data;
         if (!data) return;
 
-        // VIDNEST may send different message shapes; handle common ones defensively
-        const progress = typeof data.currentTime === 'number' ? data.currentTime : (typeof data.progress === 'number' ? data.progress : undefined);
-        const type = (typeof data.type === 'string' ? data.type.toLowerCase() : undefined);
-
-        if ((type === 'vidnest:progress' || type === 'progress' || type === 'timeupdate') && typeof progress === 'number') {
-          // Throttle saves: only save if delta > 5s since last save
-          const delta = Math.abs(progress - (initialStartRef.current + elapsedRef.current));
-          if (delta > 5) {
-            console.log('[AdvancedVideoPlayer] Source 3 postMessage progress received', { mediaId, progress });
-            // Update local elapsedRef so future autosave math makes sense
-            // Note: Do not mutate initialStartRef here (it's mount-only), instead compute a best-effort totalTime
-            const totalTime = progress;
-            // Save immediately for embed players
+        // VidRock sends: { type: 'PLAYER_EVENT', data: { event: 'timeupdate', currentTime: X, duration: Y } }
+        if (data.type === 'PLAYER_EVENT' && data.data?.event) {
+          const { event: eventType, currentTime, duration } = data.data;
+          
+          // Only process timeupdate events for progress tracking
+          if (eventType === 'timeupdate' && typeof currentTime === 'number') {
+            if (duration && typeof duration === 'number') {
+              durationRef.current = duration;
+            }
+            
+            // Use VidRock's reported currentTime as source of truth
+            const totalTime = currentTime;
+            
+            // Resync the session start to match the player's reported progress
+            sessionStartRef.current = Date.now() - (totalTime - initialStartRef.current) * 1000;
+            
+            console.log('[AdvancedVideoPlayer] Source 5 (VidRock) postMessage timeupdate:', { mediaId, currentTime, duration });
+            // Immediately save to ensure accuracy
             savePlaytime(totalTime);
-            // Also update elapsedRef roughly so unload/save handlers have a good baseline
-            elapsedRef.current = Math.max(elapsedRef.current, Math.floor(totalTime - initialStartRef.current));
           }
         }
+        // Fallback for VIDNEST events (if they send different structure)
+        else if ((data.type === 'vidnest:progress' || data.type === 'progress') && typeof data.progress === 'number') {
+          const progress = data.progress;
+          const totalTime = progress;
+          
+          sessionStartRef.current = Date.now() - (totalTime - initialStartRef.current) * 1000;
+          
+          console.log('[AdvancedVideoPlayer] Source 3 (VIDNEST) postMessage progress:', { mediaId, progress });
+          savePlaytime(totalTime);
+        }
       } catch (e) {
-        // ignore malformed postMessage data
+        console.warn('[AdvancedVideoPlayer] Error processing postMessage:', e);
       }
     };
 
@@ -212,18 +247,19 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     }
   }, [initialTime, embedUrl, mediaId, savePlaytime]);
 
-  // Memoize embed URL - append VIDNEST resume params (mount-only) so iframe auto-resumes
+  // Memoize embed URL - append VIDNEST/VIDROCK resume params (mount-only) so iframe auto-resumes
   const stableEmbedUrl = useMemo(() => {
     if (!embedUrl) return embedUrl;
 
-    // Only append params for VIDNEST (source 3) and only use the initial start time captured on mount
+    // Append params for VIDNEST (source 3) and VIDROCK (source 5) using the initial start time captured on mount
     // VidSrc (source 4) doesn't support resume parameters
-    if (embedUrl.includes('vidnest') && initialStartRef.current > 0) {
+    if ((embedUrl.includes('vidnest') || embedUrl.includes('vidrock')) && initialStartRef.current > 0) {
       const separator = embedUrl.includes('?') ? '&' : '?';
-      // For movies use startAt, for TV use progress (per VIDNEST docs)
+      // For movies use startAt, for TV use progress (per VIDNEST/VIDROCK docs)
       const param = mediaType === 'movie' ? `startAt=${Math.floor(initialStartRef.current)}` : `progress=${Math.floor(initialStartRef.current)}`;
       const urlWithParam = `${embedUrl}${separator}${param}`;
-      console.log('[AdvancedVideoPlayer] Using Source 3 resume URL:', urlWithParam);
+      const sourceLabel = embedUrl.includes('vidnest') ? 'Source 3' : 'Source 5';
+      console.log(`[AdvancedVideoPlayer] Using ${sourceLabel} resume URL:`, urlWithParam);
       return urlWithParam;
     }
     return embedUrl;
@@ -235,7 +271,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
       className={`relative w-full bg-black`}
       style={{ aspectRatio: '16 / 9' }}
     >
-      {/* Resume badge removed — VIDNEST auto-resumes at the saved timestamp */}
+      {/* Resume badge removed — VIDNEST and VIDROCK auto-resume at the saved timestamp */}
       
       {/* Embed Player - Full size with native controls */}
       <iframe

@@ -197,6 +197,11 @@ export default function LastWatchedSummary() {
     return null;
   }
 
+  if (recs.length === 0) {
+    console.log('[LastWatchedSummary] No recommendations available, hiding section');
+    return null;
+  }
+
   console.log('[LastWatchedSummary] Rendering with lastItem:', lastItem?.title, 'recs:', recs.length);
   const items = [
     {
