@@ -311,3 +311,10 @@ export async function getMediaLogos(mediaType: 'movie' | 'tv', id: number) {
     posters: data.posters || [],
   };
 }
+
+// Get person details
+export async function getPersonDetails(personId: number) {
+  return fetchFromTMDB(`/person/${personId}`, {
+    append_to_response: 'combined_credits',
+  });
+}

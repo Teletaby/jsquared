@@ -1,6 +1,6 @@
 "use client";
 
-import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, getMediaLogos } from '@/lib/tmdb';
+import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, getMediaLogos, getTvSeasonDetails, SeasonDetails } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play } from 'lucide-react';
+import { Download, Play, Film, Info } from 'lucide-react';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
@@ -19,7 +19,9 @@ import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
 import VidLinkPlayer from '@/components/VidLinkPlayer';
 import MoreInfoModal from '@/components/MoreInfoModal';
+import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
+import CastMemberModal from '@/components/CastMemberModal';
 
 
 interface TvDetailPageProps {
@@ -60,10 +62,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [trailerLoaded, setTrailerLoaded] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [selectedCastMember, setSelectedCastMember] = useState<{ id: number; name: string; image: string | null; character: string } | null>(null);
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
   const [castInfo, setCastInfo] = useState<CastDetails | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'cast'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'episodes'>('overview');
   const [initialIsInWatchlist, setInitialIsInWatchlist] = useState<boolean | undefined>(undefined);
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
@@ -114,8 +117,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
   const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
   const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
+  const [showTrailerPopup, setShowTrailerPopup] = useState(false);
+  const [showInfoResumePrompt, setShowInfoResumePrompt] = useState(false); // Resume prompt for info view
   const [episodeData, setEpisodeData] = useState<{ overview: string; name: string } | null>(null); // Store current episode data
   const [showEpisodeSynopsis, setShowEpisodeSynopsis] = useState(false); // Toggle episode synopsis display
+  const [currentSeasonDetails, setCurrentSeasonDetails] = useState<SeasonDetails | null>(null);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -141,7 +147,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     }
   }, [showResumePrompt, notificationVisible]);
 
-  
+  // Persist videoSource to localStorage whenever it changes (so it becomes the default next time)
+  useEffect(() => {
+    if (videoSource && videoSource !== 'videasy') {
+      try {
+        localStorage.setItem('lastUsedSource', videoSource);
+        console.log('[Client] Persisted lastUsedSource to localStorage (TV):', videoSource);
+      } catch (e) {
+        console.warn('[Client] Failed to persist source to localStorage', e);
+      }
+    }
+  }, [videoSource]);
 
   // Effect to reset state when media ID or episode changes
   useEffect(() => {
@@ -236,6 +252,22 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchLogo();
   }, [tmdbId]);
 
+  // Fetch season details when episodes tab is opened
+  useEffect(() => {
+    const fetchSeasonDetails = async () => {
+      if (activeTab === 'episodes' && tvShow && tmdbId) {
+        try {
+          const seasonData = await getTvSeasonDetails(tmdbId, currentSeason);
+          setCurrentSeasonDetails(seasonData);
+        } catch (error) {
+          console.error('Error fetching season details:', error);
+          setCurrentSeasonDetails(null);
+        }
+      }
+    };
+    fetchSeasonDetails();
+  }, [activeTab, tmdbId, currentSeason, tvShow]);
+
   // Separate effect to check watchlist status when session becomes available
   useEffect(() => {
     const checkStatus = async () => {
@@ -302,9 +334,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 }
               }
 
-              // If server has a stored source, prefer it over the history item's recorded source
+              // If server has a stored source, use it (prefer user's last used source)
               if (serverSource) {
-                console.log('[Client] Server has preferred source; skipping watch-history source (tv):', serverSource);
+                const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+                if (allowedSources.includes(serverSource)) {
+                  console.log('[Client] Using server preferred source (tv):', serverSource);
+                  setVideoSource(serverSource as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
+                  setUserLastSourceInfo({ source: serverSource, at: userLastSourceInfo?.at || null });
+                }
               } else {
                 const _id = sourceNameToId(tvHistory.source);
                 console.log('[Client] No server/user profile source; using source from watch-history (tv):', _id ? `Source ${_id}` : 'unknown', { tvHistorySource: tvHistory.source, userLastSourceInfo });
@@ -415,7 +452,10 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         }
       }
 
+      // This fallback should only run for logged-out users or when /api/user/source returns no source
+      console.log('[Client] No user source found, falling back to getVideoSourceSetting()');
       const source = await getVideoSourceSetting();
+      console.log('[Client] getVideoSourceSetting() returned:', source);
       setVideoSource(source);
     };
     // Re-run when session changes or query params change (so a resume link can override)
@@ -485,6 +525,100 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     setShowEpisodeSelector(false);
   };
 
+  // Handle resume choice from info view
+  const handleInfoResumeYes = () => {
+    console.log('✅ User clicked RESUME from info view - savedProgress:', savedProgress, 'seconds');
+    setResumeChoice('yes');
+    setShowInfoResumePrompt(false);
+    // Navigate to watch page
+    navigateToWatch();
+  };
+
+  const handleInfoResumeNo = () => {
+    console.log('🔄 User clicked START OVER from info view');
+    setResumeChoice('no');
+    setShowInfoResumePrompt(false);
+    // Navigate to watch page
+    navigateToWatch();
+  };
+
+  const handleInfoResumeDismiss = () => {
+    console.log('❌ User dismissed resume prompt from info view');
+    setShowInfoResumePrompt(false);
+  };
+
+  // Helper function to navigate to watch page
+  const navigateToWatch = async () => {
+    try {
+      // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
+      try {
+        // Prefer server-stored user source to avoid accidentally persisting a transient history source
+        let serverSource = userLastSourceInfo?.source;
+        if (session?.user && !serverSource) {
+          try {
+            const srcRes = await fetch('/api/user/source');
+            if (srcRes.ok) {
+              const sdata = await srcRes.json();
+              if (sdata?.source) {
+                serverSource = sdata.source;
+                setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
+                console.log('[Client] Click handler fetched server user source:', serverSource);
+              }
+            }
+          } catch (e) {
+            console.warn('[Client] Click handler failed fetching server source', e);
+          }
+        }
+
+        const resolvedSource = serverSource ?? videoSource ?? (userLastSourceInfo?.source as ('videasy' | 'vidlink' | 'vidnest') | undefined);
+        if (resolvedSource && session?.user) {
+          try {
+            // Persist per-media explicit source (do not change global user preference when clicking Play)
+            try { setExplicitSourceForMedia(tmdbId, resolvedSource); console.log('[Client] Set per-media explicit source from click (tv):', { mediaId: tmdbId, source: resolvedSource }); } catch(e) {}
+
+            console.log('[Client] Persisted explicit user source for media (per-media) from click:', resolvedSource);
+
+            // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
+            try {
+              if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
+                console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
+                fetch('/api/watch-history', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: resolvedSource, title: mediaTitle, posterPath: tvShow?.poster_path, seasonNumber: currentSeason, episodeNumber: currentEpisode }),
+                  keepalive: true,
+                }).catch(() => {});
+              }
+            } catch (e) {
+              // ignore failures to persist watch-history from click
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      } catch (e) {
+        console.warn('[Client] Error persisting resolved source on click', e);
+      }
+
+      // include current season/episode in the watch link (but not source/time)
+      try {
+        const s = Number(currentSeason || 1);
+        const e = Number(currentEpisode || 1);
+        const params = new URLSearchParams();
+        if (!Number.isNaN(s)) params.set('season', String(s));
+        if (!Number.isNaN(e)) params.set('episode', String(e));
+        const query = params.toString();
+        // Navigate to the watch page without exposing source/time in the URL
+        router.push(`/${mediaType}/${tmdbId}${query ? '?' + query : ''}`);
+      } catch (err) {
+        // Fallback navigation if something goes wrong
+        router.push(`/${mediaType}/${tmdbId}`);
+      }
+    } catch (e) {
+      console.warn('[Client] Error in navigateToWatch:', e);
+    }
+  }
+
 
   // Define change source handler BEFORE conditional returns so buttons and capture-useEffect can call it safely
   const handleChangeSource = async (source: 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock') => {
@@ -502,10 +636,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     setVideoSource(source);
     setUserLastSourceInfo({ source, at: new Date().toISOString() });
     
+    // Also set per-media explicit source so this specific content uses this source
+    try { setExplicitSourceForMedia(tmdbId, source); } catch (e) { /* ignore */ }
+    
     // Only persist when user is logged in. If not logged in, behave like normal player (no persistence).
     if (session?.user) {
       try { sessionStorage.setItem('jsc_explicit_source', source); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch (e) { /* ignore */ }
 
+      // Persist to user profile
       try {
         const res = await fetch('/api/user/source', {
           method: 'POST',
@@ -514,14 +652,39 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         });
         if (!res.ok) {
           console.warn('Failed to persist user source selection (status)', res.status);
-          // Don't revert the source - it's already been applied optimistically in the UI
         } else {
+          const responseData = await res.json();
           const persistedId = sourceNameToId(source);
-          console.log('[Client] Source persisted on server:', persistedId ? `Source ${persistedId}` : 'unknown');
+          console.log('[Client] Source persisted on server:', persistedId ? `Source ${persistedId}` : 'unknown', 'Response:', responseData);
         }
       } catch (e) {
         console.warn('Failed to persist user source selection', e);
-        // Don't revert the source - it's already been applied optimistically in the UI
+      }
+
+      // Also update the watch history item's source so "Continue Watching" works correctly
+      try {
+        const payload: any = {
+          mediaId: tmdbId,
+          mediaType: 'tv',
+          currentTime: currentPlaybackTime || 0,
+          totalDuration: savedDuration || 0,
+          progress: savedDuration > 0 ? Math.round((currentPlaybackTime / savedDuration) * 100) : 0,
+          immediate: true,
+          source: source,
+          explicit: true,
+          title: tvShow?.name || '',
+          posterPath: tvShow?.poster_path || '',
+          seasonNumber: currentSeason,
+          episodeNumber: currentEpisode,
+        };
+        await fetch('/api/watch-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        console.log('[Client] Watch history item source updated:', source);
+      } catch (e) {
+        console.warn('Failed to update watch history item source', e);
       }
 
       try { localStorage.setItem('lastUsedSource', source); } catch (e) {}
@@ -653,7 +816,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             )}
             
             {/* Fade Overlay - sits above backdrop/trailer but below content */}
-            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none z-10"></div>
+            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/60 via-black/80 to-black pointer-events-none z-10"></div>
 
             {/* Content Overlay */}
             <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
@@ -739,95 +902,48 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   <p className="text-gray-300 text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg leading-relaxed mb-3 max-w-xl drop-shadow-lg line-clamp-2">{tvShow.overview}</p>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 items-center">
+                {/* Action Buttons - Netflix Style */}
+                <div className="flex flex-wrap gap-2 items-center">
                   <button
                     onClick={() => {
-                      // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
-                      (async () => {
-                        try {
-                          // Prefer server-stored user source to avoid accidentally persisting a transient history source
-                          let serverSource = userLastSourceInfo?.source;
-                          if (session?.user && !serverSource) {
-                            try {
-                              const srcRes = await fetch('/api/user/source');
-                              if (srcRes.ok) {
-                                const sdata = await srcRes.json();
-                                if (sdata?.source) {
-                                  serverSource = sdata.source;
-                                  setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
-                                  console.log('[Client] Click handler fetched server user source:', serverSource);
-                                }
-                              }
-                            } catch (e) {
-                              console.warn('[Client] Click handler failed fetching server source', e);
-                            }
-                          }
-
-                          const resolvedSource = serverSource ?? videoSource ?? (userLastSourceInfo?.source as ('videasy' | 'vidlink' | 'vidnest') | undefined);
-                          if (resolvedSource && session?.user) {
-                            try {
-                              // Persist per-media explicit source (do not change global user preference when clicking Play)
-                              try { setExplicitSourceForMedia(tmdbId, resolvedSource); console.log('[Client] Set per-media explicit source from click (tv):', { mediaId: tmdbId, source: resolvedSource }); } catch(e) {}
-
-                              console.log('[Client] Persisted explicit user source for media (per-media) from click:', resolvedSource);
-
-                              // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
-                              try {
-                                if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-                                  console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
-                                  fetch('/api/watch-history', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: resolvedSource, title: mediaTitle, posterPath: tvShow?.poster_path, seasonNumber: currentSeason, episodeNumber: currentEpisode }),
-                                    keepalive: true,
-                                  }).catch(() => {});
-                                }
-                              } catch (e) {
-                                // ignore failures to persist watch-history from click
-                              }
-                            } catch (e) {
-                              // ignore
-                            }
-                          }
-                        } catch (e) {
-                          console.warn('[Client] Error persisting resolved source on click', e);
-                        }
-                      })();
-
-                      // include current season/episode in the watch link (but not source/time)
-                      try {
-                        const s = Number(currentSeason || 1);
-                        const e = Number(currentEpisode || 1);
-                        const params = new URLSearchParams();
-                        if (!Number.isNaN(s)) params.set('season', String(s));
-                        if (!Number.isNaN(e)) params.set('episode', String(e));
-                        const query = params.toString();
-                        // Navigate to the watch page without exposing source/time in the URL
-                        router.push(`/${mediaType}/${tmdbId}${query ? '?' + query : ''}`);
-                      } catch (err) {
-                        // Fallback navigation if something goes wrong
-                        router.push(`/${mediaType}/${tmdbId}`);
+                      console.log('📺 Watch button clicked - savedProgress:', savedProgress);
+                      // Check if there's saved progress and show resume prompt
+                      if (savedProgress > 0) {
+                        console.log('📍 Showing resume prompt with savedProgress:', savedProgress);
+                        setShowInfoResumePrompt(true);
+                        return;
                       }
+
+                      console.log('▶️ No saved progress, proceeding directly to watch');
+                      // No saved progress, proceed directly to watch
+                      navigateToWatch();
                     }}
                     disabled={tvShow.first_air_date ? new Date(tvShow.first_air_date) > new Date() : false}
-                    style={{ 
-                      backgroundColor: tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? '#666666' : '#E50914'
-                    }}
-                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl shadow-lg ${
+                    className={`font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base lg:text-base shadow-lg ${
                       tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date()
-                        ? 'cursor-not-allowed opacity-60'
-                        : 'hover:brightness-110'
+                        ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-black hover:bg-red-600 hover:text-white hover:shadow-xl transform hover:scale-105'
                     }`}
                   >
-                    <Play size={16} /> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
+                    <Play size={18} fill="currentColor" /> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
                   </button>
                   <button
                     onClick={() => setShowMoreInfoModal(true)}
-                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl"
+                    className="bg-gray-600/60 text-white font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg text-sm md:text-base lg:text-base flex items-center gap-2 transform hover:scale-105"
                   >
-                    More Info
+                    <Info size={18} /> More Info
                   </button>
+                  {trailerKey && !trailerError && (
+                    <button
+                      onClick={() => {
+                        // TODO: Implement trailer popup for TV page
+                        console.log('Trailer button clicked');
+                      }}
+                      className="bg-gray-600/60 text-white font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg text-sm md:text-base lg:text-base flex items-center gap-2 transform hover:scale-105"
+                    >
+                      <Film size={18} /> Watch Trailer
+                    </button>
+                  )}
                   <div>
                     <WatchlistButton
                       mediaId={tmdbId}
@@ -857,6 +973,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 }`}
               >
                 Overview & Reviews
+              </button>
+              <button
+                onClick={() => setActiveTab('episodes')}
+                style={{ backgroundColor: activeTab === 'episodes' ? '#E50914' : 'transparent' }}
+                className={`py-3 px-6 font-semibold transition-all ${
+                  activeTab === 'episodes'
+                    ? 'text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Episodes
               </button>
               <button
                 onClick={() => setActiveTab('cast')}
@@ -943,14 +1070,103 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
               </div>
             )}
 
+            {/* Episodes Tab - Netflix Style */}
+            {activeTab === 'episodes' && (
+              <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">Season {currentSeason}</h2>
+                  {tvShow.seasons && (
+                    <select
+                      value={currentSeason}
+                      onChange={(e) => {
+                        const season = parseInt(e.target.value);
+                        router.push(`/tv/${tmdbId}?view=info&season=${season}&episode=1`);
+                      }}
+                      className="bg-gray-800 text-white px-4 py-2 rounded border border-gray-700 hover:border-gray-500 transition-colors"
+                    >
+                      {tvShow.seasons.map((season) => (
+                        <option key={season.season_number} value={season.season_number}>
+                          Season {season.season_number}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {currentSeasonDetails && currentSeasonDetails.episodes.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {currentSeasonDetails.episodes.map((episode) => (
+                      <div
+                        key={episode.episode_number}
+                        className="group cursor-pointer bg-gray-900/50 rounded-lg overflow-hidden border border-gray-700 hover:border-red-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                      >
+                        {/* Episode Image */}
+                        <div className="relative w-full aspect-video overflow-hidden bg-gray-800">
+                          {episode.still_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${episode.still_path}`}
+                              alt={`Episode ${episode.episode_number}`}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-gray-500">No Image</span>
+                            </div>
+                          )}
+                          {/* Overlay on hover */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <Play size={40} className="text-white" fill="white" />
+                          </div>
+                        </div>
+
+                        {/* Episode Info */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-white font-bold text-sm group-hover:text-red-500 transition-colors">
+                              Ep {episode.episode_number}: {episode.name}
+                            </h3>
+                            {episode.vote_average > 0 && (
+                              <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 ml-2">
+                                ⭐ {episode.vote_average.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Description */}
+                          <p className="text-gray-400 text-xs leading-relaxed line-clamp-3">
+                            {episode.overview || 'No description available.'}
+                          </p>
+
+                          {/* Runtime */}
+                          {episode.runtime && (
+                            <p className="text-gray-500 text-xs mt-3">
+                              Duration: {episode.runtime} min
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400">No episodes available for this season.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Cast Tab */}
             {activeTab === 'cast' && castInfo && castInfo.cast.length > 0 && (
               <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
                 <h2 className="text-2xl font-bold mb-6">CAST ({castInfo.cast.length})</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {castInfo.cast.slice(0, 15).map((member) => (
-                    <div key={member.id} className="group cursor-pointer">
-                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-gray-500 transition-all">
+                    <button
+                      key={member.id}
+                      onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
+                      className="group cursor-pointer text-left"
+                    >
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
@@ -965,9 +1181,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                           </div>
                         )}
                       </div>
-                      <p className="font-bold text-sm text-white truncate group-hover:text-blue-400 transition-colors">{member.name}</p>
+                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
                       <p className="text-gray-500 text-xs truncate">{member.character}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -1376,23 +1592,27 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                 <h2 className="text-xl font-bold mb-4 text-white">CAST</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {castInfo.cast.slice(0, 12).map((member: CastMember) => (
-                    <div key={member.id} className="group">
-                      <div className="relative overflow-hidden rounded mb-2 bg-gray-800">
+                    <button
+                      key={member.id}
+                      onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
+                      className="group cursor-pointer text-left"
+                    >
+                      <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                             alt={member.name}
                             width={185}
                             height={278}
-                            className="w-full h-auto group-hover:brightness-110 transition-all duration-300"
+                            className="w-full h-auto group-hover:scale-110 transition-all duration-300"
                           />
                         ) : (
                           <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
                         )}
                       </div>
-                      <p className="font-semibold text-white text-sm truncate">{member.name}</p>
+                      <p className="font-semibold text-white text-sm truncate group-hover:text-red-500 transition-colors">{member.name}</p>
                       <p className="text-gray-500 text-xs truncate">{member.character}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -1419,6 +1639,32 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           tagline={(tvShow as any)?.tagline}
           description={tvShow?.overview}
         />
+
+        {/* Resume Prompt for Info View */}
+        {showInfoResumePrompt && (
+          <ResumePrompt
+            show={showInfoResumePrompt}
+            title={mediaTitle}
+            savedTime={savedProgress}
+            totalDuration={savedDuration}
+            posterPath={tvShow?.poster_path}
+            onResume={handleInfoResumeYes}
+            onStart={handleInfoResumeNo}
+            onDismiss={handleInfoResumeDismiss}
+          />
+        )}
+
+        {/* Cast Member Modal */}
+        {selectedCastMember && (
+          <CastMemberModal
+            isOpen={!!selectedCastMember}
+            onClose={() => setSelectedCastMember(null)}
+            castMemberId={selectedCastMember.id}
+            castMemberName={selectedCastMember.name}
+            castMemberImage={selectedCastMember.image}
+            castMemberCharacter={selectedCastMember.character}
+          />
+        )}
       </div>
     </div>
   );

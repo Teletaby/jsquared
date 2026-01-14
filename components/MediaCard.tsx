@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Play } from 'lucide-react';
+import { Play, Film } from 'lucide-react';
 import TrailerPopup from './TrailerPopup';
 import WatchlistButton from './WatchlistButton';
 
@@ -27,6 +27,9 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
   const router = useRouter();
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [trailerChecked, setTrailerChecked] = useState(false);
+  const [hasTrailer, setHasTrailer] = useState(true);
+  const [isCheckingTrailer, setIsCheckingTrailer] = useState(false);
 
   const title = media.name || media.title;
   const imageUrl = media.poster_path
@@ -43,21 +46,60 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
     }
   };
 
-  const handleTrailerClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Check trailer availability on hover
+  const checkTrailerAvailability = async () => {
+    if (trailerChecked || isCheckingTrailer) return;
+    
+    setIsCheckingTrailer(true);
     try {
       const response = await fetch(`/api/trailer/${media.id}?mediaType=${mediaTypeForPath}`);
       const data = await response.json();
+      setTrailerChecked(true);
       if (data.trailerKey) {
         setTrailerKey(data.trailerKey);
-        setShowTrailer(true);
+        setHasTrailer(true);
       } else {
-        // Handle no trailer found
-        console.log('No trailer found for this media.');
-        // Optionally, show a notification to the user
+        setHasTrailer(false);
       }
     } catch (error) {
       console.error('Error fetching trailer:', error);
+      setTrailerChecked(true);
+      setHasTrailer(false);
+    } finally {
+      setIsCheckingTrailer(false);
+    }
+  };
+
+  const handleTrailerClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // If we already checked and there's no trailer, don't do anything
+    if (trailerChecked && !hasTrailer) {
+      return;
+    }
+    
+    // If we have a trailer key, show it
+    if (trailerKey) {
+      setShowTrailer(true);
+      return;
+    }
+    
+    // Otherwise fetch and show
+    try {
+      const response = await fetch(`/api/trailer/${media.id}?mediaType=${mediaTypeForPath}`);
+      const data = await response.json();
+      setTrailerChecked(true);
+      if (data.trailerKey) {
+        setTrailerKey(data.trailerKey);
+        setHasTrailer(true);
+        setShowTrailer(true);
+      } else {
+        setHasTrailer(false);
+      }
+    } catch (error) {
+      console.error('Error fetching trailer:', error);
+      setTrailerChecked(true);
+      setHasTrailer(false);
     }
   };
 
@@ -66,6 +108,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
       <div
         className="bg-ui-elements rounded-lg overflow-hidden shadow-lg group cursor-pointer flex flex-col h-full"
         onClick={handleCardClick}
+        onMouseEnter={checkTrailerAvailability}
       >
         <div className="relative w-full flex-shrink-0">
           <img src={imageUrl} alt={title} className="w-full h-auto object-cover" />
@@ -80,13 +123,24 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
               )}
             </div>
             <div className="text-center flex gap-2 justify-center items-center">
-              <button
-                onClick={handleTrailerClick}
-                className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
-              >
-                <Play size={14} />
-                <span className="text-xs font-semibold">Watch Trailer</span>
-              </button>
+              {trailerChecked && !hasTrailer ? (
+                <button
+                  disabled
+                  className="p-1 px-2 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Film size={14} />
+                  <span className="text-xs font-semibold">No Trailer</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleTrailerClick}
+                  className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Play size={14} />
+                  <span className="text-xs font-semibold">Watch Trailer</span>
+                </button>
+              )}
               <WatchlistButton
                 mediaId={media.id}
                 mediaType={mediaTypeForPath as 'movie' | 'tv'}
@@ -110,13 +164,24 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
             )}
           </div>
           <div className="mt-2 flex gap-2 items-center">
-            <button
-              onClick={handleTrailerClick}
-              className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
-            >
-              <Play size={14} />
-              <span className="text-xs font-semibold">Watch Trailer</span>
-            </button>
+            {trailerChecked && !hasTrailer ? (
+              <button
+                disabled
+                className="p-1 px-2 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Film size={14} />
+                <span className="text-xs font-semibold">No Trailer</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleTrailerClick}
+                className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
+              >
+                <Play size={14} />
+                <span className="text-xs font-semibold">Watch Trailer</span>
+              </button>
+            )}
             <WatchlistButton
               mediaId={media.id}
               mediaType={mediaTypeForPath as 'movie' | 'tv'}

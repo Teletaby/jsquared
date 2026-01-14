@@ -63,7 +63,7 @@ const VidLinkPlayer: React.FC<VidLinkPlayerProps> = ({
         return null;
       }
 
-      let url = `https://vidlink.pro/tv/${mediaId}/${seasonNumber}/${episodeNumber}?primaryColor=${primaryColor}&secondaryColor=${secondaryColor}&iconColor=${iconColor}&icons=default&player=default&title=true&poster=true&autoplay=true&muted=false`;
+      let url = `https://vidlink.pro/tv/${mediaId}/${seasonNumber}/${episodeNumber}?primaryColor=${primaryColor}&secondaryColor=${secondaryColor}&iconColor=${iconColor}&icons=default&player=default&title=true&poster=true&autoplay=true&muted=false&nextbutton=true`;
 
       // Use the initial start time captured on mount (do not react to subsequent prop changes)
       if (initialStartRef.current > 0) {

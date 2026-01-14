@@ -44,6 +44,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
   const embedPlayerIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined); // Track embed player interval
   const latestEmbedDataRef = useRef<{ progress: number; currentTime: number; duration: number } | null>(null); // Store latest embed data
   const userHasInteractedRef = useRef<boolean>(false); // Track if user has manually seeked
+  const sourceExplicitlySentRef = useRef<boolean>(false); // Track if we've sent the source as explicit for this session
 
   // Memoize src to prevent unnecessary iframe reloads
   const stableSrc = useMemo(() => src, [src]);
@@ -255,6 +256,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
       setEmbedDuration(0);
       latestEmbedDataRef.current = null;
       lastUpdateTimeRef.current = 0;
+      sourceExplicitlySentRef.current = false; // Reset source explicit flag for new content
       console.log('Reset player state for new content:', { mediaId, seasonNumber, episodeNumber });
     }
   }, [src, mediaId, seasonNumber, episodeNumber]);
@@ -424,6 +426,14 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
         };
         const source = mapSrcToSource(stableSrc || src || '');
 
+        // Mark the first watch history update for this session as explicit
+        // This ensures the source preference is persisted to the user's profile
+        const isFirstUpdate = !sourceExplicitlySentRef.current && currentPlayedTime > 0;
+        if (isFirstUpdate && source) {
+          sourceExplicitlySentRef.current = true;
+          console.log('Marking first update as explicit to persist source preference:', source);
+        }
+
         console.log('Sending watch history update:', { 
           mediaId, 
           mediaType: currentMediaType, 
@@ -433,7 +443,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           totalPlayedSeconds,
           seasonNumber,
           episodeNumber,
-          source
+          source,
+          explicit: isFirstUpdate
         });
         
         const response = await fetch('/api/watch-history', {
@@ -454,6 +465,7 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             episodeNumber: episodeNumber || undefined,
             finished: false,
             source,
+            explicit: isFirstUpdate, // Mark first update as explicit to persist source preference
           }),
         });
         
@@ -491,65 +503,140 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           const message = JSON.parse(event.data);
           
           if (message.type === 'PLAYER_EVENT' && message.data) {
-            const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration, season: embedSeason, episode: embedEpisode } = message.data;
-            console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, episodeNumber, source: currentSource });
-            
-            // Check if this message is for our media
-            if (String(id) === String(mediaId) && eventMediaType === mediaType) {
-              // For TV shows, use the season/episode from the embed player message if available
-              const effectiveSeasonNumber = embedSeason ?? seasonNumber;
-              const effectiveEpisodeNumber = embedEpisode ?? episodeNumber;
-              setEmbedProgress(progress);
-              setEmbedCurrentTime(eventCurrentTime);
-              setEmbedDuration(eventDuration);
+            // Handle VidRock's message format
+            const vidRockData = message.data;
+            if (vidRockData.tmdbId !== undefined) {
+              // This is VidRock's format
+              const { event: playerEvent, tmdbId, mediaType: eventMediaType, currentTime: eventCurrentTime, duration: eventDuration, season: embedSeason, episode: embedEpisode } = vidRockData;
+              const progress = eventDuration > 0 ? (eventCurrentTime / eventDuration) * 100 : 0;
               
-              // Store the latest data
-              latestEmbedDataRef.current = {
-                progress,
-                currentTime: eventCurrentTime,
-                duration: eventDuration
-              };
+              console.log("VidRock progress data:", { playerEvent, tmdbId, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, embedEpisode, source: currentSource });
               
-              // Determine if this is an important event that needs immediate DB write
-              // seeked, pause, ended events should be saved immediately to prevent data loss
-              const isImportantEvent = ['seeked', 'pause', 'ended'].includes(playerEvent);
-              
-              // For embed players, send to database
-              if (user && mediaId && eventMediaType) {
-                console.log('Saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
-                // Determine source for embed messages
-                const mapEmbedToSource = (s: string) => (s.includes('vidnest') ? 'vidnest' : s.includes('vidrock') ? 'vidrock' : s.includes('vidking') ? 'videasy' : undefined);
-                const embedSource = mapEmbedToSource(stableSrc || src || '');
+              // Check if this message is for our media
+              if (String(tmdbId) === String(mediaId) && eventMediaType === mediaType) {
+                // For TV shows, use the season/episode from the embed player message if available
+                const effectiveSeasonNumber = embedSeason ?? seasonNumber;
+                const effectiveEpisodeNumber = embedEpisode ?? episodeNumber;
+                setEmbedProgress(progress);
+                setEmbedCurrentTime(eventCurrentTime);
+                setEmbedDuration(eventDuration);
+                
+                // Store the latest data
+                latestEmbedDataRef.current = {
+                  progress,
+                  currentTime: eventCurrentTime,
+                  duration: eventDuration
+                };
+                
+                // Determine if this is an important event that needs immediate DB write
+                const isImportantEvent = ['seeked', 'pause', 'ended'].includes(playerEvent);
+                
+                // For embed players, send to database
+                if (user && mediaId && eventMediaType) {
+                  console.log('Saving VidRock progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
+                  const embedSource = 'vidrock';
 
-                fetch('/api/watch-history', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    mediaId,
-                    mediaType: eventMediaType,
-                    title,
-                    posterPath,
-                    progress: progress,
-                    currentTime: Math.floor(eventCurrentTime),
-                    totalDuration: Math.floor(eventDuration),
-                    totalPlayedSeconds: 0,
-                    seasonNumber: effectiveSeasonNumber,
-                    episodeNumber: effectiveEpisodeNumber,
-                    finished: playerEvent === 'ended',
-                    immediate: isImportantEvent, // Write immediately for important events
-                    source: embedSource,
-                  }),
-                }).then(response => {
-                  if (!response.ok) {
-                    console.error('Watch history API error:', response.status);
-                  } else {
-                    console.log('Embed player progress saved to database', isImportantEvent ? '(immediate)' : '(batched)', 'source:', embedSource);
-                  }
-                }).catch(error => {
-                  console.error('Failed to save embed player progress:', error);
-                });
+                  fetch('/api/watch-history', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      mediaId,
+                      mediaType: eventMediaType,
+                      title,
+                      posterPath,
+                      progress: progress,
+                      currentTime: Math.floor(eventCurrentTime),
+                      totalDuration: Math.floor(eventDuration),
+                      totalPlayedSeconds: 0,
+                      seasonNumber: effectiveSeasonNumber,
+                      episodeNumber: effectiveEpisodeNumber,
+                      finished: playerEvent === 'ended',
+                      immediate: isImportantEvent,
+                      source: embedSource,
+                      explicit: !sourceExplicitlySentRef.current && eventCurrentTime > 0,
+                    }),
+                  }).then(response => {
+                    if (!response.ok) {
+                      console.error('Watch history API error:', response.status);
+                    } else {
+                      if (!sourceExplicitlySentRef.current && eventCurrentTime > 0) {
+                        sourceExplicitlySentRef.current = true;
+                        console.log('[Watch History] Marked VidRock source as explicit');
+                      }
+                      console.log('VidRock progress saved to database', isImportantEvent ? '(immediate)' : '(batched)');
+                    }
+                  }).catch(error => {
+                    console.error('Failed to save VidRock progress:', error);
+                  });
+                }
+              }
+            } else {
+              // Handle other embed player formats (existing logic)
+              const { event: playerEvent, id, mediaType: eventMediaType, progress, currentTime: eventCurrentTime, duration: eventDuration, season: embedSeason, episode: embedEpisode } = message.data;
+              console.log("Extracted progress from embed player:", { playerEvent, id, eventMediaType, progress, eventCurrentTime, eventDuration, embedSeason, episodeNumber, source: currentSource });
+              
+              // Check if this message is for our media
+              if (String(id) === String(mediaId) && eventMediaType === mediaType) {
+                // For TV shows, use the season/episode from the embed player message if available
+                const effectiveSeasonNumber = embedSeason ?? seasonNumber;
+                const effectiveEpisodeNumber = embedEpisode ?? episodeNumber;
+                setEmbedProgress(progress);
+                setEmbedCurrentTime(eventCurrentTime);
+                setEmbedDuration(eventDuration);
+                
+                // Store the latest data
+                latestEmbedDataRef.current = {
+                  progress,
+                  currentTime: eventCurrentTime,
+                  duration: eventDuration
+                };
+                
+                // Determine if this is an important event that needs immediate DB write
+                const isImportantEvent = ['seeked', 'pause', 'ended'].includes(playerEvent);
+                
+                // For embed players, send to database
+                if (user && mediaId && eventMediaType) {
+                  console.log('Saving embed player progress to database with season:', effectiveSeasonNumber, 'episode:', effectiveEpisodeNumber, 'immediate:', isImportantEvent);
+                  const mapEmbedToSource = (s: string) => (s.includes('vidnest') ? 'vidnest' : s.includes('vidrock') ? 'vidrock' : s.includes('vidking') ? 'videasy' : undefined);
+                  const embedSource = mapEmbedToSource(stableSrc || src || '');
+
+                  fetch('/api/watch-history', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      mediaId,
+                      mediaType: eventMediaType,
+                      title,
+                      posterPath,
+                      progress: progress,
+                      currentTime: Math.floor(eventCurrentTime),
+                      totalDuration: Math.floor(eventDuration),
+                      totalPlayedSeconds: 0,
+                      seasonNumber: effectiveSeasonNumber,
+                      episodeNumber: effectiveEpisodeNumber,
+                      finished: playerEvent === 'ended',
+                      immediate: isImportantEvent,
+                      source: embedSource,
+                      explicit: !sourceExplicitlySentRef.current && eventCurrentTime > 0,
+                    }),
+                  }).then(response => {
+                    if (!response.ok) {
+                      console.error('Watch history API error:', response.status);
+                    } else {
+                      if (!sourceExplicitlySentRef.current && eventCurrentTime > 0) {
+                        sourceExplicitlySentRef.current = true;
+                        console.log('[Watch History] Marked source as explicit (embed):', embedSource);
+                      }
+                      console.log('Embed player progress saved to database', isImportantEvent ? '(immediate)' : '(batched)', 'source:', embedSource);
+                    }
+                  }).catch(error => {
+                    console.error('Failed to save embed player progress:', error);
+                  });
+                }
               }
             }
           }
@@ -579,11 +666,17 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
           finished: false,
           immediate: true,
           source: stableSrc.includes('vidnest') ? 'vidnest' : stableSrc.includes('vidlink') ? 'vidlink' : stableSrc.includes('vidsrc') ? 'vidsrc' : stableSrc.includes('vidrock') ? 'vidrock' : (stableSrc.includes('vidking') || stableSrc.includes('videasy')) ? 'videasy' : undefined,
+          // Mark as explicit if this is the first meaningful update during this session
+          explicit: !sourceExplicitlySentRef.current && latestData.currentTime > 0,
         });
         
         // Try sendBeacon first (more reliable for page unload)
         if (navigator.sendBeacon) {
           navigator.sendBeacon('/api/watch-history', new Blob([payload], { type: 'application/json' }));
+          // Mark that we've sent source explicitly
+          if (!sourceExplicitlySentRef.current && latestData.currentTime > 0) {
+            sourceExplicitlySentRef.current = true;
+          }
         } else {
           // Fallback to sync fetch
           fetch('/api/watch-history', {
@@ -591,6 +684,11 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             headers: { 'Content-Type': 'application/json' },
             body: payload,
             keepalive: true,
+          }).then(() => {
+            // Mark that we've sent source explicitly
+            if (!sourceExplicitlySentRef.current && latestData.currentTime > 0) {
+              sourceExplicitlySentRef.current = true;
+            }
           });
         }
       }
@@ -800,8 +898,8 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
             setIframeReady(true);
             console.log('Iframe ready - embedLoadedRef set to true');
             
-            // Attempt to inject script to seek the vidking player  
-            // Some embedded players allow window.postMessage or direct methods
+            // Attempt to inject script to seek the embed player  
+            // Different embed players may require different message formats
             if (initialTime > 0 && iframeRef.current) {
               console.log('Attempting to seek embed player to:', initialTime, 'seconds');
               // Try multiple times with increasing delays as the player initializes
@@ -810,17 +908,34 @@ const ThemedVideoPlayer: React.FC<ThemedVideoPlayerProps> = ({
                   if (!iframeRef.current?.contentWindow) return;
                   
                   try {
-                    // Try standard postMessage seek
-                    iframeRef.current.contentWindow.postMessage({
-                      type: 'SEEK',
-                      time: initialTime,
-                    }, '*');
-                    
-                    // Also try alternative message format
-                    iframeRef.current.contentWindow.postMessage({
-                      action: 'seek',
-                      seconds: initialTime,
-                    }, '*');
+                    // VidRock specific seeking - try multiple formats
+                    if (stableSrc.includes('vidrock')) {
+                      // Try different message formats that VidRock might accept
+                      const seekMessages = [
+                        { type: 'SEEK', data: { time: initialTime } },
+                        { type: 'seek', time: initialTime },
+                        { action: 'seek', time: initialTime },
+                        { method: 'seek', value: initialTime }
+                      ];
+                      
+                      seekMessages.forEach((message, msgIndex) => {
+                        iframeRef.current?.contentWindow?.postMessage(message, 'https://vidrock.net');
+                      });
+                      
+                      console.log(`VidRock seek attempts ${index + 1} sent at ${delay}ms (tried ${seekMessages.length} formats)`);
+                    } else {
+                      // Try standard postMessage seek for other players
+                      iframeRef.current.contentWindow.postMessage({
+                        type: 'SEEK',
+                        time: initialTime,
+                      }, '*');
+                      
+                      // Also try alternative message format
+                      iframeRef.current.contentWindow.postMessage({
+                        action: 'seek',
+                        seconds: initialTime,
+                      }, '*');
+                    }
                     
                     // Try HTML5 seeking if player exposes it
                     const contentWindow = iframeRef.current.contentWindow as any;

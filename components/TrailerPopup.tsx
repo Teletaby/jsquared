@@ -34,7 +34,7 @@ const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex justify-center items-center transition-opacity duration-300 p-4 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 z-[100] flex justify-center items-center transition-opacity duration-300 p-4 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
       onClick={handleClose}
     >

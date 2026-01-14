@@ -1,5 +1,6 @@
 import { WatchHistory } from '@/lib/models';
 import { connectToDatabase } from '@/lib/mongodb';
+import mongoose from 'mongoose';
 
 /**
  * Batch configuration for watch history updates
@@ -26,6 +27,8 @@ interface PlaytimeUpdate {
   posterPath?: string;
   // optional source name for this update
   source?: 'videasy' | 'vidlink' | 'vidnest' | string;
+  // whether this update should be marked as explicit (for persisting source preference)
+  explicit?: boolean;
 }
 
 let updateBatch: PlaytimeUpdate[] = [];
@@ -128,11 +131,13 @@ async function flushPlaytimeUpdates(): Promise<void> {
       // Trim user's watch history to keep only the most recent 20 entries
       await trimWatchHistory(update.userId, 20);
 
-      // Note: do not update the user's last-used source from batched playtime updates (heartbeats).
-      // Prefer explicit source persistence via /api/user/source to avoid overwriting explicit user choices.
-      if (update.source) {
-        // We intentionally skip calling updateUserLastUsedSource here to avoid races with explicit user changes.
-        console.log('[Playtime Batching] Skipping user source update from batched heartbeat', { userId: update.userId, mediaId: update.mediaId, source: update.source });
+      // If this update was marked as explicit, persist the source to the user's profile
+      if (update.source && update.explicit) {
+        const userId = new mongoose.Types.ObjectId(update.userId);
+        console.log('[Playtime Batching] Persisting source from explicit batched update', { userId: update.userId, mediaId: update.mediaId, source: update.source });
+        await updateUserLastUsedSource(userId, update.source, new Date(), true);
+      } else if (update.source && !update.explicit) {
+        console.log('[Playtime Batching] Skipping user source update from non-explicit batched update', { userId: update.userId, mediaId: update.mediaId, source: update.source });
       }
     }
 

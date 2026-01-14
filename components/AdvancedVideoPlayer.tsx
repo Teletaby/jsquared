@@ -42,7 +42,8 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     // Reset session start when initialTime changes (new video/episode)
     sessionStartRef.current = Date.now();
     initialStartRef.current = initialTime;
-  }, [initialTime]);
+    sourceExplicitlySentRef.current = false; // Reset explicit flag for new content
+  }, [initialTime, embedUrl]);
 
   useEffect(() => {
     // Update every 1 second for real-time accuracy using actual elapsed wall-clock time
@@ -94,6 +95,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
   const durationRef = useRef<number>(0);
   const embedLoadedRef = useRef(false);
+  const sourceExplicitlySentRef = useRef<boolean>(false); // Track if we've sent the source as explicit for this session
 
   // Save playtime to database
   const savePlaytime = useCallback(async (time: number) => {
@@ -101,7 +103,15 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
 
     try {
       const masked = sourceNameToId(videoSource);
-      console.log('[AdvancedVideoPlayer] Saving playtime', { mediaId, mediaType, time, source: masked ? `Source ${masked}` : 'unknown' });
+      
+      // Mark the first meaningful playback update as explicit to persist source preference
+      const isFirstUpdate = !sourceExplicitlySentRef.current && time > initialTime;
+      if (isFirstUpdate) {
+        sourceExplicitlySentRef.current = true;
+        console.log('[AdvancedVideoPlayer] Marking first update as explicit to persist source:', masked ? `Source ${masked}` : 'unknown');
+      }
+      
+      console.log('[AdvancedVideoPlayer] Saving playtime', { mediaId, mediaType, time, source: masked ? `Source ${masked}` : 'unknown', explicit: isFirstUpdate });
       const response = await fetch('/api/watch-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,6 +126,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
           episodeNumber,
           source: videoSource, // ensure source is recorded for embed saves
           immediate: true, // persist immediately for accuracy
+          explicit: isFirstUpdate, // Mark first update as explicit to persist source preference
         }),
       });
 
@@ -125,7 +136,7 @@ const AdvancedVideoPlayer: React.FC<AdvancedVideoPlayerProps> = ({
     } catch (error) {
       console.error('Error saving playtime:', error);
     }
-  }, [user, embedUrl, mediaId, mediaType, posterPath, seasonNumber, episodeNumber]);
+  }, [user, embedUrl, mediaId, mediaType, posterPath, seasonNumber, episodeNumber, videoSource, initialTime]);
 
   // Auto-save frequently (every 3 seconds for vidrock, every 10 seconds for others)
   useEffect(() => {

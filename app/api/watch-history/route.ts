@@ -48,33 +48,22 @@ export async function GET(request: NextRequest) {
     // so prefer the user's preference immediately when it's newer.
     const USER_PREFERENCE_GRACE_MS = 0; // no grace window for explicit preferences
 
+    // Each watch history item retains its own source (the source used when that content was last watched).
+    // The user's global lastUsedSource is only used as a fallback when a history item has no source.
+    // This ensures "Continue Watching" resumes on the same source the user last used for that specific content.
     const adjusted = watchHistory.map((h: any) => {
       const historySource = h.source || null;
       const userSource = user.lastUsedSource || null;
-      const userAt = user.lastUsedSourceAt ? new Date(user.lastUsedSourceAt) : null;
-      // Prefer comparing the timestamp when the history item's source was last set
-      // (if available). Automated heartbeats update `lastWatchedAt` but don't
-      // change `sourceSetAt`, so using `sourceSetAt` prevents automated writes
-      // from making the history appear newer for source selection.
-      const historySourceAt = h.sourceSetAt ? new Date(h.sourceSetAt) : (h.lastWatchedAt ? new Date(h.lastWatchedAt) : null);
 
-      // Prefer the user's lastUsedSource when available so the user's explicit
-      // preference remains the decisive factor for which source is suggested.
-      // This ensures users "stay" on the source they last selected.
+      // Prefer the history item's own source. Only fall back to user's global preference if item has no source.
       let chosenSource: string | null = historySource;
-      if (userSource) {
-        chosenSource = userSource;
-        console.log('[WatchHistory][INFO] Preferring user.lastUsedSource over history item', { userId: String(user._id), mediaId: h.mediaId, userSource, userAt, historySource, historySourceAt });
-      } else if (!historySource && userSource) {
+      if (!historySource && userSource) {
         // Fallback: if history lacks a source but the user has one, use it
         chosenSource = userSource;
-        console.log('[WatchHistory][INFO] History item missing source; using user preference', { userId: String(user._id), mediaId: h.mediaId, userSource });
-      } else {
-        // No user preference available — keep history's source (may be null)
-        chosenSource = historySource;
+        console.log('[WatchHistory][INFO] History item missing source; using user preference as fallback', { userId: String(user._id), mediaId: h.mediaId, userSource });
       }
 
-      console.log('[WatchHistory][DEBUG] Returning history item', { mediaId: h.mediaId, returnedSource: chosenSource, historySource, userSource, userAt, historySourceAt });
+      console.log('[WatchHistory][DEBUG] Returning history item', { mediaId: h.mediaId, returnedSource: chosenSource, historySource, userSource });
       return {
         ...h,
         source: chosenSource,
@@ -403,6 +392,7 @@ export async function POST(request: NextRequest) {
       title: title || '',
       posterPath,
       source: source || undefined,
+      explicit: explicitUpdateFlag, // Pass explicit flag for source persistence
     });
 
     // Enforce rate limiting for automated heartbeats but allow explicit writes through.
@@ -421,9 +411,10 @@ export async function POST(request: NextRequest) {
     // Use explicitUpdateFlag captured earlier to decide whether to persist source
     if (source && explicitUpdateFlag) {
       const reqId = `wh_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-      console.log(`[WatchHistory][${reqId}] Attempting to persist source from heartbeat`, { userId: String(user._id), source, explicit: explicitUpdateFlag });
-      await updateUserLastUsedSource(user._id, source, new Date());
-      console.log(`[WatchHistory][${reqId}] Finished attempt to persist source from heartbeat`, { userId: String(user._id), source });
+      console.log(`[WatchHistory][${reqId}] Attempting to persist source from explicit action`, { userId: String(user._id), source, explicit: explicitUpdateFlag });
+      // Pass force:true for explicit user actions so they can override the previous preference
+      await updateUserLastUsedSource(user._id, source, new Date(), true);
+      console.log(`[WatchHistory][${reqId}] Finished persisting source from explicit action`, { userId: String(user._id), source });
     } else if (source && !explicitUpdateFlag) {
       console.log('[WatchHistory] Skipping persistence of source from heartbeat (not explicit)', { source, userId: String(user._id) });
     } else {

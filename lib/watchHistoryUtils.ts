@@ -54,9 +54,10 @@ export async function updateUserLastUsedSource(userId: mongoose.Types.ObjectId |
     // Log the existing value for debugging, especially for VIDNEST
     console.log('[WatchHistory] Existing lastUsedSource before update', { userId: String(userId), existingSource: existing?.lastUsedSource, existingAt, incomingAt: at ? at.toISOString() : null, force });
 
-    // Enforce policy: non-force updates MUST NOT overwrite an existing explicit user preference.
-    // Only allow non-force updates when the user currently has NO lastUsedSource set (initial write).
-    if (!force && existing?.lastUsedSource) {
+    // Enforce policy: non-force updates MUST NOT overwrite an existing explicit user preference
+    // unless the source is the same (no-op). This prevents heartbeats from changing the user's choice.
+    // Force updates (from explicit user actions) are always allowed.
+    if (!force && existing?.lastUsedSource && existing.lastUsedSource !== normalized) {
       const attempted = sourceNameToId(normalized);
       const existingId = existing.lastUsedSource ? sourceNameToId(existing.lastUsedSource) : null;
       console.warn('[WatchHistory][AUDIT] Skipping non-force update that would overwrite an existing explicit preference', { userId: String(userId), existingSource: existing?.lastUsedSource, existingSourceId: existingId ? `Source ${existingId}` : null, attemptedSource: normalized, attemptedSourceId: attempted ? `Source ${attempted}` : null, existingAt, incomingAt: at ? at.toISOString() : null });

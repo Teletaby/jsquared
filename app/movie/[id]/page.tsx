@@ -7,7 +7,7 @@ import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play } from 'lucide-react';
+import { Download, Play, Film, Info } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -25,6 +25,8 @@ import VidLinkPlayer from '@/components/VidLinkPlayer';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 import MoreInfoModal from '@/components/MoreInfoModal';
+import TrailerPopup from '@/components/TrailerPopup';
+import CastMemberModal from '@/components/CastMemberModal';
 
 interface MovieDetailPageProps {
   params: {
@@ -66,18 +68,19 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [trailerLoaded, setTrailerLoaded] = useState(false);
   const [trailerError, setTrailerError] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [selectedCastMember, setSelectedCastMember] = useState<{ id: number; name: string; image: string | null; character: string } | null>(null);
   // const hasPlayedOnceRef = useRef(false); // Removed, handled by ThemedVideoPlayer
   const router = useRouter();
   const searchParams = useSearchParams();
   const view = searchParams.get('view');
-  const [activeTab, setActiveTab] = useState<'overview' | 'cast'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'details'>('overview');
   const [initialIsInWatchlist, setInitialIsInWatchlist] = useState<boolean | undefined>(undefined);
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  // videoSource starts from localStorage when available to avoid flashes
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock' | null>(() => {
+  // videoSource starts from localStorage when available, otherwise defaults to videasy
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>(() => {
     try {
       const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
       const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
@@ -85,7 +88,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     } catch (e) {
       // ignore storage errors
     }
-    return null;
+    return 'videasy'; // Default to videasy for new users
   });
   const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
 
@@ -107,10 +110,38 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [resumeChoice, setResumeChoice] = useState<'pending' | 'yes' | 'no'>('pending'); // User's choice
   const [notificationVisible, setNotificationVisible] = useState(true); // Control notification visibility
   const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
+  const [showTrailerPopup, setShowTrailerPopup] = useState(false);
+  const [showInfoResumePrompt, setShowInfoResumePrompt] = useState(false); // Resume prompt for info view
   
   const { id } = params;
   const tmdbId = parseInt(id);
   const mediaType = 'movie'; // Define mediaType for watch history
+
+  // Immediately restore source from storage on client mount (runs once, synchronously reads storage)
+  useEffect(() => {
+    try {
+      // Priority 1: Per-media explicit source from sessionStorage (persists on refresh)
+      const perMediaSource = sessionStorage.getItem(`jsc_explicit_source_${tmdbId}`);
+      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+      if (perMediaSource && allowed.includes(perMediaSource)) {
+        console.log('[Client] Restoring per-media source from sessionStorage:', perMediaSource);
+        setVideoSource(perMediaSource as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
+        const at = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
+        setUserLastSourceInfo({ source: perMediaSource, at: at || null });
+        return; // Don't check other sources if per-media is set
+      }
+      // Priority 2: Global localStorage (persists across sessions)
+      const local = localStorage.getItem('lastUsedSource');
+      console.log('[Client] Checking localStorage for lastUsedSource:', local);
+      if (local && allowed.includes(local)) {
+        console.log('[Client] Restoring source from localStorage:', local);
+        setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
+        setUserLastSourceInfo({ source: local, at: null });
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [tmdbId]); // Only run when mediaId changes, not on every render
 
   // Auto-hide notification after 5 seconds
   useEffect(() => {
@@ -121,6 +152,18 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       return () => clearTimeout(timer);
     }
   }, [showResumePrompt, notificationVisible]);
+
+  // Persist videoSource to localStorage whenever it changes (so it becomes the default next time)
+  useEffect(() => {
+    if (videoSource && videoSource !== 'videasy') {
+      try {
+        localStorage.setItem('lastUsedSource', videoSource);
+        console.log('[Client] Persisted lastUsedSource to localStorage:', videoSource);
+      } catch (e) {
+        console.warn('[Client] Failed to persist source to localStorage', e);
+      }
+    }
+  }, [videoSource]);
 
   // Effect to reset player state when content changes - no longer needed here
   useEffect(() => {
@@ -287,9 +330,14 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 }
               }
 
-              // If server has a stored source, prefer it over the history item's recorded source
+              // If server has a stored source, use it (prefer user's last used source)
               if (serverSource) {
-                console.log('[Client] Server has preferred source; skipping watch-history source:', serverSource);
+                const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+                if (allowedSources.includes(serverSource)) {
+                  console.log('[Client] Using server preferred source:', serverSource);
+                  setVideoSource(serverSource as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
+                  setUserLastSourceInfo({ source: serverSource, at: userLastSourceInfo?.at || null });
+                }
               } else {
                 const _id = sourceNameToId(movieHistory.source);
                 console.log('[Client] No server/user profile source; using source from watch-history:', _id ? `Source ${_id}` : 'unknown', { movieHistorySource: movieHistory.source, userLastSourceInfo });
@@ -422,9 +470,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         // ignore storage errors
       }
 
-      const source = await getVideoSourceSetting();
-      setVideoSource(source);
-      setUserLastSourceInfo(null);
+      // Default to videasy for logged-out users or when no other source is found
+      console.log('[Client] No saved source found, defaulting to videasy (Source 1)');
+      setVideoSource('videasy');
+      setUserLastSourceInfo({ source: 'videasy', at: null });
     };
     // Re-run when session changes or query params change (so a resume link can override)
     fetchVideoSource();
@@ -520,29 +569,51 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     // but do not persist anything (no server call, no local/session storage writes).
     if (session?.user) {
       try {
-        // Per-media explicit selection: persist only in sessionStorage so it
-        // applies to this media/tab but does not change the user's global
-        // preference across the site.
+        // Per-media explicit selection: persist in sessionStorage for this tab
         try { setExplicitSourceForMedia(tmdbId, source); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch(e) {}
 
-        // Do not POST to /api/user/source here — clicking a source should be
-        // a per-media action by default. If you want to save a global
-        // preference, call /api/user/source from a dedicated UI control.
-
-        // If the selected source is VIDNEST and we have saved progress, persist
-        // that to watch-history immediately as before.
+        // Persist source to user profile so it remembers across sessions (same as TV page)
         try {
-          if (source === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-            console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
-            fetch('/api/watch-history', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: source, title: mediaTitle, posterPath: movie?.poster_path }),
-              keepalive: true,
-            }).catch(() => {});
+          const res = await fetch('/api/user/source', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source, explicit: true, at: new Date().toISOString() }),
+          });
+          if (!res.ok) {
+            console.warn('Failed to persist user source selection (status)', res.status);
+          } else {
+            const persistedId = sourceNameToId(source);
+            console.log('[Client] Source persisted on server:', persistedId ? `Source ${persistedId}` : 'unknown');
           }
         } catch (e) {
-          // ignore failures to persist watch-history from click
+          console.warn('Failed to persist user source selection', e);
+        }
+
+        // Also save to localStorage for faster initial load
+        try { localStorage.setItem('lastUsedSource', source); } catch (e) {}
+
+        // Update the watch history item's source so "Continue Watching" works correctly
+        try {
+          const payload: any = {
+            mediaId: tmdbId,
+            mediaType: 'movie',
+            currentTime: savedProgress || 0,
+            totalDuration: savedDuration || 0,
+            progress: savedDuration > 0 ? Math.round((savedProgress / savedDuration) * 100) : 0,
+            immediate: true,
+            source: source,
+            explicit: true,
+            title: mediaTitle,
+            posterPath: movie?.poster_path || '',
+          };
+          await fetch('/api/watch-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          console.log('[Client] Watch history item source updated:', source);
+        } catch (e) {
+          console.warn('Failed to update watch history item source', e);
         }
       } catch (e) {
         console.warn('Failed to apply per-media source selection', e);
@@ -598,15 +669,46 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       } else if (videoSource === 'vidsrc') {
         return `https://vidsrc.icu/embed/movie/${tmdbId}`;
       } else if (videoSource === 'vidrock') {
-        return `https://vidrock.net/movie/${tmdbId}`;
+        // For VidRock, we'll fetch from video-proxy API if there's saved progress
+        return savedProgress > 0 ? null : `https://vidrock.net/movie/${tmdbId}`;
       } else {
         // For videasy and vidlink sources, we use dedicated player components
         return null; // We'll use VideasyPlayer or VidLinkPlayer instead
       }
     },
-    [tmdbId, videoSource]
+    [tmdbId, videoSource, savedProgress]
   );
   const videoSrc = embedUrl;
+
+  // State for VidRock URL when fetched from video-proxy API
+  const [vidrockUrl, setVidrockUrl] = useState<string | null>(null);
+
+  // Fetch VidRock URL from video-proxy API when needed
+  useEffect(() => {
+    if (videoSource === 'vidrock' && savedProgress > 0 && !vidrockUrl) {
+      const fetchVidrockUrl = async () => {
+        try {
+          const response = await fetch('/api/video-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              source: 'vidrock',
+              tmdbId: tmdbId,
+              mediaType: 'movie',
+              startTime: savedProgress,
+            }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setVidrockUrl(data.url);
+          }
+        } catch (error) {
+          console.error('Failed to fetch VidRock URL:', error);
+        }
+      };
+      fetchVidrockUrl();
+    }
+  }, [videoSource, savedProgress, tmdbId, vidrockUrl]);
 
   // Format saved progress for display
 
@@ -640,6 +742,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             body: JSON.stringify({ source: pendingSource, explicit: true, at: new Date().toISOString() }),
           });
           try { sessionStorage.setItem('jsc_explicit_source', pendingSource); sessionStorage.setItem('jsc_explicit_source_at', new Date().toISOString()); } catch(e) {}
+          try { localStorage.setItem('lastUsedSource', pendingSource); } catch(e) {}
           if (res.ok) setUserLastSourceInfo({ source: pendingSource, at: new Date().toISOString() });
         } catch (e) {
           console.warn('Failed to persist user source selection on confirm', e);
@@ -655,6 +758,77 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const handleCancelSourceChange = () => {
     setPendingSource(null);
     setShowSourceWarning(false);
+  };
+
+  // Handle Play button click (original logic extracted)
+  const handlePlayClick = async () => {
+    // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
+    try {
+      // Prefer server-stored user source to avoid persisting a transient history source
+      let serverSource: string | undefined = userLastSourceInfo?.source;
+      if (session?.user && !serverSource) {
+        try {
+          const srcRes = await fetch('/api/user/source');
+          if (srcRes.ok) {
+            const sdata = await srcRes.json();
+            if (sdata?.source) {
+              serverSource = sdata.source;
+              setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
+              console.log('[Client] Click handler fetched server user source:', serverSource);
+            }
+          }
+        } catch (e) {
+          console.warn('[Client] Click handler failed fetching server source', e);
+        }
+      }
+
+      const resolvedSource = serverSource ?? videoSource ?? (userLastSourceInfo?.source as ('videasy' | 'vidlink' | 'vidnest') | undefined);
+      if (resolvedSource && session?.user) {
+        try {
+          // Persist per-media explicit source (do not change global user preference when clicking Play)
+          try { setExplicitSourceForMedia(tmdbId, resolvedSource); console.log('[Client] Set per-media explicit source from click:', { mediaId: tmdbId, source: resolvedSource }); } catch(e) {}
+
+          console.log('[Client] Persisted explicit user source for media (per-media) from click:', resolvedSource);
+
+          // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
+          try {
+            if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
+              console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
+              fetch('/api/watch-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: resolvedSource, title: mediaTitle, posterPath: movie?.poster_path }),
+                keepalive: true,
+              }).catch(() => {});
+            }
+          } catch (e) {
+            // ignore failures to persist watch-history from click
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    } catch (e) {
+      console.warn('[Client] Error persisting resolved source on click', e);
+    }
+
+    // Navigate to the watch page without exposing source/time in the URL
+    router.push(`/${mediaType}/${tmdbId}`);
+  };
+
+  // Handle resume choice from info view
+  const handleInfoResumeYes = () => {
+    console.log('✅ User clicked RESUME from info view - savedProgress:', savedProgress, 'seconds');
+    setResumeChoice('yes');
+    setShowInfoResumePrompt(false);
+    handlePlayClick();
+  };
+
+  const handleInfoResumeNo = () => {
+    console.log('🔄 User clicked START OVER from info view');
+    setResumeChoice('no');
+    setShowInfoResumePrompt(false);
+    handlePlayClick();
   };
 
 
@@ -729,7 +903,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             )}
 
             {/* Fade Overlay - sits above backdrop/trailer but below content */}
-            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/30 via-black/50 to-[#121212] pointer-events-none z-10"></div>
+            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/60 via-black/80 to-black pointer-events-none z-10"></div>
 
             {/* Content Overlay */}
             <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
@@ -812,82 +986,42 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   <p className="text-gray-300 text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg leading-relaxed mb-3 max-w-xl drop-shadow-lg line-clamp-2">{movie.overview}</p>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 items-center">
+                {/* Action Buttons - Netflix Style */}
+                <div className="flex flex-wrap gap-2 items-center">
                   <button
                     onClick={() => {
-                      // Do NOT include source or time in the URL. Persist user's chosen source only when logged in.
-                      (async () => {
-                        try {
-                          // Prefer server-stored user source to avoid persisting a transient history source
-                          let serverSource: string | undefined = userLastSourceInfo?.source;
-                          if (session?.user && !serverSource) {
-                            try {
-                              const srcRes = await fetch('/api/user/source');
-                              if (srcRes.ok) {
-                                const sdata = await srcRes.json();
-                                if (sdata?.source) {
-                                  serverSource = sdata.source;
-                                  setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
-                                  console.log('[Client] Click handler fetched server user source:', serverSource);
-                                }
-                              }
-                            } catch (e) {
-                              console.warn('[Client] Click handler failed fetching server source', e);
-                            }
-                          }
+                      console.log('🎬 Play button clicked - savedProgress:', savedProgress);
+                      // Check if there's saved progress and show resume prompt
+                      if (savedProgress > 0) {
+                        console.log('📍 Showing resume prompt with savedProgress:', savedProgress);
+                        setShowInfoResumePrompt(true);
+                        return;
+                      }
 
-                          const resolvedSource = serverSource ?? videoSource ?? (userLastSourceInfo?.source as ('videasy' | 'vidlink' | 'vidnest') | undefined);
-                          if (resolvedSource && session?.user) {
-                            try {
-                              // Persist per-media explicit source (do not change global user preference when clicking Play)
-                              try { setExplicitSourceForMedia(tmdbId, resolvedSource); console.log('[Client] Set per-media explicit source from click:', { mediaId: tmdbId, source: resolvedSource }); } catch(e) {}
-
-                              console.log('[Client] Persisted explicit user source for media (per-media) from click:', resolvedSource);
-
-                              // If user explicitly chose VIDNEST and we have saved progress, persist that as an immediate watch-history entry
-                              try {
-                                if (resolvedSource === 'vidnest' && typeof savedProgress === 'number' && savedProgress > 0) {
-                                  console.log('[Client] Persisting savedProgress to watch-history for Source 3:', savedProgress);
-                                  fetch('/api/watch-history', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ mediaId: tmdbId, mediaType, currentTime: savedProgress, totalDuration: savedDuration || 0, progress: (savedDuration ? (savedProgress / Math.max(savedDuration,1)) * 100 : 0), immediate: true, source: resolvedSource, title: mediaTitle, posterPath: movie?.poster_path }),
-                                    keepalive: true,
-                                  }).catch(() => {});
-                                }
-                              } catch (e) {
-                                // ignore failures to persist watch-history from click
-                              }
-                            } catch (e) {
-                              // ignore
-                            }
-                          }
-                        } catch (e) {
-                          console.warn('[Client] Error persisting resolved source on click', e);
-                        }
-                      })();
-
-                      // Navigate to the watch page without exposing source/time in the URL
-                      router.push(`/${mediaType}/${tmdbId}`);
+                      console.log('▶️ No saved progress, proceeding directly to watch');
+                      // No saved progress, proceed directly to watch
+                      handlePlayClick();
                     }}
                     disabled={movie.release_date ? new Date(movie.release_date) > new Date() : false}
-                    style={{ 
-                      backgroundColor: movie.release_date && new Date(movie.release_date) > new Date() ? '#666666' : '#E50914'
-                    }}
-                    className={`text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl shadow-lg ${
+                    className={`font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base lg:text-base shadow-lg ${
                       movie.release_date && new Date(movie.release_date) > new Date()
-                        ? 'cursor-not-allowed opacity-60'
-                        : 'hover:brightness-110'
+                        ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                        : 'bg-white text-black hover:bg-red-600 hover:text-white hover:shadow-xl transform hover:scale-105'
                     }`}
                   >
-                    <Play size={16} /> {movie.release_date && new Date(movie.release_date) > new Date() ? 'Coming Soon' : 'Play'}
+                    <Play size={18} fill="currentColor" /> {movie.release_date && new Date(movie.release_date) > new Date() ? 'Coming Soon' : 'Play'}
                   </button>
                   <button
                     onClick={() => setShowMoreInfoModal(true)}
-                    className="text-white font-bold py-2 px-6 md:py-3 md:px-8 lg:py-4 lg:px-10 xl:py-5 xl:px-12 2xl:py-6 2xl:px-16 rounded-lg transition-all duration-300 border-2 border-white hover:bg-white/10 text-sm md:text-base lg:text-lg xl:text-xl 2xl:text-2xl"
+                    className="bg-gray-600/60 text-white font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg text-sm md:text-base lg:text-base flex items-center gap-2 transform hover:scale-105"
                   >
-                    More Info
+                    <Info size={18} /> More Info
+                  </button>
+                  <button
+                    onClick={() => setShowTrailerPopup(true)}
+                    className="bg-gray-600/60 text-white font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg text-sm md:text-base lg:text-base flex items-center gap-2 transform hover:scale-105"
+                  >
+                    <Film size={18} /> Watch Trailer
                   </button>
                   <div>
                     <WatchlistButton
@@ -906,66 +1040,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
           {/* Details Section Below Hero */}
           <div className="max-w-7xl mx-auto px-6 py-16 space-y-12">
-            {/* Financial Info - Side by side */}
-            {(movie.budget || movie.revenue) && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {movie.budget ? (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
-                    <p className="text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-500 mb-3 font-bold">PRODUCTION BUDGET</p>
-                    <p className="text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-white">
-                      ${(movie.budget / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                ) : null}
-                {movie.revenue ? (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
-                    <p className="text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-500 mb-3 font-bold">BOX OFFICE REVENUE</p>
-                    <p className="text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-white">
-                      ${(movie.revenue / 1000000).toFixed(1)}M
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            {/* Production Details Grid */}
-            {(movie.production_companies || movie.production_countries || movie.spoken_languages) && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {movie.production_companies && movie.production_companies.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
-                    <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">PRODUCTION COMPANIES</h3>
-                    <div className="space-y-3">
-                      {movie.production_companies.slice(0, 4).map((company, index) => (
-                        <p key={`company-${company.id || index}`} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{company.name}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {movie.production_countries && movie.production_countries.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
-                    <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">COUNTRIES</h3>
-                    <div className="space-y-3">
-                      {movie.production_countries.map((country) => (
-                        <p key={country.iso_3166_1} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{country.name}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {movie.spoken_languages && movie.spoken_languages.length > 0 && (
-                  <div style={{ backgroundColor: '#1A1A1A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
-                    <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">LANGUAGES</h3>
-                    <div className="space-y-3">
-                      {movie.spoken_languages.slice(0, 4).map((lang) => (
-                        <p key={lang.iso_639_1} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{lang.name}</p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Tabs */}
-            <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t-lg p-2">
+            <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t-lg p-2 flex-wrap">
               <button
                 onClick={() => setActiveTab('overview')}
                 style={{ backgroundColor: activeTab === 'overview' ? '#E50914' : 'transparent' }}
@@ -987,6 +1063,17 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 }`}
               >
                 Cast & Crew
+              </button>
+              <button
+                onClick={() => setActiveTab('details')}
+                style={{ backgroundColor: activeTab === 'details' ? '#E50914' : 'transparent' }}
+                className={`py-3 px-6 font-semibold transition-all ${
+                  activeTab === 'details'
+                    ? 'text-white'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                Details
               </button>
             </div>
 
@@ -1043,8 +1130,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 <h2 className="text-2xl font-bold mb-6">CAST ({movie.cast.length})</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {movie.cast.slice(0, 15).map((member) => (
-                    <div key={member.id} className="group cursor-pointer">
-                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-gray-500 transition-all">
+                    <button
+                      key={member.id}
+                      onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
+                      className="group cursor-pointer text-left"
+                    >
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
@@ -1059,10 +1150,75 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                           </div>
                         )}
                       </div>
-                      <p className="font-bold text-sm text-white truncate group-hover:text-blue-400 transition-colors">{member.name}</p>
+                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
                       <p className="text-gray-500 text-xs truncate">{member.character}</p>
-                    </div>
+                    </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Details Tab */}
+            {activeTab === 'details' && (
+              <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
+                <div className="space-y-8">
+                  {/* Financial Info - Side by side */}
+                  {(movie.budget || movie.revenue) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {movie.budget ? (
+                        <div style={{ backgroundColor: '#0A0A0A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
+                          <p className="text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-500 mb-3 font-bold">PRODUCTION BUDGET</p>
+                          <p className="text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-white">
+                            ${(movie.budget / 1000000).toFixed(1)}M
+                          </p>
+                        </div>
+                      ) : null}
+                      {movie.revenue ? (
+                        <div style={{ backgroundColor: '#0A0A0A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
+                          <p className="text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-500 mb-3 font-bold">BOX OFFICE REVENUE</p>
+                          <p className="text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl font-bold text-white">
+                            ${(movie.revenue / 1000000).toFixed(1)}M
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Production Details Grid */}
+                  {(movie.production_companies || movie.production_countries || movie.spoken_languages) && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {movie.production_companies && movie.production_companies.length > 0 && (
+                        <div style={{ backgroundColor: '#0A0A0A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
+                          <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">PRODUCTION COMPANIES</h3>
+                          <div className="space-y-3">
+                            {movie.production_companies.slice(0, 4).map((company, index) => (
+                              <p key={`company-${company.id || index}`} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{company.name}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {movie.production_countries && movie.production_countries.length > 0 && (
+                        <div style={{ backgroundColor: '#0A0A0A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
+                          <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">COUNTRIES</h3>
+                          <div className="space-y-3">
+                            {movie.production_countries.map((country) => (
+                              <p key={country.iso_3166_1} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{country.name}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {movie.spoken_languages && movie.spoken_languages.length > 0 && (
+                        <div style={{ backgroundColor: '#0A0A0A' }} className="p-6 lg:p-8 xl:p-10 2xl:p-12 rounded-lg">
+                          <h3 className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-300 mb-4 font-bold">LANGUAGES</h3>
+                          <div className="space-y-3">
+                            {movie.spoken_languages.map((language) => (
+                              <p key={language.iso_639_1} className="text-sm lg:text-base xl:text-lg 2xl:text-xl text-gray-400">{language.name}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1072,7 +1228,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         
       {/* Player for watch view - Rendered separately to prevent reload on tab changes */}
       {view !== 'info' && (
-        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16 space-y-8">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-2 space-y-8">
             {/* Video Player */}
             {videoSource === 'videasy' ? (
               // Use VIDEASY player for source 1
@@ -1136,11 +1292,11 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   });
                 }}
               />
-            ) : videoSrc ? (
-              // Use VIDNEST for source 3 (full progress tracking support)
+            ) : videoSrc || (videoSource === 'vidrock' && vidrockUrl) ? (
+              // Use AdvancedVideoPlayer for sources that support embed URLs
               <AdvancedVideoPlayer
                 key={`${tmdbId}-${resumeChoice}`}
-                embedUrl={videoSrc}
+                embedUrl={videoSource === 'vidrock' && vidrockUrl ? vidrockUrl : (videoSrc as string)}
                 title={mediaTitle}
                 mediaId={tmdbId}
                 mediaType={mediaType}
@@ -1422,23 +1578,27 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                     <h2 className="text-xl font-bold mb-4 text-white">CAST</h2>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                       {movie.cast.slice(0, 12).map((member) => (
-                        <div key={member.id} className="group">
-                          <div className="relative overflow-hidden rounded mb-2 bg-gray-800">
+                        <button
+                          key={member.id}
+                          onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
+                          className="group cursor-pointer text-left"
+                        >
+                          <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all">
                             {member.profile_path ? (
                               <Image
                                 src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                                 alt={member.name}
                                 width={185}
                                 height={278}
-                                className="w-full h-auto group-hover:brightness-110 transition-all duration-300"
+                                className="w-full h-auto group-hover:scale-110 transition-all duration-300"
                               />
                             ) : (
                               <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
                             )}
                           </div>
-                          <p className="font-semibold text-white text-sm truncate">{member.name}</p>
+                          <p className="font-semibold text-white text-sm truncate group-hover:text-red-500 transition-colors">{member.name}</p>
                           <p className="text-gray-500 text-xs truncate">{member.character}</p>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -1454,6 +1614,40 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           tagline={movie.tagline}
           description={movie.overview}
         />
+
+        {/* Trailer Popup - Always rendered at root level for proper z-index */}
+        {showTrailerPopup && trailerKey && (
+          <TrailerPopup
+            trailerKey={trailerKey}
+            onClose={() => setShowTrailerPopup(false)}
+          />
+        )}
+
+        {/* Resume Prompt - Always rendered at root level for proper z-index */}
+        {showInfoResumePrompt && (
+          <ResumePrompt
+            show={showInfoResumePrompt}
+            title={mediaTitle}
+            savedTime={savedProgress}
+            totalDuration={savedDuration || 3600}
+            posterPath={movie?.poster_path}
+            onResume={handleInfoResumeYes}
+            onStart={handleInfoResumeNo}
+            onDismiss={() => setShowInfoResumePrompt(false)}
+          />
+        )}
+
+        {/* Cast Member Modal */}
+        {selectedCastMember && (
+          <CastMemberModal
+            isOpen={!!selectedCastMember}
+            onClose={() => setSelectedCastMember(null)}
+            castMemberId={selectedCastMember.id}
+            castMemberName={selectedCastMember.name}
+            castMemberImage={selectedCastMember.image}
+            castMemberCharacter={selectedCastMember.character}
+          />
+        )}
       </div>
   );
 };

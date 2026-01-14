@@ -12,14 +12,23 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     console.log('[API] GET /api/user/source - Session:', session?.user?.email);
-    if (!session?.user?.email) return NextResponse.json({ source: null, lastUsedSourceAt: null });
+    if (!session?.user?.email) {
+      console.log('[API] No session, returning null source');
+      return NextResponse.json({ source: null, lastUsedSourceAt: null });
+    }
 
     await connectToDatabase();
     const user = await User.findOne({ email: session.user.email }).lean();
-    if (!user) return NextResponse.json({ source: null, lastUsedSourceAt: null });
+    if (!user) {
+      console.log('[API] User not found in database');
+      return NextResponse.json({ source: null, lastUsedSourceAt: null });
+    }
+
+    console.log('[API] Found user:', { email: session.user.email, lastUsedSource: user.lastUsedSource, lastUsedSourceAt: user.lastUsedSourceAt });
 
     // If user profile doesn't have lastUsedSource, try to infer it from the latest watch-history entry
     if (!user.lastUsedSource) {
+      console.log('[API] User has no lastUsedSource, checking watch history...');
       try {
         const latest = await WatchHistory.findOne({ userId: user._id }).sort({ lastWatchedAt: -1 }).lean();
         if (latest && latest.source) {

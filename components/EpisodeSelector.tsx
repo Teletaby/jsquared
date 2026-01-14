@@ -7,6 +7,9 @@ import { getMediaLogos } from '@/lib/tmdb';
 interface Episode {
   episode_number: number;
   name: string;
+  overview?: string;
+  still_path?: string;
+  vote_average?: number;
 }
 
 interface Season {
@@ -107,16 +110,16 @@ export default function EpisodeSelector({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 pt-24">
-      <div className="bg-neutral-900 rounded-xl max-w-4xl w-full max-h-[85vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[999999] p-4 backdrop-blur-sm pt-24">
+      <div className="bg-neutral-950 rounded-2xl max-w-4xl w-full max-h-[80vh] overflow-y-auto shadow-2xl border border-neutral-800">
         {/* Minimal Header with Close Button */}
-        <div className="relative bg-gradient-to-r from-neutral-800 to-neutral-900 p-4 sm:p-6 border-b border-gray-700 flex items-center justify-between">
-          <div className="text-lg font-semibold text-gray-300">
+        <div className="relative bg-white/10 backdrop-blur-md p-4 sm:p-6 border-b border-white/20 flex items-center justify-between sticky top-0 z-10">
+          <div className="text-lg font-bold text-white tracking-wider">
             Select Season & Episode
           </div>
           <button 
             onClick={onClose} 
-            className="text-gray-400 hover:text-white text-3xl transition-colors flex-shrink-0 z-10 -mr-2"
+            className="text-gray-500 hover:text-white text-3xl transition-colors flex-shrink-0 z-10 -mr-2 hover:scale-110 duration-200"
             aria-label="Close"
           >
             ×
@@ -124,25 +127,25 @@ export default function EpisodeSelector({
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-8">
           {loading && (
-            <div className="text-center text-gray-400 py-8">Loading episodes...</div>
+            <div className="text-center text-gray-400 py-12">Loading episodes...</div>
           )}
           {error && (
-            <div className="text-center text-red-500 py-8">Error: {error}</div>
+            <div className="text-center text-red-500 py-12">Error: {error}</div>
           )}
           {!loading && !error && (
             <>
               {seasons.length > 0 ? (
                 <>
-                  <div className="mb-8">
-                    <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">
+                  <div className="mb-10">
+                    <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-[0.15em] text-opacity-80">
                       Season
                     </label>
                     <select
                       onChange={handleSeasonChange}
                       value={selectedSeason?.season_number || ''}
-                      className="w-full px-4 py-3 rounded-lg bg-neutral-800 text-white border border-neutral-700 hover:border-gray-500 focus:border-accent focus:ring-2 focus:ring-accent focus:ring-opacity-50 transition-all duration-200 font-medium cursor-pointer"
+                      className="w-full px-4 py-3 rounded-lg bg-neutral-900 text-white border border-neutral-700 hover:border-red-600 focus:border-red-600 focus:ring-2 focus:ring-red-600/30 transition-all duration-200 font-medium cursor-pointer"
                     >
                       {seasons.map(season => (
                         <option key={season.season_number} value={season.season_number}>
@@ -154,10 +157,10 @@ export default function EpisodeSelector({
 
                   {selectedSeason && selectedSeason.episodes.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-bold text-gray-300 mb-4 uppercase tracking-wider">
+                      <h3 className="text-xs font-bold text-gray-400 mb-6 uppercase tracking-[0.15em] text-opacity-70">
                         Season {selectedSeason.season_number} — {selectedSeason.episodes.length} Episodes
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      <div className="space-y-4">
                         {selectedSeason.episodes.map(episode => {
                           const isCurrentEpisode = 
                             currentSeason === selectedSeason.season_number && 
@@ -167,28 +170,63 @@ export default function EpisodeSelector({
                             <button
                               key={episode.episode_number}
                               onClick={() => handleEpisodeClick(episode.episode_number)}
-                              className={`group relative w-full p-4 rounded-lg cursor-pointer transition-all duration-200 border font-medium focus:outline-none focus:ring-2 focus:ring-accent ${
+                              className={`w-full rounded-xl cursor-pointer transition-all duration-300 border-2 focus:outline-none focus:ring-2 focus:ring-red-600/50 overflow-hidden group ${
                                 isCurrentEpisode
-                                  ? 'bg-accent text-black border-accent shadow-lg shadow-accent/50'
-                                  : 'bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700 hover:border-accent hover:shadow-lg'
+                                  ? 'bg-red-600/20 border-red-600'
+                                  : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 hover:border-red-600'
                               }`}
                             >
-                              <div className="flex flex-col items-center gap-2">
-                                <div className={`text-2xl font-bold transition-colors duration-200 ${
-                                  isCurrentEpisode ? 'text-black' : 'text-accent group-hover:text-white'
-                                }`}>
-                                  Ep. {episode.episode_number}
+                              <div className="flex gap-4 p-4">
+                                {/* Episode Image */}
+                                <div className="flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden bg-neutral-900 border border-neutral-700">
+                                  {episode.still_path ? (
+                                    <img 
+                                      src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} 
+                                      alt={episode.name}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                                      No Image
+                                    </div>
+                                  )}
                                 </div>
-                                <p className={`text-xs text-center line-clamp-2 w-full transition-colors duration-200 ${
-                                  isCurrentEpisode 
-                                    ? 'text-black font-semibold' 
-                                    : 'text-white group-hover:text-accent'
-                                }`}>
-                                  {episode.name || `Episode ${episode.episode_number}`}
-                                </p>
-                                {isCurrentEpisode && (
-                                  <span className="text-xs font-bold uppercase tracking-wider">Now Playing</span>
-                                )}
+
+                                {/* Episode Info */}
+                                <div className="flex-1 flex flex-col justify-between text-left min-w-0">
+                                  <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <span className={`text-2xl font-bold transition-colors duration-200 ${
+                                        isCurrentEpisode ? 'text-red-600' : 'text-red-500'
+                                      }`}>
+                                        {episode.episode_number}
+                                      </span>
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className={`font-bold transition-colors duration-200 truncate ${
+                                          isCurrentEpisode ? 'text-white' : 'text-white group-hover:text-red-400'
+                                        }`}>
+                                          {episode.name || `Episode ${episode.episode_number}`}
+                                        </h4>
+                                      </div>
+                                      {isCurrentEpisode && (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 whitespace-nowrap ml-2">Now Playing</span>
+                                      )}
+                                    </div>
+                                    {episode.vote_average && (
+                                      <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                                        <span>★</span>
+                                        <span>{episode.vote_average.toFixed(1)}/10</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {episode.overview && (
+                                    <p className={`text-sm line-clamp-2 transition-colors duration-200 ${
+                                      isCurrentEpisode ? 'text-gray-200' : 'text-gray-400 group-hover:text-gray-300'
+                                    }`}>
+                                      {episode.overview}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </button>
                           );

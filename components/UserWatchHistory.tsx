@@ -334,10 +334,10 @@ export default function UserWatchHistory() {
             // We no longer include `source` or `time` in the URL for privacy.
             // Instead we persist the preferred source via a background POST when the user clicks the link
             // and rely on server-side watch-history for the resume timestamp.
-            const allowedSources = ['videasy', 'vidlink', 'vidnest'];
-            // Prefer the user's server-stored preference (`videoSource`) over a history item's recorded source.
-            // History items may have older sources; user preference should take precedence for resume behavior.
-            const resumeSourceName = (videoSource && allowedSources.includes(String(videoSource))) ? String(videoSource) : (item.source && allowedSources.includes(item.source) ? item.source : undefined);
+            const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+            // Prefer the history item's recorded source (the source used when the user last watched this content).
+            // Only fall back to the user's server-stored preference if the item has no source.
+            const resumeSourceName = (item.source && allowedSources.includes(item.source)) ? item.source : ((videoSource && allowedSources.includes(String(videoSource))) ? String(videoSource) : undefined);
             const href = `${base}${params.length > 0 ? '?' + params.join('&') : ''}`;
 
             // Debug: log the resolved resume source when links are built (helps diagnose source overrides)
@@ -354,79 +354,37 @@ export default function UserWatchHistory() {
                 href={href}
                 onClick={() => {
                   // Persist the resume source immediately (best-effort, non-blocking) — only when logged in.
-                  // If the history item doesn't have a source, fall back to the user's current preferred source.
+                  // IMPORTANT: Only use the item's recorded source. Do NOT fall back to component state (videoSource)
+                  // because it may be stale from when the page first loaded. The user may have switched sources
+                  // on the watch page since then. We don't want to accidentally overwrite their preference.
                   const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
                   let resumeSource: string | undefined = undefined;
+                  
+                  // Check for per-media explicit source first
                   try {
                     const perMedia = getExplicitSourceForMedia(item.mediaId, false);
-                    if (perMedia) resumeSource = perMedia;
-                  } catch (e) { /* ignore */ }
-                  if (!resumeSource) {
-                    // Prefer the current user/server preference first, then fall back to the history item's recorded source
-                    if (videoSource && allowedSources.includes(String(videoSource))) {
-                      resumeSource = String(videoSource);
-                    } else if (item.source && allowedSources.includes(item.source)) {
-                      resumeSource = item.source;
-                    } else {
-                      resumeSource = undefined;
+                    if (perMedia && allowedSources.includes(perMedia)) {
+                      resumeSource = perMedia;
                     }
+                  } catch (e) { /* ignore */ }
+                  
+                  // Use the history item's recorded source (this comes from the server and includes
+                  // the user's lastUsedSource as a fallback if the item has no source)
+                  if (!resumeSource && item.source && allowedSources.includes(item.source)) {
+                    resumeSource = item.source;
                   }
+                  
+                  // Only persist per-media source if we have one from the item
+                  // Do NOT persist to /api/user/source - that would overwrite the user's actual preference
                   if (resumeSource && session?.user) {
                     try {
                       // Persist per-media explicit source so it applies only to this selection
-                      try {
-                        // Persist per-media explicit source synchronously so it exists before navigation
-                        try {
-                          setExplicitSourceForMedia(item.mediaId, resumeSource);
-                          console.log('[UserWatchHistory] Set per-media explicit source (sync)', { mediaId: item.mediaId, source: resumeSource });
-
-                          // Fire-and-forget: persist to server as immediate explicit write (async)
-                          (async () => {
-                            try {
-                              const payload: any = {
-                                mediaId: item.mediaId,
-                                mediaType: item.mediaType,
-                                currentTime: item.currentTime ?? 0,
-                                totalDuration: item.totalDuration ?? 0,
-                                progress: item.progress ?? 0,
-                                immediate: true,
-                                source: resumeSource,
-                                explicit: true,
-                                title: item.title || '',
-                                posterPath: item.posterPath || '',
-                              };
-                              if (item.seasonNumber !== undefined) payload.seasonNumber = item.seasonNumber;
-                              if (item.episodeNumber !== undefined) payload.episodeNumber = item.episodeNumber;
-                              await fetch('/api/watch-history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                              console.log('[UserWatchHistory] Persisted explicit source to watch-history (async)', { mediaId: item.mediaId, source: resumeSource });
-                            } catch (e) {
-                              console.warn('[UserWatchHistory] Failed to persist explicit source', e);
-                            }
-                          })();
-
-                              // Also persist the user's last-used source to their profile
-                              // so future navigations (server-side) remember this choice.
-                              (async () => {
-                                try {
-                                  await fetch('/api/user/source', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ source: resumeSource, explicit: true, at: new Date().toISOString() }),
-                                  });
-                                  console.log('[UserWatchHistory] Persisted user last-used source (async)', { mediaId: item.mediaId, source: resumeSource });
-                                } catch (e) {
-                                  console.warn('[UserWatchHistory] Failed to persist user source', e);
-                                }
-                              })();
-
-                        } catch (e) { /* ignore */ }
-                      } catch (e) { /* ignore */ }
-                    } catch (e) {
-                      // ignore
-                    }
-                  } else {
-                    // logged out: do not persist explicit choice
+                      setExplicitSourceForMedia(item.mediaId, resumeSource);
+                      console.log('[UserWatchHistory] Set per-media explicit source (sync)', { mediaId: item.mediaId, source: resumeSource });
+                    } catch (e) { /* ignore */ }
                   }
+                  // Note: We intentionally do NOT persist to /api/user/source here to avoid
+                  // overwriting the user's actual preference with potentially stale data
                 }}
                 className="block hover:scale-105 transition-transform duration-300 h-full"
               >

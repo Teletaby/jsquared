@@ -60,7 +60,7 @@ const VideasyPlayer: React.FC<VideasyPlayerProps> = ({
         return null;
       }
       
-      let url = `https://player.videasy.net/tv/${mediaId}/${seasonNumber}/${episodeNumber}?color=${colorParam}&overlay=true&autoplay=true`;
+      let url = `https://player.videasy.net/tv/${mediaId}/${seasonNumber}/${episodeNumber}?color=${colorParam}&overlay=true&autoplayNextEpisode=true&nextEpisode=true`;
       
       // Add progress parameter if user has saved progress (only the initial value)
       if (initialStartRef.current > 0) {

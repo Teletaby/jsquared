@@ -291,9 +291,13 @@ export default function LastWatchedSummary() {
                 href={href}
                 onClick={() => {
                   // Synchronously persist the per-media explicit source so it exists BEFORE navigation
+                  // IMPORTANT: Only use the item's recorded source. Do NOT fall back to component state (videoSource)
+                  // because it may be stale. We don't want to accidentally overwrite the user's preference.
                   const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
                   const resolvedMediaId = it.mediaId ?? (typeof it.id === 'number' ? it.id : undefined);
-                  const resumeSource = (allowedSources.includes(String(videoSource))) ? videoSource : (it.source && allowedSources.includes(it.source) ? it.source : undefined);
+                  
+                  // Only use the item's source, not the potentially stale videoSource
+                  const resumeSource = (it.source && allowedSources.includes(it.source)) ? it.source : undefined;
 
                   if (resolvedMediaId && resumeSource && session?.user) {
                     try {
@@ -302,31 +306,9 @@ export default function LastWatchedSummary() {
                     } catch (e) {
                       // ignore storage errors
                     }
-
-                    // Fire-and-forget: persist to server as immediate explicit write (async)
-                    (async () => {
-                      try {
-                        const payload: any = {
-                          mediaId: resolvedMediaId,
-                          mediaType: it.mediaType,
-                          currentTime: it.currentTime ?? 0,
-                          totalDuration: it.totalDuration ?? 0,
-                          progress: it.progress ?? 0,
-                          immediate: true,
-                          source: resumeSource,
-                          explicit: true,
-                          title: it.title || '',
-                          posterPath: it.posterPath || '',
-                        };
-                        if (it.seasonNumber !== undefined) payload.seasonNumber = it.seasonNumber;
-                        if (it.episodeNumber !== undefined) payload.episodeNumber = it.episodeNumber;
-                        await fetch('/api/watch-history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        console.log('[LastWatched] Persisted per-media explicit source to watch-history (async)', { mediaId: resolvedMediaId, source: resumeSource });
-                      } catch (e) {
-                        console.warn('[LastWatched] Failed to persist explicit source to server', e);
-                      }
-                    })();
                   }
+                  // Note: We intentionally do NOT persist to /api/user/source here to avoid
+                  // overwriting the user's actual preference with potentially stale data
                 }}
                 className="flex-shrink-0 w-[240px] group"
               >

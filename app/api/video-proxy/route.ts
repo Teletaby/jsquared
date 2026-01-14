@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, tmdbId, season, episode, mediaType } = body;
+    const { source, tmdbId, season, episode, mediaType, startTime } = body;
 
     // Validate input
     if (!source || !tmdbId) {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (source === 'vidnest') {
       const embedUrl = mediaType === 'movie'
         ? `https://vidnest.fun/movie/${tmdbId}`
-        : `https://vidnest.fun/tv/${tmdbId}/${season}/${episode}`;
+        : `https://vidnest.fun/tv/${tmdbId}/${season}/${episode}?nextepisode=true`;
       videoUrl = embedUrl;
       metadata = {
         source: 'vidnest',
@@ -97,9 +97,23 @@ export async function POST(request: NextRequest) {
 
     // Handle VidRock (Source 5)
     if (source === 'vidrock') {
-      const embedUrl = mediaType === 'movie'
+      const baseUrl = mediaType === 'movie'
         ? `https://vidrock.net/movie/${tmdbId}`
         : `https://vidrock.net/tv/${tmdbId}/${season}/${episode}`;
+      
+      // Add parameters
+      const params = [];
+      params.push('autoplay=true');
+      params.push('download=false');
+      if (mediaType === 'tv') {
+        params.push('autonext=true');
+        params.push('episodeselector=false');
+      }
+      if (startTime && startTime > 0) {
+        params.push(`start=${Math.floor(startTime)}`);
+      }
+      
+      const embedUrl = `${baseUrl}?${params.join('&')}`;
       videoUrl = embedUrl;
       metadata = {
         source: 'vidrock',
