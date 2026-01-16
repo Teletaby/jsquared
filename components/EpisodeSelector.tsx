@@ -10,6 +10,7 @@ interface Episode {
   overview?: string;
   still_path?: string;
   vote_average?: number;
+  air_date?: string;
 }
 
 interface Season {
@@ -165,29 +166,46 @@ export default function EpisodeSelector({
                           const isCurrentEpisode = 
                             currentSeason === selectedSeason.season_number && 
                             currentEpisode === episode.episode_number;
+                          const airDate = episode.air_date ? new Date(episode.air_date) : null;
+                          const isReleased = airDate ? airDate <= new Date() : false;
                           
                           return (
                             <button
                               key={episode.episode_number}
                               onClick={() => handleEpisodeClick(episode.episode_number)}
-                              className={`w-full rounded-xl cursor-pointer transition-all duration-300 border-2 focus:outline-none focus:ring-2 focus:ring-red-600/50 overflow-hidden group ${
+                              disabled={!isReleased}
+                              className={`w-full rounded-xl transition-all duration-300 border-2 focus:outline-none focus:ring-2 focus:ring-red-600/50 overflow-hidden group ${
+                                !isReleased
+                                  ? 'cursor-not-allowed'
+                                  : 'cursor-pointer'
+                              } ${
                                 isCurrentEpisode
                                   ? 'bg-red-600/20 border-red-600'
-                                  : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 hover:border-red-600'
+                                  : isReleased
+                                    ? 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 hover:border-red-600'
+                                    : 'bg-neutral-800/60 border-neutral-700/50 opacity-75'
                               }`}
                             >
                               <div className="flex gap-4 p-4">
                                 {/* Episode Image */}
-                                <div className="flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden bg-neutral-900 border border-neutral-700">
+                                <div className="relative flex-shrink-0 w-32 h-20 rounded-lg overflow-hidden bg-neutral-900 border border-neutral-700">
                                   {episode.still_path ? (
                                     <img 
                                       src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} 
                                       alt={episode.name}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      className={`w-full h-full object-cover ${isReleased ? 'group-hover:scale-105' : 'opacity-40'} transition-transform duration-300`}
                                     />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-500">
                                       No Image
+                                    </div>
+                                  )}
+                                  {!isReleased && (
+                                    <div className="absolute inset-0 bg-black/85 flex items-center justify-center">
+                                      <div className="text-center">
+                                        <p className="text-red-500 font-bold text-xs">NOT AVAILABLE</p>
+                                        {airDate && <p className="text-white text-[10px] mt-1">{airDate.toLocaleDateString()}</p>}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
@@ -197,13 +215,13 @@ export default function EpisodeSelector({
                                   <div>
                                     <div className="flex items-center gap-3 mb-2">
                                       <span className={`text-2xl font-bold transition-colors duration-200 ${
-                                        isCurrentEpisode ? 'text-red-600' : 'text-red-500'
+                                        isCurrentEpisode ? 'text-red-600' : isReleased ? 'text-red-500' : 'text-red-500/60'
                                       }`}>
                                         {episode.episode_number}
                                       </span>
                                       <div className="flex-1 min-w-0">
                                         <h4 className={`font-bold transition-colors duration-200 truncate ${
-                                          isCurrentEpisode ? 'text-white' : 'text-white group-hover:text-red-400'
+                                          isCurrentEpisode ? 'text-white' : isReleased ? 'text-white group-hover:text-red-400' : 'text-gray-500'
                                         }`}>
                                           {episode.name || `Episode ${episode.episode_number}`}
                                         </h4>
@@ -212,14 +230,17 @@ export default function EpisodeSelector({
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 whitespace-nowrap ml-2">Now Playing</span>
                                       )}
                                     </div>
-                                    {episode.vote_average && (
-                                      <div className="flex items-center gap-1 text-xs text-gray-400 mb-2">
+                                    {isReleased && episode.vote_average !== undefined && episode.vote_average > 0 && (
+                                      <div className="flex items-center gap-1 text-xs text-yellow-400 mb-2">
                                         <span>★</span>
                                         <span>{episode.vote_average.toFixed(1)}/10</span>
                                       </div>
                                     )}
+                                    {!isReleased && (
+                                      <p className="text-xs text-gray-500 mb-2 italic">Not yet released</p>
+                                    )}
                                   </div>
-                                  {episode.overview && (
+                                  {episode.overview && isReleased && (
                                     <p className={`text-sm line-clamp-2 transition-colors duration-200 ${
                                       isCurrentEpisode ? 'text-gray-200' : 'text-gray-400 group-hover:text-gray-300'
                                     }`}>

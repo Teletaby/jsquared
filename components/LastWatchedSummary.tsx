@@ -219,11 +219,11 @@ export default function LastWatchedSummary() {
   ];
 
   return (
-    <div className="mb-8">
-      <div className="flex items-baseline gap-4 mb-4 px-2 md:px-0">
-        <h3 className="text-2xl font-normal text-gray-100">Since you watched</h3>
+    <div className="mb-12">
+      <div className="flex items-baseline gap-4 mb-6 px-4">
+        <h3 className="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Since you watched</h3>
         {lastItem && (
-          <div className="text-xl md:text-2xl font-extrabold text-red-600 tracking-tight max-w-[48ch] truncate">{lastItem.title}</div>
+          <div className="text-xl md:text-2xl font-bold text-[#E50914] tracking-tight max-w-[48ch] truncate">{lastItem.title}</div>
         )}
       </div>
 
@@ -244,7 +244,7 @@ export default function LastWatchedSummary() {
           </div>
         </div>
 
-        <div ref={scrollRef} onScroll={checkScroll} className="flex gap-4 overflow-x-auto pb-3 hide-scrollbar px-2">
+        <div ref={scrollRef} onScroll={checkScroll} className="flex gap-4 overflow-x-auto pb-3 hide-scrollbar px-4">
           {items.map((it: any) => {
             // Resolve a numeric mediaId reliably (recs may have `id` while watch history uses `mediaId`)
             const resolvedMediaId = it.mediaId ?? (typeof it.id === 'number' ? it.id : undefined);
@@ -310,34 +310,48 @@ export default function LastWatchedSummary() {
                   // Note: We intentionally do NOT persist to /api/user/source here to avoid
                   // overwriting the user's actual preference with potentially stale data
                 }}
-                className="flex-shrink-0 w-[240px] group"
+                className="flex-shrink-0 w-[180px] group"
               >
-                  <div className={`rounded-md overflow-hidden bg-black border border-transparent shadow-xl relative transform hover:scale-105 transition-all duration-200 ${it.isLast ? 'border-red-600 shadow-[0_8px_30px_rgba(255,0,0,0.12)]' : ''}`}>
-                  <div className="relative w-full h-44 bg-gray-800">
+                <div className={`rounded-xl overflow-hidden bg-black shadow-lg relative transform hover:scale-105 transition-all duration-300 ${it.isLast ? 'ring-2 ring-[#E50914] shadow-[0_8px_30px_rgba(229,9,20,0.3)]' : 'ring-1 ring-gray-700 hover:ring-gray-600'}`}>
+                  {/* Image Container */}
+                  <div className="relative w-full bg-gray-800" style={{ aspectRatio: '2/3' }}>
                     {it.posterPath ? (
-                      <Image src={`https://image.tmdb.org/t/p/w500${it.posterPath}`} alt={it.title} fill className="object-cover" />
+                      <>
+                        <Image src={`https://image.tmdb.org/t/p/w500${it.posterPath}`} alt={it.title} fill className="object-cover group-hover:scale-110 transition-transform duration-300" />
+                        {/* Dark Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 group-hover:to-black/90 transition-all duration-300" />
+                      </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500">No Image</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 text-sm">No Image</div>
                     )}
 
+                    {/* Info - Overlay on image */}
+                    <div className="absolute inset-0 flex flex-col justify-between p-3">
+                      {/* Top */}
+                      <div></div>
 
-
-                    {/* Resume button for the last watched item */}
-                    {it.isLast && (
-                      <div className="absolute inset-0 flex items-end p-3">
-                        <button className="ml-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full font-semibold shadow-xl">Resume</button>
+                      {/* Bottom - Title and buttons */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <p className="text-xs font-bold text-white truncate line-clamp-2 mb-2 font-orbitron uppercase tracking-wide">{it.title}</p>
+                        
+                        {it.isLast && (
+                          <>
+                            <p className="text-xs text-gray-300 mb-2">{timeAgo(it.lastWatchedAt)}</p>
+                            <button className="w-full bg-[#E50914] hover:bg-[#FF1A20] text-white px-3 py-2 rounded-lg font-bold text-xs transition-colors duration-300 flex items-center justify-center gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                              RESUME
+                            </button>
+                          </>
+                        )}
+                        {it.relatedToLast && (
+                          <div className="inline-block mt-2 px-2 py-1 bg-[#E50914]/20 text-xs text-[#E50914] rounded-lg border border-[#E50914]/50 font-semibold">
+                            Related
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="p-3">
-                    <p className="text-sm font-semibold text-white tracking-tight line-clamp-2">{it.title}</p>
-                    {it.isLast && (
-                      <p className="text-xs text-gray-300 mt-1">{timeAgo(it.lastWatchedAt)}</p>
-                    )}
-                    {it.relatedToLast && (
-                      <div className="inline-block mt-2 px-2 py-1 bg-white/6 text-xs text-white rounded">Related to last watched</div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </Link>

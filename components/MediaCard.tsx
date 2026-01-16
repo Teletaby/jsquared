@@ -11,6 +11,7 @@ export interface Media {
   title: string;
   overview?: string;
   poster_path?: string;
+  backdrop_path?: string;
   vote_average?: number;
   media_type?: 'movie' | 'tv';
   name?: string;
@@ -32,9 +33,11 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
   const [isCheckingTrailer, setIsCheckingTrailer] = useState(false);
 
   const title = media.name || media.title;
-  const imageUrl = media.poster_path
+  const imageUrl = media.backdrop_path
+    ? `https://image.tmdb.org/t/p/w780${media.backdrop_path}`
+    : media.poster_path
     ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
-    : 'https://via.placeholder.com/500x750.png?text=No+Image';
+    : 'https://via.placeholder.com/780x440.png?text=No+Image';
   
   const mediaTypeForPath = media.media_type === 'tv' || !!media.name ? 'tv' : 'movie';
 
@@ -106,39 +109,108 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
   return (
     <>
       <div
-        className="bg-ui-elements rounded-lg overflow-hidden shadow-lg group cursor-pointer flex flex-col h-full"
+        className="relative w-full rounded-xl shadow-lg group cursor-pointer flex flex-col h-full transition-all duration-300 hover:shadow-2xl hover:scale-105 origin-bottom overflow-hidden"
         onClick={handleCardClick}
         onMouseEnter={checkTrailerAvailability}
+        style={{ aspectRatio: '2/3' }}
       >
-        <div className="relative w-full flex-shrink-0">
-          <img src={imageUrl} alt={title} className="w-full h-auto object-cover" />
-          {/* Overlay for larger screens on hover */}
-          <div className="absolute inset-0 bg-black bg-opacity-60 flex-col justify-between p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex">
-            <div>
-              <h3 className="text-white text-lg font-bold">{title}</h3>
-              {typeof media.vote_average === 'number' && media.vote_average > 0 && (
-                <p className="text-yellow-400 text-sm font-semibold">
-                  Rating: {media.vote_average.toFixed(1)} / 10
+        {/* Image Container - with overflow hidden */}
+        <div className="absolute inset-0 rounded-xl overflow-hidden">
+          {/* Background Image */}
+          <img
+            src={imageUrl}
+            alt={title}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
+
+          {/* Dark Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80 group-hover:from-black/30 group-hover:via-black/50 group-hover:to-black/90 transition-all duration-300" />
+        </div>
+
+        {/* Content Container */}
+        <div className="relative h-full flex flex-col justify-between p-4 sm:p-5">
+          {/* Top Section - Title and Rating */}
+          <div className="transform transition-all duration-300">
+            {/* Title */}
+            <h3 className="text-white text-lg sm:text-xl font-bold line-clamp-2 mb-2 font-orbitron uppercase tracking-wide">
+              {title}
+            </h3>
+
+            {/* Rating */}
+            {typeof media.vote_average === 'number' &&
+              media.vote_average > 0 && (
+                <p className="text-yellow-400 text-xs sm:text-sm font-bold mb-3">
+                  ★ {media.vote_average.toFixed(1)}/10
                 </p>
               )}
-            </div>
-            <div className="text-center flex gap-2 justify-center items-center">
+          </div>
+
+          {/* Bottom Section - Empty for layout */}
+          <div></div>
+
+          {/* Buttons - Animated */}
+          <div className="flex gap-2 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {trailerChecked && !hasTrailer ? (
+              <button
+                disabled
+                className="px-3 py-1.5 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1.5 whitespace-nowrap cursor-not-allowed text-xs font-bold"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Film size={16} />
+                <span>NO TRAILER</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleTrailerClick}
+                className="px-4 py-2 rounded-lg bg-white text-black hover:bg-[#E50914] hover:text-white transition-colors duration-300 flex items-center gap-2 whitespace-nowrap font-bold text-xs active:scale-95 hover:shadow-lg"
+              >
+                <Play size={16} fill="currentColor" />
+                <span>VIEW TRAILER</span>
+              </button>
+            )}
+
+            <WatchlistButton
+              mediaId={media.id}
+              mediaType={mediaTypeForPath as 'movie' | 'tv'}
+              title={title}
+              posterPath={media.poster_path || ''}
+              rating={media.vote_average}
+              hideTooltip={true}
+              initialIsInWatchlist={initialIsInWatchlist}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Always visible info for mobile */}
+      <div className="md:hidden w-full">
+        <div className="absolute inset-0 flex flex-col justify-between p-4 rounded-xl pointer-events-none">
+          <div></div>
+          <div className="pointer-events-auto">
+            <h3 className="text-white text-sm font-bold truncate mb-1 font-orbitron uppercase">{title}</h3>
+            {typeof media.vote_average === 'number' &&
+              media.vote_average > 0 && (
+                <p className="text-yellow-400 text-xs font-bold mb-2">
+                  ★ {media.vote_average.toFixed(1)}/10
+                </p>
+              )}
+            <div className="flex gap-2 items-center">
               {trailerChecked && !hasTrailer ? (
                 <button
                   disabled
-                  className="p-1 px-2 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed"
+                  className="px-2 py-1 rounded text-xs bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed font-bold"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Film size={14} />
-                  <span className="text-xs font-semibold">No Trailer</span>
+                  <Film size={12} />
+                  <span>NO TRAILER</span>
                 </button>
               ) : (
                 <button
                   onClick={handleTrailerClick}
-                  className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
+                  className="px-3 py-1 rounded text-xs bg-white text-black hover:bg-[#E50914] hover:text-white transition-colors flex items-center gap-1 whitespace-nowrap font-bold"
                 >
-                  <Play size={14} />
-                  <span className="text-xs font-semibold">Watch Trailer</span>
+                  <Play size={12} fill="currentColor" />
+                  <span>VIEW TRAILER</span>
                 </button>
               )}
               <WatchlistButton
@@ -151,46 +223,6 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
                 initialIsInWatchlist={initialIsInWatchlist}
               />
             </div>
-          </div>
-        </div>
-        {/* Always visible content for smaller screens */}
-        <div className="p-3 flex flex-col justify-between flex-grow md:hidden">
-          <div>
-            <h3 className="text-white text-base font-bold truncate">{title}</h3>
-            {typeof media.vote_average === 'number' && media.vote_average > 0 && (
-              <p className="text-yellow-400 text-xs font-semibold">
-                Rating: {media.vote_average.toFixed(1)} / 10
-              </p>
-            )}
-          </div>
-          <div className="mt-2 flex gap-2 items-center">
-            {trailerChecked && !hasTrailer ? (
-              <button
-                disabled
-                className="p-1 px-2 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <Film size={14} />
-                <span className="text-xs font-semibold">No Trailer</span>
-              </button>
-            ) : (
-              <button
-                onClick={handleTrailerClick}
-                className="p-1 px-2 rounded-lg bg-accent text-white hover:bg-accent-darker transition-colors duration-300 flex items-center gap-1 whitespace-nowrap"
-              >
-                <Play size={14} />
-                <span className="text-xs font-semibold">Watch Trailer</span>
-              </button>
-            )}
-            <WatchlistButton
-              mediaId={media.id}
-              mediaType={mediaTypeForPath as 'movie' | 'tv'}
-              title={title}
-              posterPath={media.poster_path || ''}
-              rating={media.vote_average}
-              hideTooltip={true}
-              initialIsInWatchlist={initialIsInWatchlist}
-            />
           </div>
         </div>
       </div>

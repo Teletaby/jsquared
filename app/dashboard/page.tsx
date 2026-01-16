@@ -126,10 +126,10 @@ const DashboardPage = () => {
 
   if (!session?.user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black flex items-center justify-center text-white">
+      <div className="min-h-screen bg-background flex items-center justify-center text-white">
         <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Please sign in to access your dashboard</h1>
-          <Link href="/signin" className="inline-block bg-accent text-white px-8 py-3 rounded-lg hover:opacity-90">
+          <h1 className="text-4xl font-bold mb-4 font-orbitron uppercase tracking-wider">Please sign in to access your dashboard</h1>
+          <Link href="/signin" className="inline-block bg-[#E50914] text-white px-8 py-3 rounded-lg hover:bg-[#FF1A20] transition-colors font-bold">
             Sign In
           </Link>
         </div>
@@ -140,11 +140,11 @@ const DashboardPage = () => {
   return (
     <>
       <Header />
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white pt-20">
-        <main className="container mx-auto py-8 px-4">
+      <div className="min-h-screen bg-background text-white">
+        <main className="container mx-auto py-8 px-4 pt-24">
           {/* User Profile Section */}
-          <div className="mb-12 flex items-center gap-6 rounded-lg bg-gradient-to-r from-accent/20 to-accent/10 p-8 shadow-lg">
-            <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-full border-4 border-accent">
+          <div className="mb-16 flex items-center gap-8 rounded-xl bg-gradient-to-r from-[#E50914]/20 to-[#1A1A1A] p-8 shadow-2xl border border-[#E50914]/30">
+            <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-full border-4 border-[#E50914] shadow-lg shadow-[#E50914]/50">
               {user?.image ? (
                 <Image
                   src={user.image}
@@ -153,52 +153,57 @@ const DashboardPage = () => {
                   className="object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-accent/30 text-3xl font-bold">
+                <div className="flex h-full w-full items-center justify-center bg-[#E50914] text-4xl font-bold">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
             </div>
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">{user?.name || 'Welcome'}</h1>
-              <p className="text-gray-300 text-lg">{user?.email}</p>
-              <div className="mt-4 flex gap-4 text-sm flex-wrap">
-                <span className="bg-accent/30 px-4 py-2 rounded-full">
-                  Watch History: {loadingStats ? 'Loading...' : `${watchHistoryStats.totalItems} items`}
-                </span>
-                <span className="bg-accent/30 px-4 py-2 rounded-full">
-                  Hours Watched: {loadingStats ? 'Loading...' : `${Math.floor(watchHistoryStats.totalHoursWatched)}h ${Math.round((watchHistoryStats.totalHoursWatched % 1) * 60)}m`}
-                </span>
-                <span className="bg-accent/30 px-4 py-2 rounded-full">Watchlist: {watchlist.length} items</span>
-              </div>
+              <h1 className="text-4xl font-bold mb-2 font-orbitron uppercase tracking-wider">{user?.name || 'Welcome'}</h1>
+              <p className="text-gray-400 text-lg mb-6">{user?.email}</p>
+              {(session?.user as any)?.role === 'admin' && (
+                <div className="mt-4 flex gap-4 text-sm flex-wrap">
+                  <span className="bg-[#E50914]/20 border border-[#E50914]/50 px-4 py-2 rounded-lg text-[#E50914] font-bold">
+                    Watch History: {loadingStats ? 'Loading...' : `${watchHistoryStats.totalItems} items`}
+                  </span>
+                  <span className="bg-[#E50914]/20 border border-[#E50914]/50 px-4 py-2 rounded-lg text-[#E50914] font-bold">
+                    Hours Watched: {loadingStats ? 'Loading...' : `${Math.floor(watchHistoryStats.totalHoursWatched)}h ${Math.round((watchHistoryStats.totalHoursWatched % 1) * 60)}m`}
+                  </span>
+                  <span className="bg-[#E50914]/20 border border-[#E50914]/50 px-4 py-2 rounded-lg text-[#E50914] font-bold">Watchlist: {watchlist.length} items</span>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Continue Watching Section */}
-          <section className="mb-12">
+          <section className="mb-16">
             <Suspense fallback={<div className="text-white text-center">Loading watch history...</div>}>
               <UserWatchHistory />
             </Suspense>
           </section>
 
           {/* Watchlist Section */}
-          <section className="mb-12">
-            <h2 className="text-3xl font-bold mb-6 text-white">My Watchlist</h2>
+          <section className="mb-16">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-8 bg-[#E50914] rounded-full"></div>
+              <h2 className="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">My Watchlist</h2>
+            </div>
             {loadingWatchlist ? (
               <div className="text-center text-gray-400">Loading watchlist...</div>
             ) : watchlist.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">
-                <p className="mb-4">No items in your watchlist yet</p>
-                <Link href="/movies" className="inline-block bg-accent text-white px-6 py-2 rounded-lg hover:opacity-90">
+              <div className="text-center text-gray-400 py-12 border border-gray-700 rounded-xl">
+                <p className="mb-4 text-lg">No items in your watchlist yet</p>
+                <Link href="/movies" className="inline-block bg-[#E50914] text-white px-6 py-2 rounded-lg hover:bg-[#FF1A20] transition-colors font-bold">
                   Explore Movies
                 </Link>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                 {watchlist.map((item) => (
-                  <div key={item._id} className="relative group overflow-hidden rounded-lg">
+                  <div key={item._id} className="relative group overflow-hidden rounded-xl">
                     <Link
                       href={`/${item.mediaType}/${item.mediaId}`}
-                      className="block transition-transform duration-200 hover:scale-105"
+                      className="block transition-transform duration-300 hover:scale-105 h-full"
                     >
                       <div className="relative aspect-[2/3] bg-gray-800">
                         {item.posterPath && (
@@ -206,19 +211,20 @@ const DashboardPage = () => {
                             src={`https://image.tmdb.org/t/p/w200${item.posterPath}`}
                             alt={item.title}
                             fill
-                            className="object-cover"
+                            className="object-cover group-hover:scale-110 transition-transform duration-300"
                           />
                         )}
-                        <div className="absolute inset-0 bg-black opacity-0 transition-opacity group-hover:opacity-40" />
+                        {/* Dark Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 group-hover:to-black/90 transition-all duration-300" />
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-3">
-                        <p className="truncate text-sm font-semibold text-white">{item.title}</p>
-                        {item.rating && <p className="text-xs text-yellow-400">⭐ {item.rating.toFixed(1)}</p>}
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="truncate text-xs font-bold text-white font-orbitron uppercase tracking-wide line-clamp-2">{item.title}</p>
+                        {item.rating && <p className="text-xs text-[#E50914] font-bold mt-1">★ {item.rating.toFixed(1)}</p>}
                       </div>
                     </Link>
                     <button
                       onClick={(e) => handleRemoveFromWatchlist(e, item.mediaId, item.mediaType)}
-                      className="absolute top-2 right-2 bg-red-600 p-1.5 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"
+                      className="absolute top-2 right-2 bg-[#E50914] hover:bg-[#FF1A20] p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all duration-300 z-10"
                       aria-label="Remove from watchlist"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

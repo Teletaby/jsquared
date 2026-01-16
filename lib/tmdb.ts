@@ -78,6 +78,7 @@ export interface EpisodeDetails {
   still_path: string | null;
   vote_average: number;
   runtime?: number;
+  air_date?: string;
 }
 
 export interface SeasonDetails {

@@ -38,27 +38,33 @@ const MediaFetcherList = ({ title, items }: MediaFetcherListProps) => {
   }, [session, items, checkMultipleWatchlistStatuses]); // Add checkMultipleWatchlistStatuses back to dependencies
 
   return (
-    <div className="my-8">
-      <h2 className="text-2xl sm:text-3xl mb-4 text-white">{title}</h2>
+    <div className="my-12">
+      <h2 className="text-2xl sm:text-3xl font-bold mb-6 text-white font-orbitron uppercase px-4">
+        {title}
+      </h2>
       {items && items.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 px-4">
           {items.map((item: any) => {
             const mediaTypeForPath = item.media_type === 'tv' || !!item.name ? 'tv' : 'movie';
             const key = `${item.id}-${mediaTypeForPath}`;
             const initialIsInWatchlist = watchlistStatuses[key];
             return (
-              <MediaCard 
-                key={item.id} 
-                media={{ ...item, media_type: mediaTypeForPath }} 
-                initialIsInWatchlist={initialIsInWatchlist}
-              />
+              <div key={item.id} className="group relative">
+                <MediaCard
+                  media={{ ...item, media_type: mediaTypeForPath }}
+                  initialIsInWatchlist={initialIsInWatchlist}
+                />
+              </div>
             );
           })}
         </div>
       ) : (
-        <div className="text-center text-gray-500 bg-ui-elements p-8 rounded-lg">
+        <div className="text-center text-gray-500 bg-ui-elements p-8 rounded-lg mx-4">
           <h3 className="text-xl mb-2">Could Not Load Content</h3>
-          <p>This might be because the TMDB API key is not set up correctly or no movies were found for this category.</p>
+          <p>
+            This might be because the TMDB API key is not set up correctly or
+            no movies were found for this category.
+          </p>
         </div>
       )}
     </div>

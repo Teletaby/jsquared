@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play, Film, Info } from 'lucide-react';
+import { Download, Play, Film, Info, Search as SearchIcon } from 'lucide-react';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
@@ -49,6 +49,14 @@ interface MediaDetails {
     poster_path: string;
   }[];
   reviews?: ReviewsResponse; // Added reviews property
+}
+
+interface Suggestion {
+  id: number;
+  title: string;
+  name: string;
+  poster_path: string;
+  media_type: string;
 }
 
 const TvDetailPage = ({ params }: TvDetailPageProps) => {
@@ -99,6 +107,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     // }, [videoSource]);
   const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLUListElement>(null);
+
   const timeAgo = (iso?: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -134,6 +150,63 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const mediaType = 'tv';
   const currentSeason = searchParams.get('season') ? parseInt(searchParams.get('season')!, 10) : 1;
   const currentEpisode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!, 10) : 1;
+
+  // Search functionality
+  useEffect(() => {
+    const fetchSuggestions = async (query: string) => {
+      if (query.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setIsLoadingSearch(true);
+      try {
+        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        if (data.results) {
+          setSuggestions(data.results.slice(0, 5)); // Limit to 5 suggestions
+        }
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSearch(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2);
+  }, [suggestions, searchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSuggestionClick = (suggestion: Suggestion) => {
+    setShowSuggestions(false);
+    // Navigate directly to the movie/TV show detail page
+    const path = suggestion.media_type === 'tv' ? `/tv/${suggestion.id}` : `/movie/${suggestion.id}`;
+    router.push(path);
+  };
 
 
 
@@ -1080,7 +1153,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                       value={currentSeason}
                       onChange={(e) => {
                         const season = parseInt(e.target.value);
-                        router.push(`/tv/${tmdbId}?view=info&season=${season}&episode=1`);
+                        router.push(`/tv/${tmdbId}?view=info&season=${season}&episode=1`, { scroll: false });
                       }}
                       className="bg-gray-800 text-white px-4 py-2 rounded border border-gray-700 hover:border-gray-500 transition-colors"
                     >
@@ -1095,10 +1168,14 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {currentSeasonDetails && currentSeasonDetails.episodes.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {currentSeasonDetails.episodes.map((episode) => (
+                    {currentSeasonDetails.episodes.map((episode) => {
+                      const airDate = episode.air_date ? new Date(episode.air_date) : null;
+                      const isReleased = airDate ? airDate <= new Date() : false;
+                      
+                      return (
                       <div
                         key={episode.episode_number}
-                        className="group cursor-pointer bg-gray-900/50 rounded-lg overflow-hidden border border-gray-700 hover:border-red-600 transition-all duration-300 transform hover:scale-105 hover:shadow-lg"
+                        className={`group bg-gray-900/50 rounded-lg overflow-hidden border transition-all duration-300 ${isReleased ? 'cursor-pointer border-gray-700 hover:border-red-600 transform hover:scale-105 hover:shadow-lg' : 'cursor-not-allowed border-gray-700/50 opacity-75'}`}
                       >
                         {/* Episode Image */}
                         <div className="relative w-full aspect-video overflow-hidden bg-gray-800">
@@ -1106,29 +1183,41 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                             <img
                               src={`https://image.tmdb.org/t/p/w500${episode.still_path}`}
                               alt={`Episode ${episode.episode_number}`}
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              className={`w-full h-full object-cover ${isReleased ? 'group-hover:scale-110' : 'opacity-40'} transition-transform duration-500`}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <span className="text-gray-500">No Image</span>
                             </div>
                           )}
-                          {/* Overlay on hover */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <Play size={40} className="text-white" fill="white" />
-                          </div>
+                          {/* Overlay on hover or Not Available */}
+                          {isReleased ? (
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                              <Play size={40} className="text-white" fill="white" />
+                            </div>
+                          ) : (
+                            <div className="absolute inset-0 bg-black/85 flex items-center justify-center">
+                              <div className="text-center">
+                                <p className="text-red-500 font-bold text-lg mb-3">NOT AVAILABLE</p>
+                                {airDate && <p className="text-white text-sm">Airs on {airDate.toLocaleDateString()}</p>}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Episode Info */}
-                        <div className="p-4">
+                        <div className={`p-4 ${isReleased ? '' : 'opacity-60'}`}>
                           <div className="flex items-start justify-between mb-2">
-                            <h3 className="text-white font-bold text-sm group-hover:text-red-500 transition-colors">
+                            <h3 className={`font-bold text-sm ${isReleased ? 'text-white group-hover:text-red-500' : 'text-gray-400'} transition-colors`}>
                               Ep {episode.episode_number}: {episode.name}
                             </h3>
-                            {episode.vote_average > 0 && (
+                            {isReleased && episode.vote_average > 0 && (
                               <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 ml-2">
                                 ⭐ {episode.vote_average.toFixed(1)}
                               </span>
+                            )}
+                            {!isReleased && (
+                              <span className="text-gray-500 text-xs flex-shrink-0 ml-2 italic">Not yet released</span>
                             )}
                           </div>
 
@@ -1137,15 +1226,24 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                             {episode.overview || 'No description available.'}
                           </p>
 
-                          {/* Runtime */}
-                          {episode.runtime && (
-                            <p className="text-gray-500 text-xs mt-3">
-                              Duration: {episode.runtime} min
-                            </p>
+                          {/* Air Date or Runtime */}
+                          {isReleased ? (
+                            episode.runtime && (
+                              <p className="text-gray-500 text-xs mt-3">
+                                Duration: {episode.runtime} min
+                              </p>
+                            )
+                          ) : (
+                            airDate && (
+                              <p className="text-gray-500 text-xs mt-3">
+                                Airs: {airDate.toLocaleDateString()}
+                              </p>
+                            )
                           )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8">

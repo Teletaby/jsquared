@@ -1,16 +1,23 @@
 "use client";
 
 import { Dialog, Transition } from '@headlessui/react';
-import { Fragment, useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/solid';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { GENRE_MAP } from '@/lib/genreMap';
 import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface Suggestion {
+  id: number;
+  title: string;
+  name: string;
+  poster_path: string;
+  media_type: string;
 }
 
 const COUNTRIES = [
@@ -29,9 +36,14 @@ const COUNTRIES = [
 const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [rating, setRating] = useState(5);
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLUListElement>(null);
   useDisableScroll(isOpen);
 
   const handleGenreChange = (genreId: number) => {
@@ -39,6 +51,66 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
       prev.includes(genreId) ? prev.filter(id => id !== genreId) : [...prev, genreId]
     );
   };
+
+  const handleSuggestionClick = (suggestion: Suggestion) => {
+    setShowSuggestions(false);
+    // Navigate directly to the movie/TV show VIEW INFO page
+    const path = suggestion.media_type === 'tv' ? `/tv/${suggestion.id}?view=info` : `/movie/${suggestion.id}?view=info`;
+    router.push(path);
+    onClose();
+  };
+
+  useEffect(() => {
+    const fetchSuggestions = async (query: string) => {
+      if (query.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        if (data.results) {
+          setSuggestions(data.results.slice(0, 5)); // Limit to 5 suggestions
+        }
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        setSuggestions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2);
+  }, [suggestions, searchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
 
   const handleSearch = () => {
     if (!searchTerm.trim() && selectedGenres.length === 0 && !selectedCountry) {
@@ -83,6 +155,8 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('');
+      setSuggestions([]);
+      setShowSuggestions(false);
       setRating(5);
       setSelectedGenres([]);
       setSelectedCountry(null);
@@ -119,24 +193,71 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                 <Dialog.Title as="h3" className="text-lg sm:text-2xl font-bold leading-6 text-white flex justify-between items-center flex-shrink-0">
                   Advanced Search
                   <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-800 transition-colors">
-                    <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                    <X className="h-5 w-5 sm:h-6 sm:w-6" />
                   </button>
                 </Dialog.Title>
                 
                 <div className="mt-4 sm:mt-6 relative">
                   <input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search for movies or TV shows..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onFocus={() => setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleSearch();
                       }
                     }}
-                    className="w-full p-3 pl-10 bg-gray-800 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none pr-3"
+                    className="w-full p-3 pl-10 bg-gray-800 rounded-lg text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none pr-12"
                   />
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  {searchTerm.length > 0 && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1 hover:bg-gray-700 rounded z-10"
+                      title="Clear search"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                  {isLoading && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    </div>
+                  )}
+                  {showSuggestions && (
+                    <ul
+                      ref={suggestionsRef}
+                      className="absolute z-50 w-full bg-gray-800 border border-gray-600 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg"
+                    >
+                      {suggestions.map((suggestion) => (
+                        <li
+                          key={`${suggestion.media_type}-${suggestion.id}`}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="flex items-center p-3 hover:bg-gray-700 cursor-pointer"
+                        >
+                          <img
+                            src={`https://image.tmdb.org/t/p/w92${suggestion.poster_path}`}
+                            alt={suggestion.title || suggestion.name}
+                            className="w-10 h-14 object-cover rounded mr-3"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div>
+                            <div className="text-white text-sm font-medium">
+                              {suggestion.title || suggestion.name}
+                            </div>
+                            <div className="text-gray-400 text-xs capitalize">
+                              {suggestion.media_type}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 <div className="mt-6">

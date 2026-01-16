@@ -295,15 +295,15 @@ export default function UserWatchHistory() {
 
 
   return (
-    <div className="my-8">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-          <span className="w-1 h-6 bg-accent rounded-full"></span>
+    <div className="my-12">
+      <div className="flex items-center gap-3 mb-6 px-4">
+        <div className="w-1 h-8 bg-[#E50914] rounded-full"></div>
+        <h2 className="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">
           Continue Watching
         </h2>
       </div>
 
-      <div className="relative px-2"> {/* Added px-2 here */}
+      <div className="relative px-4">
         {/* Left Arrow - Always show if there are items */}
         {consolidatedHistory.length > 0 && (
           <button
@@ -348,7 +348,8 @@ export default function UserWatchHistory() {
             return (
             <div
               key={item._id}
-              className="flex-shrink-0 group relative overflow-hidden rounded-lg w-[200px] h-[300px] transition-transform duration-300"
+              className="flex-shrink-0 group relative overflow-hidden rounded-xl w-[200px] transition-transform duration-300"
+              style={{ aspectRatio: '2/3' }}
             >
               <Link
                 href={href}
@@ -386,10 +387,10 @@ export default function UserWatchHistory() {
                   // Note: We intentionally do NOT persist to /api/user/source here to avoid
                   // overwriting the user's actual preference with potentially stale data
                 }}
-                className="block hover:scale-105 transition-transform duration-300 h-full"
+                className="block h-full hover:scale-105 transition-transform duration-300"
               >
-                <div className="relative w-full bg-gray-900 flex flex-col h-full rounded-lg shadow-lg">
-                  <div className="relative w-full h-36 overflow-hidden rounded-t-lg">
+                <div className="relative w-full h-full bg-gray-900 flex flex-col rounded-xl shadow-lg ring-1 ring-gray-700 hover:ring-gray-600 overflow-hidden group">
+                  {/* Image Container */}
                   {item.posterPath ? (
                     <Image
                       src={`https://image.tmdb.org/t/p/w400${item.posterPath}`}
@@ -399,78 +400,70 @@ export default function UserWatchHistory() {
                     />
                   ) : (
                     <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                      <span className="text-gray-500 text-sm text-center px-2">No Image Available</span>
+                      <span className="text-gray-500 text-xs text-center px-2">No Image Available</span>
                     </div>
                   )}
 
+                  {/* Dark Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 group-hover:to-black/90 transition-all duration-300" />
 
-
-                  {/* Play Button Overlay */}
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 text-white">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.604 3.69A.375.375 0 019.75 15.25V8.75c0-.29.326-.45.546-.308l5.604 3.69z" />
-                    </svg>
+                  {/* Play Button Overlay - Center */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="bg-[#E50914]/90 hover:bg-[#FF1A20] p-3 rounded-full transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" className="w-6 h-6">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
                   </div>
 
-                  {/* Progress Label */}
+                  {/* Progress Badge - Top Left */}
                   {item.progress !== undefined && (
-                    <div className="absolute top-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white font-semibold">
-                      {(() => {
-                        const progressValue = item.progress || 0;
-                        console.log(`Progress for ${item.title}:`, { progress: progressValue, currentTime: item.currentTime, totalDuration: item.totalDuration });
-                        return `${progressValue.toFixed(1)}%`;
-                      })()}
+                    <div className="absolute top-3 left-3 bg-black/70 px-2 py-1 rounded-lg text-xs text-white font-bold backdrop-blur-sm">
+                      {Math.floor(item.progress || 0)}%
                     </div>
                   )}
 
-                  {/* Duration Badge */}
-                  <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 rounded text-xs text-white hidden">
-                    {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')} / {Math.floor((item.totalDuration || 0) / 60)}:{String(Math.floor((item.totalDuration || 0) % 60)).padStart(2, '0')}
-                  </div>
-
-                  {/* Delete Button */}
+                  {/* Delete Button - Top Right */}
                   <button
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       setDeleteConfirmation({ id: item._id, title: item.title });
                     }}
-                    className="absolute bottom-2 right-2 bg-red-600/80 hover:bg-red-600 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20"
+                    className="absolute top-3 right-3 bg-black/70 hover:bg-[#E50914] p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all duration-300 z-20 backdrop-blur-sm"
                     aria-label="Delete from history"
                   >
                     <Trash2 size={16} />
                   </button>
-                </div>
 
-                {/* Title and Progress */}
-                <div className="p-3">
-                  <div className="h-12"> {/* Adjusted height for potentially longer titles */}
-                    <p className="text-white text-sm font-semibold line-clamp-2">{item.title}</p>
-                  </div>
-                  
-                  {/* Season and Episode Info for TV Shows */}
-                  {item.mediaType === 'tv' && (item.seasonNumber !== undefined || item.episodeNumber !== undefined) && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {item.seasonNumber !== undefined && `S${item.seasonNumber}`}
-                      {item.seasonNumber !== undefined && item.episodeNumber !== undefined && ' • '}
-                      {item.episodeNumber !== undefined && `E${item.episodeNumber}`}
+                  {/* Content - Bottom */}
+                  <div className="absolute bottom-0 inset-x-0 p-3">
+                    <div className="mb-2">
+                      <p className="text-white text-xs font-bold line-clamp-2 font-orbitron uppercase tracking-wide">{item.title}</p>
+                    </div>
+                    
+                    {/* Season and Episode Info for TV Shows */}
+                    {item.mediaType === 'tv' && (item.seasonNumber !== undefined || item.episodeNumber !== undefined) && (
+                      <p className="text-xs text-gray-300 mb-2">
+                        {item.seasonNumber !== undefined && `S${item.seasonNumber}`}
+                        {item.seasonNumber !== undefined && item.episodeNumber !== undefined && ' • '}
+                        {item.episodeNumber !== undefined && `E${item.episodeNumber}`}
+                      </p>
+                    )}
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full h-1.5 bg-gray-600/50 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-[#E50914] transition-all duration-300"
+                        style={{ width: `${item.progress || 0}%` }}
+                      />
+                    </div>
+                    
+                    <p className="text-xs text-gray-300">
+                      {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')} / {Math.floor(item.totalDuration / 60)}:{String(Math.floor(item.totalDuration % 60)).padStart(2, '0')}
                     </p>
-                  )}
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden mt-3">
-                    <div
-                      className="h-full bg-red-600 transition-all duration-300"
-                      style={{ width: `${item.progress || 0}%` }}
-                    />
                   </div>
-                  
-                  <p className="text-xs text-gray-400 mt-2">
-                    {Math.floor(item.currentTime / 60)}:{String(Math.floor(item.currentTime % 60)).padStart(2, '0')} / {Math.floor(item.totalDuration / 60)}:{String(Math.floor(item.totalDuration % 60)).padStart(2, '0')}
-                  </p>
                 </div>
-              </div>
               </Link>
 
             </div>

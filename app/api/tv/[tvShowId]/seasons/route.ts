@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: { params: { tvShowId: st
             overview: episode.overview,
             still_path: episode.still_path,
             vote_average: episode.vote_average,
+            air_date: episode.air_date,
           })) || [],
         };
       })

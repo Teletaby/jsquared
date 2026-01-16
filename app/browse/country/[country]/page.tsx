@@ -1,7 +1,8 @@
 import { discoverMovies, discoverTvShows } from '@/lib/tmdb';
 import MovieList from '@/components/MovieList';
-import CountryCarousel from '@/components/CountryCarousel';
+import NetflixCarousel from '@/components/NetflixCarousel';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import Link from 'next/link';
 
 interface CountryPageProps {
@@ -33,13 +34,20 @@ const CountryPage = async ({ params, searchParams }: CountryPageProps) => {
 
   if (!countryInfo) {
     return (
-      <div className="container mx-auto p-4 text-white text-center">
-        <h1 className="text-3xl font-bold mb-4">Country Not Found</h1>
-        <p>The country you&apos;re looking for is not available.</p>
-        <Link href="/" className="text-blue-500 hover:text-blue-400 mt-4">
-          Back to Home
-        </Link>
-      </div>
+      <>
+        <Header />
+        <div className="min-h-screen bg-background pt-24">
+          <div className="container mx-auto px-6 py-16">
+            <div className="text-center">
+              <h1 className="text-5xl font-bold text-white mb-4">Country Not Found</h1>
+              <p className="text-gray-400 text-lg mb-8">The country you&apos;re looking for is not available.</p>
+              <Link href="/" className="inline-block bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition">
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -100,12 +108,17 @@ const CountryPage = async ({ params, searchParams }: CountryPageProps) => {
     return (
       <>
         <Header />
-        <div className="container mx-auto p-4 pt-24">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-white mb-4">
-              {countryInfo.name}
-            </h1>
-            <p className="text-red-500">{error}</p>
+        <div className="min-h-screen bg-background pt-24">
+          <div className="container mx-auto px-6 py-16">
+            <div className="text-center">
+              <h1 className="text-5xl font-bold text-white mb-4">
+                {countryInfo.name}
+              </h1>
+              <p className="text-gray-400 text-lg">{error}</p>
+              <Link href="/" className="inline-block mt-8 bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition">
+                Back to Home
+              </Link>
+            </div>
           </div>
         </div>
       </>
@@ -115,53 +128,60 @@ const CountryPage = async ({ params, searchParams }: CountryPageProps) => {
   return (
     <>
       <Header />
-      <div className="container mx-auto p-4 pt-24">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-8">
-          Popular in {countryInfo.name}
-        </h1>
-
-        {/* Top 20 This Week Carousel - Mixed Movies & TV Shows */}
-        {topTrendingThisWeek.length > 0 && (
-          <CountryCarousel
-            items={topTrendingThisWeek}
-            title="🔥 Top 20 This Week"
-          />
-        )}
-
-        {movies.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-xl font-bold text-white mb-4">
-              🎬 Movies
-            </h2>
-            <MovieList
-              movies={movies.map((m: any) => ({
-                ...m,
-                media_type: 'movie',
-              }))}
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-6 py-24">
+          {/* Top 20 This Week Carousel - Mixed Movies & TV Shows */}
+          {topTrendingThisWeek.length > 0 && (
+            <NetflixCarousel
+              items={topTrendingThisWeek}
+              title={`Top 20 on ${countryInfo.name} This Week`}
             />
-          </div>
-        )}
+          )}
 
-        {tvShows.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-xl font-bold text-white mb-4">
-              📺 TV Series
-            </h2>
-            <MovieList
-              movies={tvShows.map((t: any) => ({
-                ...t,
-                media_type: 'tv',
-              }))}
-            />
-          </div>
-        )}
+          {movies.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-white mb-8 font-orbitron uppercase">
+                Movies
+              </h2>
+              <MovieList
+                movies={movies.map((m: any) => ({
+                  ...m,
+                  media_type: 'movie',
+                }))}
+              />
+            </div>
+          )}
 
-        {movies.length === 0 && tvShows.length === 0 && (
-          <p className="text-white text-center">
-            No content found for {countryInfo.name}.
-          </p>
-        )}
+          {tvShows.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold text-white mb-8 font-orbitron uppercase">
+                TV Series
+              </h2>
+              <MovieList
+                movies={tvShows.map((t: any) => ({
+                  ...t,
+                  media_type: 'tv',
+                }))}
+              />
+            </div>
+          )}
+
+          {movies.length === 0 && tvShows.length === 0 && (
+            <div className="flex items-center justify-center py-32">
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-white mb-3">No Content Available</h3>
+                <p className="text-gray-400 mb-8">
+                  No content found for {countryInfo.name}.
+                </p>
+                <Link href="/" className="inline-block bg-white text-black px-8 py-3 rounded-full font-bold hover:bg-gray-200 transition">
+                  Explore Other Countries
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+      <Footer />
     </>
   );
 };

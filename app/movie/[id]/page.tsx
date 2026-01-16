@@ -7,7 +7,7 @@ import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play, Film, Info } from 'lucide-react';
+import { Download, Play, Film, Info, Search as SearchIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -57,6 +57,14 @@ interface MediaDetails {
   tagline?: string;
 }
 
+interface Suggestion {
+  id: number;
+  title: string;
+  name: string;
+  poster_path: string;
+  media_type: string;
+}
+
 const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [movie, setMovie] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,6 +100,14 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   });
   const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLUListElement>(null);
+
   const timeAgo = (iso?: string | null) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -116,6 +132,63 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { id } = params;
   const tmdbId = parseInt(id);
   const mediaType = 'movie'; // Define mediaType for watch history
+
+  // Search functionality
+  useEffect(() => {
+    const fetchSuggestions = async (query: string) => {
+      if (query.length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setIsLoadingSearch(true);
+      try {
+        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        if (data.results) {
+          setSuggestions(data.results.slice(0, 5)); // Limit to 5 suggestions
+        }
+      } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        setSuggestions([]);
+      } finally {
+        setIsLoadingSearch(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      fetchSuggestions(searchTerm);
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2);
+  }, [suggestions, searchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node) &&
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSuggestionClick = (suggestion: Suggestion) => {
+    setShowSuggestions(false);
+    // Navigate directly to the movie/TV show detail page
+    const path = suggestion.media_type === 'tv' ? `/tv/${suggestion.id}` : `/movie/${suggestion.id}`;
+    router.push(path);
+  };
 
   // Immediately restore source from storage on client mount (runs once, synchronously reads storage)
   useEffect(() => {

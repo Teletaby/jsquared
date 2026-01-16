@@ -61,18 +61,19 @@ const MovieList: React.FC<MovieListProps> = ({ movies }) => {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 my-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 my-8">
         {movies.map((media: Media) => {
           const mediaTypeForPath = media.media_type === 'tv' || !!media.name ? 'tv' : 'movie';
           const statusKey = `${media.id}-${mediaTypeForPath}`;
           const initialIsInWatchlist = watchlistStatus[statusKey];
 
           return (
-            <MediaCard
-              key={media.id}
-              media={media}
-              initialIsInWatchlist={initialIsInWatchlist}
-            />
+            <div key={media.id} className="group relative">
+              <MediaCard
+                media={media}
+                initialIsInWatchlist={initialIsInWatchlist}
+              />
+            </div>
           );
         })}
       </div>
