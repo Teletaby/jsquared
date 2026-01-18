@@ -34,17 +34,17 @@ const TrailerPopup: React.FC<TrailerPopupProps> = ({ trailerKey, onClose }) => {
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex justify-center items-center transition-opacity duration-300 p-4 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
+      className={`fixed inset-0 z-[99999] flex justify-center items-center transition-opacity duration-300 p-4 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.99)' }}
       onClick={handleClose}
     >
       <div
-        className={`relative bg-black p-3 sm:p-4 rounded-lg shadow-xl w-full max-w-3xl transition-all duration-300 transform-gpu ${isOpen ? 'transform scale-100 opacity-100' : 'transform scale-95 opacity-0'}`}
+        className={`relative z-[100000] bg-black p-3 sm:p-4 rounded-lg shadow-2xl w-full max-w-3xl transition-all duration-300 transform-gpu ${isOpen ? 'transform scale-100 opacity-100' : 'transform scale-95 opacity-0'}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={handleClose}
-          className="absolute -top-3 sm:-top-4 -right-3 sm:-right-4 bg-white text-black rounded-full p-1.5 sm:p-2 hover:bg-gray-200 transition-colors z-10"
+          className="absolute -top-3 sm:-top-4 -right-3 sm:-right-4 bg-white text-black rounded-full p-1.5 sm:p-2 hover:bg-gray-200 transition-colors z-[100001]"
           aria-label="Close trailer"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

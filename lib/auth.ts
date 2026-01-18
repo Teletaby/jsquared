@@ -92,7 +92,8 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger, session }: { token: JWT; user?: any; trigger?: 'signIn' | 'signUp' | 'update'; session?: any }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role; // Add the user's role to the token
+        token.role = user.role;
+        token.image = user.image; // Add image to token on sign in
       }
       if (trigger === 'update' && session?.user) {
         token.name = session.user.name;
@@ -103,9 +104,23 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }: { session: any; token: JWT }) {
-      if (session.user) {
+      if (session.user && token.id) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string; // Add the user's role to the session
+        session.user.role = token.role as string;
+        
+        // Fetch fresh user data from database to get latest image
+        try {
+          await connectToDatabase();
+          const dbUser = await User.findById(token.id);
+          if (dbUser) {
+            session.user.image = dbUser.image; // Always use the latest image from DB
+          } else {
+            session.user.image = token.image as string;
+          }
+        } catch (error) {
+          console.error('Error fetching user in session callback:', error);
+          session.user.image = token.image as string;
+        }
       }
       return session;
     },

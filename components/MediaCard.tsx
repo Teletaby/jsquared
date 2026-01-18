@@ -149,23 +149,24 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
           <div></div>
 
           {/* Buttons - Animated */}
-          <div className="flex gap-2 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="flex gap-1 sm:gap-2 items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
             {trailerChecked && !hasTrailer ? (
               <button
                 disabled
-                className="px-3 py-1.5 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1.5 whitespace-nowrap cursor-not-allowed text-xs font-bold"
+                className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-gray-600/50 text-gray-400 flex items-center gap-1 sm:gap-1.5 whitespace-nowrap cursor-not-allowed text-xs font-bold"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Film size={16} />
-                <span>NO TRAILER</span>
+                <Film size={12} className="sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">NO TRAILER</span>
               </button>
             ) : (
               <button
                 onClick={handleTrailerClick}
-                className="px-4 py-2 rounded-lg bg-white text-black hover:bg-[#E50914] hover:text-white transition-colors duration-300 flex items-center gap-2 whitespace-nowrap font-bold text-xs active:scale-95 hover:shadow-lg"
+                className="px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-white text-black hover:bg-[#E50914] hover:text-white transition-colors duration-300 flex items-center gap-1 sm:gap-2 whitespace-nowrap font-bold text-xs active:scale-95 hover:shadow-lg"
               >
-                <Play size={16} fill="currentColor" />
-                <span>VIEW TRAILER</span>
+                <Play size={12} className="sm:w-4 sm:h-4" fill="currentColor" />
+                <span className="sm:hidden">TRAILER</span>
+                <span className="hidden sm:inline">VIEW TRAILER</span>
               </button>
             )}
 
@@ -177,55 +178,13 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
               rating={media.vote_average}
               hideTooltip={true}
               initialIsInWatchlist={initialIsInWatchlist}
+              onToggle={() => router.push(`/${mediaTypeForPath}/${media.id}?view=info`)}
             />
           </div>
         </div>
       </div>
 
-      {/* Always visible info for mobile */}
-      <div className="md:hidden w-full">
-        <div className="absolute inset-0 flex flex-col justify-between p-4 rounded-xl pointer-events-none">
-          <div></div>
-          <div className="pointer-events-auto">
-            <h3 className="text-white text-sm font-bold truncate mb-1 font-orbitron uppercase">{title}</h3>
-            {typeof media.vote_average === 'number' &&
-              media.vote_average > 0 && (
-                <p className="text-yellow-400 text-xs font-bold mb-2">
-                  ★ {media.vote_average.toFixed(1)}/10
-                </p>
-              )}
-            <div className="flex gap-2 items-center">
-              {trailerChecked && !hasTrailer ? (
-                <button
-                  disabled
-                  className="px-2 py-1 rounded text-xs bg-gray-600/50 text-gray-400 flex items-center gap-1 whitespace-nowrap cursor-not-allowed font-bold"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Film size={12} />
-                  <span>NO TRAILER</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleTrailerClick}
-                  className="px-3 py-1 rounded text-xs bg-white text-black hover:bg-[#E50914] hover:text-white transition-colors flex items-center gap-1 whitespace-nowrap font-bold"
-                >
-                  <Play size={12} fill="currentColor" />
-                  <span>VIEW TRAILER</span>
-                </button>
-              )}
-              <WatchlistButton
-                mediaId={media.id}
-                mediaType={mediaTypeForPath as 'movie' | 'tv'}
-                title={title}
-                posterPath={media.poster_path || ''}
-                rating={media.vote_average}
-                hideTooltip={true}
-                initialIsInWatchlist={initialIsInWatchlist}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Always visible info for mobile - removed for cleaner look */}
       {showTrailer && trailerKey && (
         <TrailerPopup trailerKey={trailerKey} onClose={() => setShowTrailer(false)} />
       )}

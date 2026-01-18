@@ -1,6 +1,6 @@
 "use client";
 
-import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails, getMediaLogos } from '@/lib/tmdb';
+import { getMovieDetails, ReviewsResponse, CastMember, getCastDetails, getMediaLogos, getMovieRecommendations } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
@@ -82,6 +82,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const searchParams = useSearchParams();
   const view = searchParams.get('view');
   const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'details'>('overview');
+  const [forceRender, setForceRender] = useState(0);
   const [initialIsInWatchlist, setInitialIsInWatchlist] = useState<boolean | undefined>(undefined);
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
@@ -128,6 +129,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
   const [showTrailerPopup, setShowTrailerPopup] = useState(false);
   const [showInfoResumePrompt, setShowInfoResumePrompt] = useState(false); // Resume prompt for info view
+  const [similarMovies, setSimilarMovies] = useState<any[]>([]);
+  const similarSectionRef = useRef<HTMLDivElement>(null);
+  const overviewTabRef = useRef<HTMLButtonElement>(null);
   
   const { id } = params;
   const tmdbId = parseInt(id);
@@ -328,6 +332,23 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     fetchLogo();
   }, [tmdbId]);
 
+  // Fetch recommendations
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (tmdbId) {
+        try {
+          const recData = await getMovieRecommendations(tmdbId);
+          if (recData?.results) {
+            setSimilarMovies(recData.results.slice(0, 20));
+          }
+        } catch (error) {
+          console.error('Error fetching recommendations:', error);
+        }
+      }
+    };
+    fetchRecommendations();
+  }, [tmdbId]);
+
   // Separate effect to check watchlist status when session becomes available
   useEffect(() => {
     const checkStatus = async () => {
@@ -338,6 +359,18 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     };
     checkStatus();
   }, [session, movie, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
+
+  // Effect to scroll to similar section when activeTab becomes 'overview'
+  useEffect(() => {
+    if (activeTab === 'overview' && similarMovies.length > 0) {
+      // Use requestAnimationFrame for more reliable timing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    }
+  }, [activeTab, similarMovies.length]);
 
   // Fetch saved watch progress - reset on new movie
   useEffect(() => {
@@ -906,7 +939,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
 
   return (
-    <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
+    <div>
+      <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
       {/* Preload VIDEASY, VidLink and VIDNEST for faster loading */}
       <link rel="dns-prefetch" href="https://player.videasy.net" />
       <link rel="preconnect" href="https://player.videasy.net" />
@@ -976,7 +1010,9 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             )}
 
             {/* Fade Overlay - sits above backdrop/trailer but below content */}
-            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/60 via-black/80 to-black pointer-events-none z-10"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-transparent opacity-80 pointer-events-none z-10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60 pointer-events-none z-10" />
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none z-10" />
 
             {/* Content Overlay */}
             <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
@@ -1096,7 +1132,24 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   >
                     <Film size={18} /> Watch Trailer
                   </button>
-                  <div>
+                  <div className="flex items-center gap-2">
+                    {similarMovies.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('overview');
+                          setForceRender(prev => prev + 1);
+                          setTimeout(() => {
+                            similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 50);
+                        }}
+                        className="w-10 h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center justify-center transform hover:scale-105"
+                        title="View recommendations"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                      </button>
+                    )}
                     <WatchlistButton
                       mediaId={tmdbId}
                       mediaType={mediaType}
@@ -1116,6 +1169,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             {/* Tabs */}
             <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t-lg p-2 flex-wrap">
               <button
+                ref={overviewTabRef}
                 onClick={() => setActiveTab('overview')}
                 style={{ backgroundColor: activeTab === 'overview' ? '#E50914' : 'transparent' }}
                 className={`py-3 px-6 font-semibold transition-all ${
@@ -1152,7 +1206,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
             {/* Reviews Tab */}
             {activeTab === 'overview' && (
-              <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
+              <div key={`overview-${activeTab}-${forceRender}`} style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
                 {movie.reviews && movie.reviews.results.length > 0 ? (
                   <div className="space-y-4">
                     <h2 className="text-2xl font-bold mb-6">REVIEWS ({movie.reviews.results.length})</h2>
@@ -1197,34 +1251,70 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               </div>
             )}
 
+            {/* Similar Movies Section */}
+            {activeTab === 'overview' && similarMovies.length > 0 && (
+              <div ref={similarSectionRef} style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6 mt-6 scroll-mt-32">
+                <h2 className="text-2xl font-bold mb-6 text-white">SIMILAR TO <span className="text-[#E50914]">{movie?.title?.toUpperCase()}</span></h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {similarMovies.map((movie) => (
+                    <a
+                      key={movie.id}
+                      href={`/movie/${movie.id}?view=info`}
+                      className="group cursor-pointer text-left"
+                    >
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
+                        {movie.poster_path ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w342${movie.poster_path}`}
+                            alt={movie.title}
+                            width={200}
+                            height={300}
+                            className="w-full h-auto group-hover:scale-110 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full aspect-[2/3] bg-zinc-800 flex items-center justify-center">
+                            <span className="text-gray-500 text-xs text-center px-2">No Image</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{movie.title}</p>
+                      {movie.vote_average > 0 && (
+                        <p className="text-yellow-400 text-xs font-semibold">⭐ {movie.vote_average.toFixed(1)}</p>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Cast Tab */}
             {activeTab === 'cast' && movie.cast && movie.cast.length > 0 && (
               <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
-                <h2 className="text-2xl font-bold mb-6">CAST ({movie.cast.length})</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {movie.cast.slice(0, 15).map((member) => (
+                <h2 className="text-xl font-bold mb-4">CAST ({movie.cast.length})</h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-3">
+                  {movie.cast.slice(0, 21).map((member) => (
                     <button
                       key={member.id}
                       onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
                       className="group cursor-pointer text-left"
                     >
-                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-2 border border-gray-700 group-hover:border-red-600 transition-all aspect-[2/3]">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                             alt={member.name}
-                            width={185}
-                            height={278}
-                            className="w-full h-auto group-hover:scale-110 transition-transform duration-500"
+                            width={130}
+                            height={195}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         ) : (
-                          <div className="w-full aspect-[2/3] bg-zinc-800 flex items-center justify-center">
+                          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
                             <span className="text-gray-500 text-xs">No Image</span>
                           </div>
                         )}
                       </div>
-                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
-                      <p className="text-gray-500 text-xs truncate">{member.character}</p>
+                      <p className="font-bold text-xs text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
+                      <p className="text-gray-500 text-xs truncate line-clamp-1">{member.character}</p>
                     </button>
                   ))}
                 </div>
@@ -1648,29 +1738,29 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {/* Cast Tab */}
                 {activeTab === 'cast' && movie.cast && movie.cast.length > 0 && (
                   <div>
-                    <h2 className="text-xl font-bold mb-4 text-white">CAST</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {movie.cast.slice(0, 12).map((member) => (
+                    <h2 className="text-lg font-bold mb-3 text-white">CAST</h2>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-3">
+                      {movie.cast.slice(0, 21).map((member) => (
                         <button
                           key={member.id}
                           onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
                           className="group cursor-pointer text-left"
                         >
-                          <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all">
+                          <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all aspect-[2/3]">
                             {member.profile_path ? (
                               <Image
                                 src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                                 alt={member.name}
-                                width={185}
-                                height={278}
-                                className="w-full h-auto group-hover:scale-110 transition-all duration-300"
+                                width={130}
+                                height={195}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-all duration-300"
                               />
                             ) : (
-                              <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
+                              <div className="w-full h-full bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
                             )}
                           </div>
-                          <p className="font-semibold text-white text-sm truncate group-hover:text-red-500 transition-colors">{member.name}</p>
-                          <p className="text-gray-500 text-xs truncate">{member.character}</p>
+                          <p className="font-semibold text-white text-xs truncate group-hover:text-red-500 transition-colors">{member.name}</p>
+                          <p className="text-gray-500 text-xs truncate line-clamp-1">{member.character}</p>
                         </button>
                       ))}
                     </div>
@@ -1680,48 +1770,50 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             </div>
           </div>
         )}
-        <MoreInfoModal
-          isOpen={showMoreInfoModal}
-          onClose={() => setShowMoreInfoModal(false)}
-          title={mediaTitle}
-          tagline={movie.tagline}
-          description={movie.overview}
-        />
-
-        {/* Trailer Popup - Always rendered at root level for proper z-index */}
-        {showTrailerPopup && trailerKey && (
-          <TrailerPopup
-            trailerKey={trailerKey}
-            onClose={() => setShowTrailerPopup(false)}
-          />
-        )}
-
-        {/* Resume Prompt - Always rendered at root level for proper z-index */}
-        {showInfoResumePrompt && (
-          <ResumePrompt
-            show={showInfoResumePrompt}
-            title={mediaTitle}
-            savedTime={savedProgress}
-            totalDuration={savedDuration || 3600}
-            posterPath={movie?.poster_path}
-            onResume={handleInfoResumeYes}
-            onStart={handleInfoResumeNo}
-            onDismiss={() => setShowInfoResumePrompt(false)}
-          />
-        )}
-
-        {/* Cast Member Modal */}
-        {selectedCastMember && (
-          <CastMemberModal
-            isOpen={!!selectedCastMember}
-            onClose={() => setSelectedCastMember(null)}
-            castMemberId={selectedCastMember.id}
-            castMemberName={selectedCastMember.name}
-            castMemberImage={selectedCastMember.image}
-            castMemberCharacter={selectedCastMember.character}
-          />
-        )}
       </div>
+
+      <MoreInfoModal
+        isOpen={showMoreInfoModal}
+        onClose={() => setShowMoreInfoModal(false)}
+        title={mediaTitle}
+        tagline={movie.tagline}
+        description={movie.overview}
+      />
+
+      {/* Trailer Popup - Always rendered at root level for proper z-index */}
+      {showTrailerPopup && trailerKey && (
+        <TrailerPopup
+          trailerKey={trailerKey}
+          onClose={() => setShowTrailerPopup(false)}
+        />
+      )}
+
+      {/* Resume Prompt - Always rendered at root level for proper z-index */}
+      {showInfoResumePrompt && (
+        <ResumePrompt
+          show={showInfoResumePrompt}
+          title={mediaTitle}
+          savedTime={savedProgress}
+          totalDuration={savedDuration || 3600}
+          posterPath={movie?.poster_path}
+          onResume={handleInfoResumeYes}
+          onStart={handleInfoResumeNo}
+          onDismiss={() => setShowInfoResumePrompt(false)}
+        />
+      )}
+
+      {/* Cast Member Modal */}
+      {selectedCastMember && (
+        <CastMemberModal
+          isOpen={!!selectedCastMember}
+          onClose={() => setSelectedCastMember(null)}
+          castMemberId={selectedCastMember.id}
+          castMemberName={selectedCastMember.name}
+          castMemberImage={selectedCastMember.image}
+          castMemberCharacter={selectedCastMember.character}
+        />
+      )}
+    </div>
   );
 };
 

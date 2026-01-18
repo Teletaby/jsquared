@@ -1,6 +1,6 @@
 "use client";
 
-import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, getMediaLogos, getTvSeasonDetails, SeasonDetails } from '@/lib/tmdb';
+import { getTvShowDetails, ReviewsResponse, getCastDetails, CastDetails, CastMember, getMediaLogos, getTvSeasonDetails, SeasonDetails, getTvRecommendations } from '@/lib/tmdb';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
@@ -22,6 +22,7 @@ import MoreInfoModal from '@/components/MoreInfoModal';
 import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 import CastMemberModal from '@/components/CastMemberModal';
+import TrailerPopup from '@/components/TrailerPopup';
 
 
 interface TvDetailPageProps {
@@ -75,6 +76,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [showEpisodeSelector, setShowEpisodeSelector] = useState(false);
   const [castInfo, setCastInfo] = useState<CastDetails | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'cast' | 'episodes'>('overview');
+  const [forceRender, setForceRender] = useState(0);
   const [initialIsInWatchlist, setInitialIsInWatchlist] = useState<boolean | undefined>(undefined);
   const { data: session } = useSession();
   const { checkWatchlistStatus } = useWatchlist();
@@ -138,6 +140,9 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const [episodeData, setEpisodeData] = useState<{ overview: string; name: string } | null>(null); // Store current episode data
   const [showEpisodeSynopsis, setShowEpisodeSynopsis] = useState(false); // Toggle episode synopsis display
   const [currentSeasonDetails, setCurrentSeasonDetails] = useState<SeasonDetails | null>(null);
+  const [similarShows, setSimilarShows] = useState<any[]>([]);
+  const similarSectionRef = useRef<HTMLDivElement>(null);
+  const overviewTabRef = useRef<HTMLButtonElement>(null);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -325,6 +330,23 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     fetchLogo();
   }, [tmdbId]);
 
+  // Fetch recommendations
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (tmdbId) {
+        try {
+          const recData = await getTvRecommendations(tmdbId);
+          if (recData?.results) {
+            setSimilarShows(recData.results.slice(0, 20));
+          }
+        } catch (error) {
+          console.error('Error fetching recommendations:', error);
+        }
+      }
+    };
+    fetchRecommendations();
+  }, [tmdbId]);
+
   // Fetch season details when episodes tab is opened
   useEffect(() => {
     const fetchSeasonDetails = async () => {
@@ -351,6 +373,18 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     };
     checkStatus();
   }, [session, tvShow, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
+
+  // Effect to scroll to similar section when activeTab becomes 'overview'
+  useEffect(() => {
+    if (activeTab === 'overview' && similarShows.length > 0) {
+      // Use requestAnimationFrame for more reliable timing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    }
+  }, [activeTab, similarShows.length]);
 
   // Fetch saved watch progress - reset when episode changes
   useEffect(() => {
@@ -690,7 +724,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     } catch (e) {
       console.warn('[Client] Error in navigateToWatch:', e);
     }
-  }
+  };
 
 
   // Define change source handler BEFORE conditional returns so buttons and capture-useEffect can call it safely
@@ -827,177 +861,182 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
 
   return (
-    <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
-      {/* Preload VIDEASY, VidLink and VIDNEST for faster loading (temporarily commented out during debug) */}
-      {/* <link rel="dns-prefetch" href="https://player.videasy.net" /> */}
-      {/* <link rel="preconnect" href="https://player.videasy.net" /> */}
-      {/* <link rel="dns-prefetch" href="https://vidlink.pro" /> */}
-      {/* <link rel="preconnect" href="https://vidlink.pro" /> */}
-      {/* <link rel="dns-prefetch" href="https://vidnest.fun" /> */}
-      {/* <link rel="preconnect" href="https://vidnest.fun" /> */}
+    <div>
+      <div style={{ backgroundColor: '#121212' }} className="text-white min-h-screen">
+        {/* Preload VIDEASY, VidLink and VIDNEST for faster loading (temporarily commented out during debug) */}
+        {/* <link rel="dns-prefetch" href="https://player.videasy.net" /> */}
+        {/* <link rel="preconnect" href="https://player.videasy.net" /> */}
+        {/* <link rel="dns-prefetch" href="https://vidlink.pro" /> */}
+        {/* <link rel="preconnect" href="https://vidlink.pro" /> */}
+        {/* <link rel="dns-prefetch" href="https://vidnest.fun" /> */}
+        {/* <link rel="preconnect" href="https://vidnest.fun" /> */}
 
-      <Header />
-      {/* Show last-used source badge if available (helps confirm persistence) */}
-      {userLastSourceInfo?.source && (
-        <div className="container mx-auto px-4 mt-3">
-          <div className="inline-flex items-center gap-3 bg-white/3 text-sm rounded-full px-3 py-1">
-            <span className="text-gray-300">Last used source</span>
-            <span className="font-semibold text-white">{userLastSourceInfo.source}</span>
-            {userLastSourceInfo.at && <span className="text-gray-400">• {timeAgo(userLastSourceInfo.at)}</span>}
+        <Header />
+        {/* Show last-used source badge if available (helps confirm persistence) */}
+        {userLastSourceInfo?.source && (
+          <div className="container mx-auto px-4 mt-3">
+            <div className="inline-flex items-center gap-3 bg-white/3 text-sm rounded-full px-3 py-1">
+              <span className="text-gray-300">Last used source</span>
+              <span className="font-semibold text-white">{userLastSourceInfo.source}</span>
+              {userLastSourceInfo.at && <span className="text-gray-400">• {timeAgo(userLastSourceInfo.at)}</span>}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {view === 'info' && (
-        <>
-          {/* Hero Section */}
-          <div className="relative h-screen flex flex-col justify-center overflow-hidden">
-            {/* Backdrop Image - always shown first as base layer (touches navbar and sits behind it) */}
-            {tvShow?.backdrop_path && (
-              <img
-                src={`https://image.tmdb.org/t/p/w1280${tvShow.backdrop_path}`}
-                alt="backdrop"
-                className="absolute top-0 left-0 w-full h-full object-cover z-0"
-              />
-            )}
+        {view === 'info' && (
+          <>
+            {/* Hero Section */}
+            <div className="relative h-screen flex flex-col justify-center overflow-hidden">
+              {/* Backdrop Image - always shown first as base layer (touches navbar and sits behind it) */}
+              {tvShow?.backdrop_path && (
+                <img
+                  src={`https://image.tmdb.org/t/p/w1280${tvShow.backdrop_path}`}
+                  alt="backdrop"
+                  className="absolute top-0 left-0 w-full h-full object-cover z-0"
+                />
+              )}
 
-            {/* Trailer Video Background - fades in on top of backdrop (touches navbar and sits behind it) */}
-            {trailerKey && !trailerError && (
-              <div 
-                className="absolute top-0 left-0 w-screen h-full overflow-hidden z-0"
-                style={{ 
-                  opacity: trailerLoaded ? 1 : 0, 
-                  pointerEvents: trailerLoaded ? 'auto' : 'none',
-                  transition: 'opacity 1000ms ease-in-out'
-                }}
-              >
-                <iframe                  id="trailerPlayer"                  src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
-                  frameBorder="0"
-                  allow="autoplay; encrypted-media"
-                  onLoad={() => setTrailerLoaded(true)}
-                  onError={() => setTrailerError(true)}
-                  className="absolute top-1/2 left-1/2 min-w-full min-h-full"
+              {/* Trailer Video Background - fades in on top of backdrop (touches navbar and sits behind it) */}
+              {trailerKey && !trailerError && (
+                <div 
+                  className="absolute top-0 left-0 w-screen h-full overflow-hidden z-0"
                   style={{ 
-                    pointerEvents: 'none', 
-                    transform: 'translate(-50%, -50%) scale(1.5)',
-                    width: '177.78vh',
-                    height: '100vh',
-                    border: 'none'
+                    opacity: trailerLoaded ? 1 : 0, 
+                    pointerEvents: trailerLoaded ? 'auto' : 'none',
+                    transition: 'opacity 1000ms ease-in-out'
                   }}
-                ></iframe>
-              </div>
-            )}
-            
-            {/* Fade Overlay - sits above backdrop/trailer but below content */}
-            <div className="absolute top-0 left-0 w-screen h-full bg-gradient-to-b from-black/60 via-black/80 to-black pointer-events-none z-10"></div>
+                >
+                  <iframe
+                    id="trailerPlayer"
+                    src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&mute=1&controls=0&modestbranding=1&loop=1&playlist=${trailerKey}&start=5&showinfo=0&rel=0`}
+                    frameBorder="0"
+                    allow="autoplay; encrypted-media"
+                    onLoad={() => setTrailerLoaded(true)}
+                    onError={() => setTrailerError(true)}
+                    className="absolute top-1/2 left-1/2 min-w-full min-h-full"
+                    style={{ 
+                      pointerEvents: 'none', 
+                      transform: 'translate(-50%, -50%) scale(1.5)',
+                      width: '177.78vh',
+                      height: '100vh',
+                      border: 'none'
+                    }}
+                  ></iframe>
+                </div>
+              )}
+              
+              {/* Fade Overlay - sits above backdrop/trailer but below content */}
+              <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-transparent opacity-80 pointer-events-none z-10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60 pointer-events-none z-10" />
+              <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none z-10" />
 
-            {/* Content Overlay */}
-            <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
+              {/* Content Overlay */}
+              <div className="relative z-20 max-w-7xl mx-auto px-6 md:px-12 lg:px-16 w-full py-8">
                 <div className="max-w-2xl">
-                {/* Logo or Title */}
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={mediaTitle}
-                    draggable={false}
-                    className="h-16 md:h-20 lg:h-28 w-auto object-contain mb-2 drop-shadow-lg select-none"
-                  />
-                ) : (
-                  <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-bold text-white mb-2 drop-shadow-2xl">
-                    {mediaTitle}
-                  </h1>
-                )}
+                  {/* Logo or Title */}
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={mediaTitle}
+                      draggable={false}
+                      className="h-16 md:h-20 lg:h-28 w-auto object-contain mb-2 drop-shadow-lg select-none"
+                    />
+                  ) : (
+                    <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-bold text-white mb-2 drop-shadow-2xl">
+                      {mediaTitle}
+                    </h1>
+                  )}
 
-                {/* Quick Stats - Single Row */}
-                <div className="flex flex-wrap gap-2 mb-2 text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xs lg:text-sm text-gray-400 uppercase">RATING</span>
-                    {typeof tvShow.vote_average === 'number' && tvShow.vote_average > 0 ? (
-                      <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
-                    ) : (
-                      <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-400">—</span>
+                  {/* Quick Stats - Single Row */}
+                  <div className="flex flex-wrap gap-2 mb-2 text-xs md:text-sm lg:text-base xl:text-lg 2xl:text-xl">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xs lg:text-sm text-gray-400 uppercase">RATING</span>
+                      {typeof tvShow.vote_average === 'number' && tvShow.vote_average > 0 ? (
+                        <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-white">{tvShow.vote_average.toFixed(1)}</span>
+                      ) : (
+                        <span className="text-base md:text-lg lg:text-2xl xl:text-3xl 2xl:text-4xl font-bold text-gray-400">—</span>
+                      )}
+                    </div>
+                    
+                    {tvShow.first_air_date && (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs lg:text-sm text-gray-400 uppercase">FIRST AIRED</span>
+                        <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{new Date(tvShow.first_air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                      </div>
+                    )}
+
+                    {tvShow.episode_run_time && tvShow.episode_run_time.length > 0 && (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs lg:text-sm text-gray-400 uppercase">EPISODE AVG</span>
+                        <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{formatDuration(tvShow.episode_run_time[0])}</span>
+                      </div>
+                    )}
+
+                    {tvShow.seasons && (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs lg:text-sm text-gray-400 uppercase">SEASONS</span>
+                        <span className="text-xs md:text-sm lg:text-lg font-bold text-white">{tvShow.seasons.length}</span>
+                      </div>
+                    )}
+
+                    {tvShow.first_air_date && (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs lg:text-sm text-gray-400 uppercase">STATUS</span>
+                        <span className="text-xs md:text-sm lg:text-lg font-bold text-white">
+                          {(() => {
+                            const firstAirDate = new Date(tvShow.first_air_date);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            firstAirDate.setHours(0, 0, 0, 0);
+                            return firstAirDate > today ? 'Unreleased' : 'Released';
+                          })()}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  
-                  {tvShow.first_air_date && (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs lg:text-sm text-gray-400 uppercase">FIRST AIRED</span>
-                      <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{new Date(tvShow.first_air_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+
+                  {/* Genres */}
+                  {tvShow.genres && tvShow.genres.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {tvShow.genres.map((genre) => (
+                        <span
+                          key={genre.id}
+                          className="text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-300 font-medium"
+                        >
+                          {genre.name}
+                        </span>
+                      ))}
                     </div>
                   )}
 
-                  {tvShow.episode_run_time && tvShow.episode_run_time.length > 0 && (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs lg:text-sm text-gray-400 uppercase">EPISODE AVG</span>
-                      <span className="text-xs md:text-sm lg:text-lg xl:text-xl 2xl:text-2xl font-bold text-white">{formatDuration(tvShow.episode_run_time[0])}</span>
-                    </div>
+                  {/* Description */}
+                  {tvShow.overview && (
+                    <p className="text-gray-300 text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg leading-relaxed mb-3 max-w-xl drop-shadow-lg line-clamp-2">{tvShow.overview}</p>
                   )}
 
-                  {tvShow.seasons && (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs lg:text-sm text-gray-400 uppercase">SEASONS</span>
-                      <span className="text-xs md:text-sm lg:text-lg font-bold text-white">{tvShow.seasons.length}</span>
-                    </div>
-                  )}
+                  {/* Action Buttons - Netflix Style */}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <button
+                      onClick={() => {
+                        console.log('📺 Watch button clicked - savedProgress:', savedProgress);
+                        // Check if there's saved progress and show resume prompt
+                        if (savedProgress > 0) {
+                          console.log('📍 Showing resume prompt with savedProgress:', savedProgress);
+                          setShowInfoResumePrompt(true);
+                          return;
+                        }
 
-                  {tvShow.first_air_date && (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xs lg:text-sm text-gray-400 uppercase">STATUS</span>
-                      <span className="text-xs md:text-sm lg:text-lg font-bold text-white">
-                        {(() => {
-                          const firstAirDate = new Date(tvShow.first_air_date);
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          firstAirDate.setHours(0, 0, 0, 0);
-                          return firstAirDate > today ? 'Unreleased' : 'Released';
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Genres */}
-                {tvShow.genres && tvShow.genres.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {tvShow.genres.map((genre) => (
-                      <span
-                        key={genre.id}
-                        className="text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg text-gray-300 font-medium"
-                      >
-                        {genre.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Description */}
-                {tvShow.overview && (
-                  <p className="text-gray-300 text-xs md:text-xs lg:text-sm xl:text-base 2xl:text-lg leading-relaxed mb-3 max-w-xl drop-shadow-lg line-clamp-2">{tvShow.overview}</p>
-                )}
-
-                {/* Action Buttons - Netflix Style */}
-                <div className="flex flex-wrap gap-2 items-center">
-                  <button
-                    onClick={() => {
-                      console.log('📺 Watch button clicked - savedProgress:', savedProgress);
-                      // Check if there's saved progress and show resume prompt
-                      if (savedProgress > 0) {
-                        console.log('📍 Showing resume prompt with savedProgress:', savedProgress);
-                        setShowInfoResumePrompt(true);
-                        return;
-                      }
-
-                      console.log('▶️ No saved progress, proceeding directly to watch');
-                      // No saved progress, proceed directly to watch
-                      navigateToWatch();
-                    }}
-                    disabled={tvShow.first_air_date ? new Date(tvShow.first_air_date) > new Date() : false}
-                    className={`font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base lg:text-base shadow-lg ${
-                      tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date()
-                        ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
-                        : 'bg-white text-black hover:bg-red-600 hover:text-white hover:shadow-xl transform hover:scale-105'
-                    }`}
-                  >
+                        console.log('▶️ No saved progress, proceeding directly to watch');
+                        // No saved progress, proceed directly to watch
+                        navigateToWatch();
+                      }}
+                      disabled={tvShow.first_air_date ? new Date(tvShow.first_air_date) > new Date() : false}
+                      className={`font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 flex items-center justify-center gap-2 text-sm md:text-base lg:text-base shadow-lg ${
+                        tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date()
+                          ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-black hover:bg-red-600 hover:text-white hover:shadow-xl transform hover:scale-105'
+                      }`}
+                    >
                     <Play size={18} fill="currentColor" /> {tvShow.first_air_date && new Date(tvShow.first_air_date) > new Date() ? 'Coming Soon' : 'Watch'}
                   </button>
                   <button
@@ -1008,16 +1047,30 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   </button>
                   {trailerKey && !trailerError && (
                     <button
-                      onClick={() => {
-                        // TODO: Implement trailer popup for TV page
-                        console.log('Trailer button clicked');
-                      }}
+                      onClick={() => setShowTrailerPopup(true)}
                       className="bg-gray-600/60 text-white font-bold py-2 px-6 md:py-2.5 md:px-7 lg:py-3 lg:px-8 rounded transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg text-sm md:text-base lg:text-base flex items-center gap-2 transform hover:scale-105"
                     >
                       <Film size={18} /> Watch Trailer
                     </button>
                   )}
-                  <div>
+                  <div className="flex items-center gap-2">
+                    {similarShows.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setActiveTab('overview');
+                          setForceRender(prev => prev + 1);
+                          setTimeout(() => {
+                            similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 50);
+                        }}
+                        className="w-10 h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center justify-center transform hover:scale-105"
+                        title="View recommendations"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        </svg>
+                      </button>
+                    )}
                     <WatchlistButton
                       mediaId={tmdbId}
                       mediaType={mediaType}
@@ -1037,6 +1090,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {/* Tabs */}
             <div style={{ backgroundColor: '#1A1A1A' }} className="flex gap-2 border-b border-gray-700 rounded-t-lg p-2">
               <button
+                ref={overviewTabRef}
                 onClick={() => setActiveTab('overview')}
                 style={{ backgroundColor: activeTab === 'overview' ? '#E50914' : 'transparent' }}
                 className={`py-3 px-6 font-semibold transition-all ${
@@ -1073,7 +1127,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
             {/* Overview Tab */}
             {activeTab === 'overview' && (
-              <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
+              <div key={`overview-${activeTab}-${forceRender}`} style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
                 {tvShow.overview && (
                   <div className="mb-6">
                     <h2 className="text-2xl font-bold mb-4 text-white">SYNOPSIS</h2>
@@ -1140,6 +1194,42 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Similar Shows Section */}
+            {activeTab === 'overview' && similarShows.length > 0 && (
+              <div ref={similarSectionRef} style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6 mt-6 scroll-mt-32">
+                <h2 className="text-2xl font-bold mb-6 text-white">SIMILAR TO <span className="text-[#E50914]">{tvShow?.name?.toUpperCase()}</span></h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {similarShows.map((show) => (
+                    <a
+                      key={show.id}
+                      href={`/tv/${show.id}?view=info`}
+                      className="group cursor-pointer text-left"
+                    >
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
+                        {show.poster_path ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w342${show.poster_path}`}
+                            alt={show.name || show.title}
+                            width={200}
+                            height={300}
+                            className="w-full h-auto group-hover:scale-110 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full aspect-[2/3] bg-zinc-800 flex items-center justify-center">
+                            <span className="text-gray-500 text-xs text-center px-2">No Image</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{show.name || show.title}</p>
+                      {show.vote_average > 0 && (
+                        <p className="text-yellow-400 text-xs font-semibold">⭐ {show.vote_average.toFixed(1)}</p>
+                      )}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1256,31 +1346,31 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {/* Cast Tab */}
             {activeTab === 'cast' && castInfo && castInfo.cast.length > 0 && (
               <div style={{ backgroundColor: '#1A1A1A' }} className="border border-t-0 border-gray-700 rounded-b-lg p-6">
-                <h2 className="text-2xl font-bold mb-6">CAST ({castInfo.cast.length})</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {castInfo.cast.slice(0, 15).map((member) => (
+                <h2 className="text-xl font-bold mb-4">CAST ({castInfo.cast.length})</h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-3">
+                  {castInfo.cast.slice(0, 21).map((member) => (
                     <button
                       key={member.id}
                       onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
                       className="group cursor-pointer text-left"
                     >
-                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-3 border border-gray-700 group-hover:border-red-600 transition-all">
+                      <div style={{ backgroundColor: '#0A0A0A' }} className="relative overflow-hidden rounded mb-2 border border-gray-700 group-hover:border-red-600 transition-all aspect-[2/3]">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                             alt={member.name}
-                            width={185}
-                            height={278}
-                            className="w-full h-auto group-hover:scale-110 transition-transform duration-500"
+                            width={130}
+                            height={195}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
                         ) : (
-                          <div className="w-full aspect-[2/3] bg-zinc-800 flex items-center justify-center">
+                          <div className="w-full h-full bg-zinc-800 flex items-center justify-center">
                             <span className="text-gray-500 text-xs">No Image</span>
                           </div>
                         )}
                       </div>
-                      <p className="font-bold text-sm text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
-                      <p className="text-gray-500 text-xs truncate">{member.character}</p>
+                      <p className="font-bold text-xs text-white truncate group-hover:text-red-500 transition-colors">{member.name}</p>
+                      <p className="text-gray-500 text-xs truncate line-clamp-1">{member.character}</p>
                     </button>
                   ))}
                 </div>
@@ -1687,29 +1777,29 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
             {/* Cast Tab */}
             {activeTab === 'cast' && castInfo && castInfo.cast.length > 0 && (
               <div>
-                <h2 className="text-xl font-bold mb-4 text-white">CAST</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {castInfo.cast.slice(0, 12).map((member: CastMember) => (
+                <h2 className="text-lg font-bold mb-3 text-white">CAST</h2>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-3">
+                  {castInfo.cast.slice(0, 21).map((member: CastMember) => (
                     <button
                       key={member.id}
                       onClick={() => setSelectedCastMember({ id: member.id, name: member.name, image: member.profile_path, character: member.character })}
                       className="group cursor-pointer text-left"
                     >
-                      <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all">
+                      <div className="relative overflow-hidden rounded mb-2 bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all aspect-[2/3]">
                         {member.profile_path ? (
                           <Image
                             src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
                             alt={member.name}
-                            width={185}
-                            height={278}
-                            className="w-full h-auto group-hover:scale-110 transition-all duration-300"
+                            width={130}
+                            height={195}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-all duration-300"
                           />
                         ) : (
-                          <div className="w-full aspect-[2/3] bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
+                          <div className="w-full h-full bg-gray-700 flex items-center justify-center text-xs text-gray-500">No Image</div>
                         )}
                       </div>
-                      <p className="font-semibold text-white text-sm truncate group-hover:text-red-500 transition-colors">{member.name}</p>
-                      <p className="text-gray-500 text-xs truncate">{member.character}</p>
+                      <p className="font-semibold text-white text-xs truncate group-hover:text-red-500 transition-colors">{member.name}</p>
+                      <p className="text-gray-500 text-xs truncate line-clamp-1">{member.character}</p>
                     </button>
                   ))}
                 </div>
@@ -1718,51 +1808,60 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           </div>
         </div>
         )}
+      </div>
 
-        {showEpisodeSelector && (
-          <EpisodeSelector
-            tvShowId={id}
-            showTitle={mediaTitle}
-            posterPath={tvShow.poster_path}
-            currentSeason={currentSeason}
-            currentEpisode={currentEpisode}
-            onClose={() => setShowEpisodeSelector(false)}
-            onEpisodeSelect={handleEpisodeSelect}
-          />
-        )}
-        <MoreInfoModal
-          isOpen={showMoreInfoModal}
-          onClose={() => setShowMoreInfoModal(false)}
-          title={mediaTitle}
-          tagline={(tvShow as any)?.tagline}
-          description={tvShow?.overview}
+      {showEpisodeSelector && (
+        <EpisodeSelector
+          tvShowId={id}
+          showTitle={mediaTitle}
+          posterPath={tvShow.poster_path}
+          currentSeason={currentSeason}
+          currentEpisode={currentEpisode}
+          onClose={() => setShowEpisodeSelector(false)}
+          onEpisodeSelect={handleEpisodeSelect}
         />
+      )}
+      <MoreInfoModal
+        isOpen={showMoreInfoModal}
+        onClose={() => setShowMoreInfoModal(false)}
+        title={mediaTitle}
+        tagline={(tvShow as any)?.tagline}
+        description={tvShow?.overview}
+      />
 
-        {/* Resume Prompt for Info View */}
-        {showInfoResumePrompt && (
-          <ResumePrompt
-            show={showInfoResumePrompt}
-            title={mediaTitle}
-            savedTime={savedProgress}
-            totalDuration={savedDuration}
-            posterPath={tvShow?.poster_path}
-            onResume={handleInfoResumeYes}
-            onStart={handleInfoResumeNo}
-            onDismiss={handleInfoResumeDismiss}
-          />
-        )}
+      {/* Trailer Popup - Always rendered at root level for proper z-index */}
+      {showTrailerPopup && trailerKey && (
+        <TrailerPopup
+          trailerKey={trailerKey}
+          onClose={() => setShowTrailerPopup(false)}
+        />
+      )}
 
-        {/* Cast Member Modal */}
-        {selectedCastMember && (
-          <CastMemberModal
-            isOpen={!!selectedCastMember}
-            onClose={() => setSelectedCastMember(null)}
-            castMemberId={selectedCastMember.id}
-            castMemberName={selectedCastMember.name}
-            castMemberImage={selectedCastMember.image}
-            castMemberCharacter={selectedCastMember.character}
-          />
-        )}
+      {/* Resume Prompt for Info View */}
+      {showInfoResumePrompt && (
+        <ResumePrompt
+          show={showInfoResumePrompt}
+          title={mediaTitle}
+          savedTime={savedProgress}
+          totalDuration={savedDuration}
+          posterPath={tvShow?.poster_path}
+          onResume={handleInfoResumeYes}
+          onStart={handleInfoResumeNo}
+          onDismiss={handleInfoResumeDismiss}
+        />
+      )}
+
+      {/* Cast Member Modal */}
+      {selectedCastMember && (
+        <CastMemberModal
+          isOpen={!!selectedCastMember}
+          onClose={() => setSelectedCastMember(null)}
+          castMemberId={selectedCastMember.id}
+          castMemberName={selectedCastMember.name}
+          castMemberImage={selectedCastMember.image}
+          castMemberCharacter={selectedCastMember.character}
+        />
+      )}
       </div>
     </div>
   );

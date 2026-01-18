@@ -67,11 +67,11 @@ const Top20Week =  () => {
 
   return (
     <div 
-      className="mb-8"
+      className="mb-8 sm:mb-12 px-4"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <h2 className="text-3xl font-bold mb-4 text-white font-orbitron">TOP 20 THIS WEEK</h2>
+      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-4 text-white font-orbitron whitespace-nowrap sm:whitespace-normal overflow-hidden text-ellipsis">TOP 20 THIS WEEK</h2>
       <div className="relative">
         {/* Left Arrow */}
         {canScrollLeft && (
@@ -85,11 +85,11 @@ const Top20Week =  () => {
 
         <div 
           ref={scrollContainerRef}
-          className="flex overflow-x-auto space-x-4 pb-4 hide-scrollbar"
+          className="flex overflow-x-auto space-x-2 sm:space-x-4 pb-4 hide-scrollbar"
           onScroll={checkScrollability}
         >
           {trending.map((media: any) => (
-            <div key={media.id} className="min-w-[200px]">
+            <div key={media.id} className="min-w-[160px] sm:min-w-[200px]">
               <MediaCard media={media} />
             </div>
           ))}

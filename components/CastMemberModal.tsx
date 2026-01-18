@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { getPersonDetails } from '@/lib/tmdb';
 
 interface PersonDetails {
@@ -37,6 +38,7 @@ export default function CastMemberModal({
   castMemberImage,
   castMemberCharacter,
 }: CastMemberModalProps) {
+  const router = useRouter();
   const [personDetails, setPersonDetails] = useState<PersonDetails | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -194,7 +196,15 @@ export default function CastMemberModal({
                       .sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0))
                       .slice(0, 4)
                       .map((item: any, idx: number) => (
-                        <div key={idx} className="group cursor-pointer">
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
+                            router.push(`/${mediaType}/${item.id}?view=info`);
+                            onClose();
+                          }}
+                          className="group cursor-pointer text-left hover:opacity-80 transition-opacity"
+                        >
                           <div className="relative overflow-hidden rounded-lg mb-3 aspect-[2/3] bg-gray-800 border border-gray-700 group-hover:border-red-600 transition-all">
                             {item.poster_path ? (
                               <Image
@@ -219,7 +229,7 @@ export default function CastMemberModal({
                               as {item.character}
                             </p>
                           )}
-                        </div>
+                        </button>
                       ))}
                   </div>
                 </div>

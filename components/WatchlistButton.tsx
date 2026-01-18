@@ -13,6 +13,7 @@ interface WatchlistButtonProps {
   rating?: number;
   hideTooltip?: boolean;
   initialIsInWatchlist?: boolean;
+  onToggle?: () => void;
 }
 
 export default function WatchlistButton({
@@ -23,6 +24,7 @@ export default function WatchlistButton({
   rating,
   hideTooltip = false,
   initialIsInWatchlist,
+  onToggle,
 }: WatchlistButtonProps) {
   const { data: session } = useSession();
   const { addToWatchlist, removeFromWatchlist } = useWatchlist();
@@ -41,9 +43,19 @@ export default function WatchlistButton({
       e.preventDefault();
     }
 
+    // Call onToggle immediately when clicked
+    onToggle?.();
+
     if (!session?.user) {
-      // Redirect to sign in
-      window.location.href = '/signin';
+      // If onToggle is provided, delay redirect to allow tab switching
+      if (onToggle) {
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 200);
+      } else {
+        // Redirect to sign in
+        window.location.href = '/signin';
+      }
       return;
     }
 

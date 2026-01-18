@@ -60,37 +60,240 @@ const Header = () => {
             </nav>
             {!loading && (
               <>
-                {user ? (
-                  <Menu as="div" className="relative inline-block text-left">
-                    <div>
-                      <Menu.Button className="inline-flex w-full justify-center rounded-full p-2 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 overflow-hidden backdrop-blur transition-colors duration-200">
-                        {user.image ? (
-                          <Image
-                            src={user.image}
-                            alt={user.name || 'User'}
-                            width={32}
-                            height={32}
-                            className="rounded-full object-cover"
-                          />
-                        ) : (
-                          <UserCircle2 size={32} aria-hidden="true" />
-                        )}
-                      </Menu.Button>
-                    </div>
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-100"
-                      enterFrom="transform opacity-0 scale-95"
-                      enterTo="transform opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
-                      leaveFrom="transform opacity-100 scale-100"
-                      leaveTo="transform opacity-0 scale-95"
+                {/* Desktop User Menu - Hidden on Mobile */}
+                <div className="hidden md:flex items-center gap-4">
+                  {user ? (
+                    <Menu as="div" className="relative inline-block text-left">
+                      <div>
+                        <Menu.Button className="inline-flex w-full justify-center rounded-full p-2 text-sm font-medium text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 overflow-hidden backdrop-blur transition-colors duration-200">
+                          {user.image ? (
+                            <Image
+                              src={user.image}
+                              alt={user.name || 'User'}
+                              width={32}
+                              height={32}
+                              className="rounded-full object-cover"
+                            />
+                          ) : (
+                            <UserCircle2 size={32} aria-hidden="true" />
+                          )}
+                        </Menu.Button>
+                      </div>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                      >
+                        <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
+                          <div className="px-1 py-1 ">
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link href="/dashboard"
+                                  className={`${
+                                    active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                  } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                                >
+                                  Dashboard
+                                </Link>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <button
+                                  onClick={logout}
+                                  className={`${
+                                    active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                  } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                                >
+                                  Logout
+                                </button>
+                              )}
+                            </Menu.Item>
+                          </div>
+                        </Menu.Items>
+                      </Transition>
+                    </Menu>
+                  ) : (
+                    <button
+                      onClick={handleAuthClick}
+                      className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"
+                      aria-label="Sign In / Sign Up"
                     >
-                      <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
-                        <div className="px-1 py-1 ">
+                      <UserCircle2 size={24} />
+                    </button>
+                  )}
+                  {user?.role === 'admin' && (
+                    <Link href="/admin" className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Admin Panel">
+                      <Settings size={24} />
+                    </Link>
+                  )}
+                  {/* TV Remote Dropdown - Admin Only */}
+                  {user?.role === 'admin' ? (
+                    <Menu as="div" className="relative inline-block text-left">
+                      <Menu.Button className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="TV Remote">
+                        <Tv size={24} />
+                      </Menu.Button>
+                      <Transition
+                        as={Fragment}
+                        enter="transition ease-out duration-100"
+                        enterFrom="transform opacity-0 scale-95"
+                        enterTo="transform opacity-100 scale-100"
+                        leave="transition ease-in duration-75"
+                        leaveFrom="transform opacity-100 scale-100"
+                        leaveTo="transform opacity-0 scale-95"
+                      >
+                        <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
+                          <div className="px-1 py-1">
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link href="/receiver"
+                                  className={`${
+                                    active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                  } group flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors duration-150`}
+                                >
+                                  Get Code
+                                </Link>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link href="/remote"
+                                  className={`${
+                                    active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                  } group flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors duration-150`}
+                                >
+                                  Enter Code
+                                </Link>
+                              )}
+                            </Menu.Item>
+                          </div>
+                        </Menu.Items>
+                      </Transition>
+                    </Menu>
+                  ) : (
+                    <div className="relative group">
+                      <button disabled className="text-lg text-gray-500 cursor-not-allowed opacity-50" title="TV Remote">
+                        <Tv size={24} />
+                      </button>
+                      <div className="absolute right-0 mt-2 w-32 bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 rounded-md p-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        Coming Soon
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
+                </div>
+              </>
+            )}
+
+            {/* Mobile Menu Button and Dropdown */}
+            <div className="md:hidden flex items-center gap-2">
+              {/* Mobile Search Icon */}
+              <button 
+                onClick={() => setIsSearchOpen(true)} 
+                className="text-gray-300 hover:text-blue-500 transition-colors duration-200 p-2 md:hidden"
+              >
+                <Search size={24} />
+              </button>
+
+              <Menu as="div" className="relative inline-block text-left">
+                <div>
+                  <Menu.Button className="inline-flex w-full justify-center rounded-md p-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75">
+                    <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+                  </Menu.Button>
+                </div>
+
+                <Transition
+                  as={Fragment}
+                  enter="transition ease-out duration-150"
+                  enterFrom="transform opacity-0 scale-95"
+                  enterTo="transform opacity-100 scale-100"
+                  leave="transition ease-in duration-100"
+                  leaveFrom="transform opacity-100 scale-100"
+                  leaveTo="transform opacity-0 scale-95"
+                >
+                  <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
+                    <div className="px-1 py-1">
+                      {navItems.map((item) => (
+                        <Menu.Item key={item.name}>
+                          {({ active }) => (
+                            <Link
+                              href={item.href}
+                              className={`${
+                                active ? 'bg-blue-500 text-white' : pathname === item.href ? 'bg-blue-500/50 text-white' : 'text-gray-200'
+                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                            >
+                              {item.name}
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      ))}
+
+                      {/* Divider */}
+                      <div className="my-1 h-px bg-gray-600/50"></div>
+
+                      {/* Admin Panel - Admin Only */}
+                      {user?.role === 'admin' && (
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              href="/admin"
+                              className={`${
+                                active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                            >
+                              <Settings size={18} className="mr-2" />
+                              Admin Panel
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      )}
+
+                      {/* TV Remote - Admin Only */}
+                      {user?.role === 'admin' && (
+                        <>
                           <Menu.Item>
                             {({ active }) => (
-                              <Link href="/dashboard"
+                              <Link
+                                href="/receiver"
+                                className={`${
+                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                              >
+                                <Tv size={18} className="mr-2" />
+                                Get Code
+                              </Link>
+                            )}
+                          </Menu.Item>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                href="/remote"
+                                className={`${
+                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
+                                } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
+                              >
+                                <Tv size={18} className="mr-2" />
+                                Enter Code
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        </>
+                      )}
+
+                      {/* Another Divider */}
+                      <div className="my-1 h-px bg-gray-600/50"></div>
+
+                      {/* User Account Section */}
+                      {user ? (
+                        <>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                href="/dashboard"
                                 className={`${
                                   active ? 'bg-blue-500 text-white' : 'text-gray-200'
                                 } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
@@ -111,127 +314,19 @@ const Header = () => {
                               </button>
                             )}
                           </Menu.Item>
-                        </div>
-                      </Menu.Items>
-                    </Transition>
-                  </Menu>
-                ) : (
-                  <button
-                    onClick={handleAuthClick}
-                    className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"
-                    aria-label="Sign In / Sign Up"
-                  >
-                    <UserCircle2 size={24} />
-                  </button>
-                )}
-                {user?.role === 'admin' && (
-                  <Link href="/admin" className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Admin Panel">
-                    <Settings size={24} />
-                  </Link>
-                )}
-                {/* TV Remote Dropdown - Admin Only */}
-                {user?.role === 'admin' ? (
-                  <Menu as="div" className="relative inline-block text-left">
-                    <Menu.Button className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="TV Remote">
-                      <Tv size={24} />
-                    </Menu.Button>
-                    <Transition
-                      as={Fragment}
-                      enter="transition ease-out duration-100"
-                      enterFrom="transform opacity-0 scale-95"
-                      enterTo="transform opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
-                      leaveFrom="transform opacity-100 scale-100"
-                      leaveTo="transform opacity-0 scale-95"
-                    >
-                      <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 focus:outline-none border border-white/10">
-                        <div className="px-1 py-1">
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link href="/receiver"
-                                className={`${
-                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                                } group flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors duration-150`}
-                              >
-                                Get Code
-                              </Link>
-                            )}
-                          </Menu.Item>
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link href="/remote"
-                                className={`${
-                                  active ? 'bg-blue-500 text-white' : 'text-gray-200'
-                                } group flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors duration-150`}
-                              >
-                                Enter Code
-                              </Link>
-                            )}
-                          </Menu.Item>
-                        </div>
-                      </Menu.Items>
-                    </Transition>
-                  </Menu>
-                ) : (
-                  <div className="relative group">
-                    <button disabled className="text-lg text-gray-500 cursor-not-allowed opacity-50" title="TV Remote">
-                      <Tv size={24} />
-                    </button>
-                    <div className="absolute right-0 mt-2 w-32 bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 rounded-md p-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                      Coming Soon
-                    </div>
-                  </div>
-                )}
-                <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
-              </>
-            )}
-
-            {/* Mobile Menu Button and Dropdown */}
-            <div className="md:hidden">
-              <Menu as="div" className="relative inline-block text-left">
-                <div>
-                  <Menu.Button className="inline-flex w-full justify-center rounded-md p-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75">
-                    <Bars3Icon className="h-6 w-6" aria-hidden="true" />
-                  </Menu.Button>
-                </div>
-
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-150"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-100"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right rounded-md bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none">
-                    <div className="px-1 py-1">
-                      {navItems.map((item) => (
-                        <Menu.Item key={item.name}>
-                          {({ active }) => (
-                            <Link
-                              href={item.href}
-                              className={`${
-                                active ? 'bg-blue-500 text-white' : pathname === item.href ? 'bg-blue-500/50 text-white' : 'text-gray-200'
-                              } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
-                            >
-                              {item.name}
-                            </Link>
-                          )}
-                        </Menu.Item>
-                      ))}
-                      {user?.role === 'admin' && (
+                        </>
+                      ) : (
                         <Menu.Item>
                           {({ active }) => (
-                            <Link
-                              href="/admin"
+                            <button
+                              onClick={handleAuthClick}
                               className={`${
                                 active ? 'bg-blue-500 text-white' : 'text-gray-200'
                               } group flex w-full items-center rounded-md px-2 py-2 text-sm transition-colors duration-150`}
                             >
-                              <Settings size={24} className="mr-2" />
-                              Admin Panel
-                            </Link>
+                              <UserCircle2 size={18} className="mr-2" />
+                              Sign In
+                            </button>
                           )}
                         </Menu.Item>
                       )}

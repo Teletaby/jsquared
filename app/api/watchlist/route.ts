@@ -35,7 +35,14 @@ export async function GET(request: NextRequest) {
     }
 
     const watchlist = await Watchlist.find({ userId: user._id }).sort({ addedAt: -1 });
-    return NextResponse.json(watchlist);
+    const plainWatchlist = watchlist.map(item => item.toObject ? item.toObject() : item);
+    console.log('Watchlist items returned:', plainWatchlist.map(item => ({ 
+      mediaId: item.mediaId, 
+      mediaType: item.mediaType, 
+      folderId: item.folderId,
+      title: item.title 
+    })));
+    return NextResponse.json(plainWatchlist);
   } catch (err: unknown) {
     console.error('Error fetching watchlist:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -60,6 +67,9 @@ export async function POST(request: NextRequest) {
 
     const { mediaId, mediaType, title, posterPath, rating } = await request.json();
 
+    // Find existing watchlist item to preserve folderId if it exists
+    const existingItem = await Watchlist.findOne({ userId: user._id, mediaId, mediaType });
+    
     const watchlist = await Watchlist.findOneAndUpdate(
       { userId: user._id, mediaId, mediaType },
       {
@@ -71,12 +81,16 @@ export async function POST(request: NextRequest) {
           posterPath,
           rating,
           addedAt: new Date(),
+          // Preserve existing folderId if it exists
+          ...(existingItem?.folderId && { folderId: existingItem.folderId }),
         },
       },
       { upsert: true, new: true }
     );
 
-    return NextResponse.json(watchlist);
+    const plainWatchlist = watchlist?.toObject ? watchlist.toObject() : watchlist;
+    console.log('POST response item:', plainWatchlist);
+    return NextResponse.json(plainWatchlist);
   } catch (error) {
     console.error('Error updating watchlist:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

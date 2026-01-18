@@ -319,3 +319,13 @@ export async function getPersonDetails(personId: number) {
     append_to_response: 'combined_credits',
   });
 }
+
+// Get similar movies
+export async function getSimilarMovies(movieId: number) {
+  return fetchFromTMDB(`/movie/${movieId}/similar`);
+}
+
+// Get similar TV shows
+export async function getSimilarTvShows(tvId: number) {
+  return fetchFromTMDB(`/tv/${tvId}/similar`);
+}

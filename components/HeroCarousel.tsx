@@ -202,8 +202,8 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   // Safeguard: if there is no content, show a simple placeholder
   if (!items || items.length === 0) {
     return (
-      <div className="relative w-screen left-1/2 -translate-x-1/2 h-[70vh] max-h-[500px] flex items-center justify-center mb-8 mt-0">
-        <div className="text-gray-400">No trending content available for today.</div>
+      <div className="relative w-screen left-1/2 -translate-x-1/2 h-[50vh] sm:h-[60vh] md:h-[70vh] md:max-h-[500px] flex items-center justify-center mb-8 mt-0">
+        <div className="text-gray-400 text-sm sm:text-base">No trending content available for today.</div>
       </div>
     );
   }
@@ -211,7 +211,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   return (
     <>
       {/* Carousel - positioned below navbar */}
-      <div className="relative w-screen left-1/2 -translate-x-1/2 h-[70vh] max-h-[500px] overflow-hidden mb-8 mt-0">
+      <div className="relative w-screen left-1/2 -translate-x-1/2 h-[50vh] sm:h-[60vh] md:h-[70vh] md:max-h-[500px] overflow-hidden mb-8 mt-0">
         {/* Carousel Items */}
         {items.map((item, index) => {
           const itemMediaType = item.media_type === 'tv' || !!item.name ? 'tv' : 'movie';
@@ -238,26 +238,26 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#121212] to-transparent pointer-events-none" />
 
             {/* Content (on top of overlays) */}
-            <div className="absolute inset-0 flex flex-col justify-center p-8 pb-24 md:p-12 md:pb-28 md:pl-24 lg:pl-32 z-20">
-              <div className="max-w-2xl">
+            <div className="absolute inset-0 flex flex-col justify-center p-4 pb-16 sm:p-6 sm:pb-20 md:p-12 md:pb-28 md:pl-24 lg:pl-32 z-20">
+              <div className="max-w-xl sm:max-w-2xl">
                 {/* Logo or Title */}
                 {logoMap.has(item.id) ? (
                   <img
                     src={logoMap.get(item.id)}
                     alt={title}
                     draggable={false}
-                    className="h-16 md:h-24 lg:h-32 w-auto object-contain mb-4 mt-8 drop-shadow-lg select-none"
+                    className="h-10 sm:h-16 md:h-24 lg:h-32 w-auto object-contain mb-2 sm:mb-4 mt-4 sm:mt-8 drop-shadow-lg select-none"
                   />
                 ) : (
-                  <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 drop-shadow-lg">
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 sm:mb-4 drop-shadow-lg">
                     {title}
                   </h1>
                 )}
 
                 {/* Rating & Info */}
-                <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-2 mb-3 sm:gap-3 sm:mb-4 flex-wrap">
                   {typeof item.vote_average === 'number' && item.vote_average > 0 && (
-                    <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">
+                    <div className="flex items-center gap-1 sm:gap-2 bg-white/20 backdrop-blur-md px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border border-white/30 text-sm sm:text-base">
                       <span className="text-yellow-400">⭐</span>
                       <span className="text-white font-semibold">
                         {item.vote_average.toFixed(1)}/10
@@ -266,15 +266,15 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                   )}
 
                   {/* Media type badge placed to the right of the rating */}
-                  <div className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded-full border border-white/20">
+                  <div className="flex items-center gap-1 sm:gap-2 bg-white/10 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full border border-white/20">
                     {itemMediaType === 'tv' ? (
                       <>
-                        <Tv size={16} className="text-white opacity-90" aria-hidden />
+                        <Tv size={14} className="text-white opacity-90 sm:w-4" aria-hidden />
                         <span className="text-xs font-semibold uppercase text-white">TV</span>
                       </>
                     ) : (
                       <>
-                        <Film size={16} className="text-white opacity-90" aria-hidden />
+                        <Film size={14} className="text-white opacity-90 sm:w-4" aria-hidden />
                         <span className="text-xs font-semibold uppercase text-white">Movie</span>
                       </>
                     )}
@@ -283,13 +283,13 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
 
                 {/* Description */}
                 {currentItem?.overview && (
-                  <p className="text-white text-sm md:text-base line-clamp-3 mb-6 drop-shadow-lg">
+                  <p className="text-white text-xs sm:text-sm md:text-base line-clamp-2 sm:line-clamp-3 mb-3 sm:mb-4 md:mb-6 drop-shadow-lg">
                     {currentItem?.overview}
                   </p>
                 )}
 
                 {/* Buttons */}
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap sm:gap-3">
                   {(() => {
                     const releaseDate = mediaType === 'movie' ? currentItem?.release_date : currentItem?.first_air_date;
                     const isUnreleased = releaseDate ? new Date(releaseDate) > new Date() : false;
@@ -300,7 +300,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                         disabled={isUnreleased}
                         onMouseEnter={() => setIsWatchButtonHovered(!isUnreleased)}
                         onMouseLeave={() => setIsWatchButtonHovered(false)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${
+                        className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-sm sm:text-base transition-all duration-300 ${
                           isUnreleased
                             ? 'bg-gray-600 text-gray-300 cursor-not-allowed opacity-60'
                             : `hover:scale-105 ${
@@ -317,10 +317,11 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                   })()}
                   <button
                     onClick={handleMoreInfo}
-                    className="flex items-center gap-2 bg-white/30 text-white p-3 rounded-lg font-semibold hover:bg-white/50 transition-all duration-300 backdrop-blur-md border border-white/30"
+                    className="flex items-center gap-1 sm:gap-2 bg-white/30 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-sm sm:text-base hover:bg-white/50 transition-all duration-300 backdrop-blur-md border border-white/30"
                   >
-                    <Info size={20} />
-                    <span>More Info</span>
+                    <Info size={16} className="sm:w-5" />
+                    <span className="hidden sm:inline">More Info</span>
+                    <span className="sm:hidden">Info</span>
                   </button>
                   <WatchlistButton
                       mediaId={item.id}
@@ -330,6 +331,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
                       rating={item.vote_average}
                       hideTooltip={true}
                       initialIsInWatchlist={initialIsInWatchlist}
+                      onToggle={() => router.push(`/${itemMediaType}/${item.id}?view=info`)}
                     />
                 </div>
               </div>

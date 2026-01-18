@@ -103,26 +103,10 @@ export default function LastWatchedSummary() {
             const recData = await recRes.json();
             console.log('[LastWatchedSummary] Recommendations fetched:', recData?.results?.length || 0, 'items');
             if (recData?.results && Array.isArray(recData.results)) {
-              // Try to filter by genres if we have them
-              let resToShow: any[] = [];
-              if (lastGenreIds && lastGenreIds.length > 0) {
-                console.log('[LastWatchedSummary] Filtering by genres:', lastGenreIds);
-                // First try genre-filtered
-                for (const r of recData.results) {
-                  const gids = r.genre_ids || [];
-                  const overlap = gids.some((id: number) => lastGenreIds!.includes(id));
-                  if (overlap) resToShow.push(r);
-                }
-                console.log('[LastWatchedSummary] Genre-filtered results:', resToShow.length);
-              }
-              
-              // If genre filtering produced no results, use all recommendations
-              if (resToShow.length === 0) {
-                console.log('[LastWatchedSummary] No genre matches, using all recommendations');
-                resToShow = recData.results;
-              }
+              // Use all TMDB recommendations without genre filtering to maximize selection
+              const resToShow = recData.results;
 
-              const chosen = resToShow.slice(0, 6);
+              const chosen = resToShow.slice(0, 20);
               console.log('[LastWatchedSummary] Final recommendations to display:', chosen.length);
               const mapped = chosen.map((r: any) => ({
                 id: `rec-${r.id}`,
@@ -220,10 +204,10 @@ export default function LastWatchedSummary() {
 
   return (
     <div className="mb-12">
-      <div className="flex items-baseline gap-4 mb-6 px-4">
-        <h3 className="text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Since you watched</h3>
+      <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 mb-6 px-4">
+        <h3 className="text-2xl sm:text-3xl font-bold text-white font-orbitron uppercase tracking-wider">Since you watched</h3>
         {lastItem && (
-          <div className="text-xl md:text-2xl font-bold text-[#E50914] tracking-tight max-w-[48ch] truncate">{lastItem.title}</div>
+          <div className="text-sm sm:text-lg md:text-xl font-bold text-[#E50914] tracking-tight truncate">{lastItem.title}</div>
         )}
       </div>
 

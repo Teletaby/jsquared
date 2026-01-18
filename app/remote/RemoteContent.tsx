@@ -13,6 +13,11 @@ interface Movie {
   media_type?: string;
 }
 
+interface Episode {
+  season: number;
+  episode: number;
+}
+
 const RemoteContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -30,6 +35,9 @@ const RemoteContent = () => {
   const [duration, setDuration] = useState(100);
   const [isConnected, setIsConnected] = useState(false);
   const [currentVideoType, setCurrentVideoType] = useState<'iframe' | 'direct' | null>(null);
+  const [selectedTV, setSelectedTV] = useState<Movie | null>(null);
+  const [selectedEpisode, setSelectedEpisode] = useState<Episode>({ season: 1, episode: 1 });
+  const [tvSeasons, setTVSeasons] = useState<number>(0);
 
   useEffect(() => {
     if (actualRoomId && actualRoomId !== '') {
@@ -158,21 +166,55 @@ const RemoteContent = () => {
 
   const handleSelectMovie = (movie: Movie) => {
     const mediaType = movie.media_type || 'movie';
-    const movieTitle = movie.title || movie.name || 'Unknown';
     
+    if (mediaType === 'tv') {
+      // For TV shows, show episode selector
+      setSelectedTV(movie);
+      setSelectedEpisode({ season: 1, episode: 1 });
+      // Fetch number of seasons
+      const showTitle = movie.name || 'Unknown';
+      setTVSeasons(10); // Default to 10, can be updated from TMDB API
+    } else {
+      // For movies, load directly
+      const movieTitle = movie.title || 'Unknown';
+      const command = {
+        type: 'load-video',
+        payload: {
+          id: movie.id,
+          title: movieTitle,
+          type: mediaType,
+          posterPath: movie.poster_path,
+          youtubeId: null,
+        }
+      };
+      
+      console.log('Sending command:', command);
+      sendCommand(command);
+      setSearchQuery('');
+      setSearchResults([]);
+    }
+  };
+
+  const handlePlayEpisode = () => {
+    if (!selectedTV) return;
+
+    const showTitle = selectedTV.name || 'Unknown';
     const command = {
       type: 'load-video',
       payload: {
-        id: movie.id,
-        title: movieTitle,
-        type: mediaType,
-        posterPath: movie.poster_path,
-        youtubeId: null, // We'll get this from the API
+        id: selectedTV.id,
+        title: `${showTitle} S${selectedEpisode.season}E${selectedEpisode.episode}`,
+        type: 'tv',
+        season: selectedEpisode.season,
+        episode: selectedEpisode.episode,
+        posterPath: selectedTV.poster_path,
+        youtubeId: null,
       }
     };
     
-    console.log('Sending command:', command);
+    console.log('Sending TV episode command:', command);
     sendCommand(command);
+    setSelectedTV(null);
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -290,6 +332,70 @@ const RemoteContent = () => {
             ) : (
               <p className="text-gray-400 text-center">No results found</p>
             )}
+          </div>
+        )}
+
+        {/* Episode Selector Modal */}
+        {selectedTV && (
+          <div className="mt-4 md:mt-6 lg:mt-8 bg-gray-800/50 backdrop-blur-lg rounded-lg border border-gray-700 p-3 md:p-4 lg:p-6">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-base md:text-lg lg:text-xl font-bold text-white">
+                {selectedTV.name}
+              </h2>
+              <button
+                onClick={() => setSelectedTV(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Season Selector */}
+              <div>
+                <label className="block text-sm md:text-base text-gray-300 mb-2 font-semibold">Season</label>
+                <select
+                  value={selectedEpisode.season}
+                  onChange={(e) => 
+                    setSelectedEpisode({ ...selectedEpisode, season: parseInt(e.target.value) })
+                  }
+                  className="w-full px-3 md:px-4 py-2 md:py-3 rounded-lg bg-gray-700/50 border border-gray-600 focus:border-blue-500 focus:outline-none text-white text-xs md:text-sm lg:text-base"
+                >
+                  {Array.from({ length: tvSeasons }, (_, i) => i + 1).map(season => (
+                    <option key={season} value={season}>
+                      Season {season}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Episode Selector */}
+              <div>
+                <label className="block text-sm md:text-base text-gray-300 mb-2 font-semibold">Episode</label>
+                <select
+                  value={selectedEpisode.episode}
+                  onChange={(e) => 
+                    setSelectedEpisode({ ...selectedEpisode, episode: parseInt(e.target.value) })
+                  }
+                  className="w-full px-3 md:px-4 py-2 md:py-3 rounded-lg bg-gray-700/50 border border-gray-600 focus:border-blue-500 focus:outline-none text-white text-xs md:text-sm lg:text-base"
+                >
+                  {Array.from({ length: 15 }, (_, i) => i + 1).map(episode => (
+                    <option key={episode} value={episode}>
+                      Episode {episode}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Play Button */}
+            <button
+              onClick={handlePlayEpisode}
+              className="w-full py-2 md:py-3 lg:py-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors duration-200 text-xs md:text-sm lg:text-base flex items-center justify-center gap-2"
+            >
+              <Play size={18} fill="white" className="md:w-5 md:h-5" />
+              Play Episode
+            </button>
           </div>
         )}
       </div>

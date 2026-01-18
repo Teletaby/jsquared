@@ -138,6 +138,11 @@ const watchlistSchema = new Schema(
     title: String,
     posterPath: String,
     rating: Number,
+    folderId: {
+      type: Schema.Types.ObjectId,
+      ref: 'WatchlistFolder',
+      sparse: true,
+    },
     addedAt: {
       type: Date,
       default: Date.now,
@@ -145,6 +150,36 @@ const watchlistSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Watchlist Folder Schema
+const watchlistFolderSchema = new Schema(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    description: {
+      type: String,
+      sparse: true,
+    },
+    color: {
+      type: String,
+      default: '#E50914',
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
+watchlistFolderSchema.index({ userId: 1, name: 1 }, { unique: true });
 
 // Settings Schema
 const settingsSchema = new Schema(
@@ -181,6 +216,18 @@ watchHistorySchema.index(
 );
 watchlistSchema.index({ userId: 1, mediaId: 1, mediaType: 1 }, { unique: true });
 
+// Add debug hook to watchlist
+watchlistSchema.post('findOneAndUpdate', function(doc: any) {
+  try {
+    console.log('[Watchlist Hook][findOneAndUpdate] watchlist item updated:', { 
+      _id: doc?._id, 
+      mediaId: doc?.mediaId,
+      folderId: doc?.folderId,
+      allFields: Object.keys(doc || {})
+    });
+  } catch (e) { console.error('[Watchlist Hook] error in findOneAndUpdate hook', e); }
+});
+
 // Add debug hooks to surface any writes to lastUsedSource
 userSchema.post('findOneAndUpdate', function(doc: any) {
   try {
@@ -204,4 +251,5 @@ userSchema.post('save', function(doc: any) {
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
 export const WatchHistory = mongoose.models.WatchHistory || mongoose.model('WatchHistory', watchHistorySchema);
 export const Watchlist = mongoose.models.Watchlist || mongoose.model('Watchlist', watchlistSchema);
+export const WatchlistFolder = mongoose.models.WatchlistFolder || mongoose.model('WatchlistFolder', watchlistFolderSchema);
 export const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema);
