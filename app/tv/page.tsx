@@ -1,5 +1,6 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
-import Header from '@/components/Header';
+import HeroCarousel from '@/components/HeroCarousel';
+import RootLayoutContent from '@/components/RootLayoutContent';
 import { Suspense } from 'react';
 import { getPopularTvShows, getTopRatedTvShows, getAiringTodayTvShows } from '@/lib/tmdb';
 
@@ -19,11 +20,15 @@ const TvShowsPage = async () => {
   const topRatedTvShows = await getTopRatedTvShows();
   const airingTodayTvShows = await getAiringTodayTvShows();
 
+  const heroItems = (popularTvShows?.results || []).slice(0, 10).map((show: any) => ({
+    ...show,
+    media_type: 'tv'
+  }));
+
   return (
-    <>
-      <Header />
-      <main className="container mx-auto p-4 pt-24">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">TV Shows</h1>
+    <RootLayoutContent>
+      <HeroCarousel items={heroItems} />
+      <div className="container mx-auto p-4 pt-0">
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer title="Popular TV Shows" items={popularTvShows?.results?.slice(0, 12) || []} />
         </Suspense>
@@ -34,8 +39,8 @@ const TvShowsPage = async () => {
           <MediaListWithTrailer title="Airing Today TV Shows" items={airingTodayTvShows?.results?.slice(0, 12) || []} />
         </Suspense>
         {/* Add more TV show categories as needed */}
-      </main>
-    </>
+      </div>
+    </RootLayoutContent>
   );
 };
 

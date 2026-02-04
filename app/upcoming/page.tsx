@@ -1,5 +1,6 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
-import Header from '@/components/Header';
+import HeroCarousel from '@/components/HeroCarousel';
+import RootLayoutContent from '@/components/RootLayoutContent';
 import { Suspense } from 'react';
 import { getUnreleasedMovies, getUnreleasedTvShows } from '@/lib/tmdb';
 
@@ -23,7 +24,7 @@ const UpcomingPage = async () => {
 
   // Filter out items without poster_path AND make sure date is strictly in the future
   const filterItemsWithPoster = (items: any[], dateField: 'release_date' | 'first_air_date') => {
-    return items?.filter((item: any) => {
+    return (items || []).filter((item: any) => {
       // Must have a poster
       if (!item.poster_path) return false;
       
@@ -36,15 +37,28 @@ const UpcomingPage = async () => {
       
       // Only show if date is AFTER today
       return itemDate > today;
-    }) || [];
+    });
   };
 
+  const upcomingMovies = filterItemsWithPoster(unreleasedMovies?.results || [], 'release_date');
+  const upcomingTvShows = filterItemsWithPoster(unreleasedTvShows?.results || [], 'first_air_date');
+  
+  const heroItems = [...upcomingMovies.slice(0, 5), ...upcomingTvShows.slice(0, 5)]
+    .sort((a, b) => {
+      const dateA = new Date(a.release_date || a.first_air_date || '');
+      const dateB = new Date(b.release_date || b.first_air_date || '');
+      return dateA.getTime() - dateB.getTime();
+    })
+    .slice(0, 10)
+    .map((item: any) => ({
+      ...item,
+      media_type: item.title ? 'movie' : 'tv'
+    }));
+
   return (
-    <>
-      <Header />
-      <main className="container mx-auto p-4 pt-24">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Coming Soon</h1>
-        
+    <RootLayoutContent>
+      <HeroCarousel items={heroItems} />
+      <div className="container mx-auto p-4 pt-0">
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer 
             title="Upcoming Movies" 
@@ -62,8 +76,8 @@ const UpcomingPage = async () => {
               .slice(0, 12)} 
           />
         </Suspense>
-      </main>
-    </>
+      </div>
+    </RootLayoutContent>
   );
 };
 

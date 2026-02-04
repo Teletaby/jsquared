@@ -27,6 +27,7 @@ import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 import MoreInfoModal from '@/components/MoreInfoModal';
 import TrailerPopup from '@/components/TrailerPopup';
 import CastMemberModal from '@/components/CastMemberModal';
+import Footer from '@/components/Footer';
 
 interface MovieDetailPageProps {
   params: {
@@ -359,18 +360,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     };
     checkStatus();
   }, [session, movie, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
-
-  // Effect to scroll to similar section when activeTab becomes 'overview'
-  useEffect(() => {
-    if (activeTab === 'overview' && similarMovies.length > 0) {
-      // Use requestAnimationFrame for more reliable timing
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      });
-    }
-  }, [activeTab, similarMovies.length]);
 
   // Fetch saved watch progress - reset on new movie
   useEffect(() => {
@@ -1142,12 +1131,12 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                             similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           }, 50);
                         }}
-                        className="w-10 h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center justify-center transform hover:scale-105"
-                        title="View recommendations"
+                        className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center gap-2 transform hover:scale-105 text-sm"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                         </svg>
+                        <span className="hidden sm:inline">View Similar</span>
                       </button>
                     )}
                     <WatchlistButton
@@ -1550,7 +1539,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 1 {videoSource === 'videasy' && '✓'}
+                    Player 1 {videoSource === 'videasy' && '✓'}
                   </button>
                   <button
                     data-source-button="vidlink"
@@ -1561,7 +1550,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 2 {videoSource === 'vidlink' && '✓'}
+                    Player 2 {videoSource === 'vidlink' && '✓'}
                   </button>
                   <button
                     data-source-button="vidnest"
@@ -1572,7 +1561,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 3 {videoSource === 'vidnest' && '✓'}
+                    Player 3 {videoSource === 'vidnest' && '✓'}
                   </button>
                   <button
                     data-source-button="vidsrc"
@@ -1583,7 +1572,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 4 {videoSource === 'vidsrc' && '✓'}
+                    Player 4 {videoSource === 'vidsrc' && '✓'}
                   </button>
                   <button
                     data-source-button="vidrock"
@@ -1594,7 +1583,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 5 {videoSource === 'vidrock' && '✓'}
+                    Player 5 {videoSource === 'vidrock' && '✓'}
                   </button>
                   <WatchlistButton
                     mediaId={tmdbId}
@@ -1813,6 +1802,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
           castMemberCharacter={selectedCastMember.character}
         />
       )}
+      
+      <Footer />
     </div>
   );
 };

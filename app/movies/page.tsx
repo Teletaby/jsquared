@@ -1,5 +1,6 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
-import Header from '@/components/Header';
+import HeroCarousel from '@/components/HeroCarousel';
+import RootLayoutContent from '@/components/RootLayoutContent';
 import { Suspense } from 'react';
 import { getPopularMovies, discoverMovies } from '@/lib/tmdb';
 import { GENRE_MAP } from '@/lib/genreMap';
@@ -20,11 +21,15 @@ const MoviesPage = async () => {
   const actionMovies = await discoverMovies({ with_genres: GENRE_MAP['action'], page: '1' });
   const comedyMovies = await discoverMovies({ with_genres: GENRE_MAP['comedy'], page: '1' });
 
+  const heroItems = (popularMovies?.results || []).slice(0, 10).map((movie: any) => ({
+    ...movie,
+    media_type: 'movie'
+  }));
+
   return (
-    <>
-      <Header />
-      <main className="container mx-auto p-4 pt-24">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-6">Movies</h1>
+    <RootLayoutContent>
+      <HeroCarousel items={heroItems} />
+      <div className="container mx-auto p-4 pt-0">
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer title="Popular Movies" items={popularMovies?.results?.slice(0, 12) || []} />
         </Suspense>
@@ -34,8 +39,8 @@ const MoviesPage = async () => {
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer title="Comedy" items={comedyMovies?.results?.slice(0, 12) || []} />
         </Suspense>
-      </main>
-    </>
+      </div>
+    </RootLayoutContent>
   );
 };
 

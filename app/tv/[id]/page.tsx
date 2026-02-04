@@ -23,6 +23,7 @@ import ResumePrompt from '@/components/ResumePrompt';
 import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 import CastMemberModal from '@/components/CastMemberModal';
 import TrailerPopup from '@/components/TrailerPopup';
+import Footer from '@/components/Footer';
 
 
 interface TvDetailPageProps {
@@ -373,18 +374,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     };
     checkStatus();
   }, [session, tvShow, tmdbId, mediaType, checkWatchlistStatus, initialIsInWatchlist]);
-
-  // Effect to scroll to similar section when activeTab becomes 'overview'
-  useEffect(() => {
-    if (activeTab === 'overview' && similarShows.length > 0) {
-      // Use requestAnimationFrame for more reliable timing
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      });
-    }
-  }, [activeTab, similarShows.length]);
 
   // Fetch saved watch progress - reset when episode changes
   useEffect(() => {
@@ -1063,12 +1052,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                             similarSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           }, 50);
                         }}
-                        className="w-10 h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center justify-center transform hover:scale-105"
-                        title="View recommendations"
+                        className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center gap-2 transform hover:scale-105 text-sm"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                          <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                         </svg>
+                        <span className="hidden sm:inline">View Similar</span>
                       </button>
                     )}
                     <WatchlistButton
@@ -1265,7 +1254,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                       return (
                       <div
                         key={episode.episode_number}
-                        className={`group bg-gray-900/50 rounded-lg overflow-hidden border transition-all duration-300 ${isReleased ? 'cursor-pointer border-gray-700 hover:border-red-600 transform hover:scale-105 hover:shadow-lg' : 'cursor-not-allowed border-gray-700/50 opacity-75'}`}
+                        className={`group bg-gray-900/50 rounded-lg overflow-hidden border transition-all duration-300 select-none ${isReleased ? 'cursor-pointer border-gray-700 hover:border-red-600 transform hover:scale-105 hover:shadow-lg' : 'cursor-not-allowed border-2 border-red-600/70 shadow-lg shadow-red-600/30'}`}
+                        style={!isReleased ? { userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' } : {}}
                       >
                         {/* Episode Image */}
                         <div className="relative w-full aspect-video overflow-hidden bg-gray-800">
@@ -1275,10 +1265,12 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                               alt={`Episode ${episode.episode_number}`}
                               className={`w-full h-full object-cover ${isReleased ? 'group-hover:scale-110' : 'opacity-40'} transition-transform duration-500`}
                             />
-                          ) : (
+                          ) : isReleased ? (
                             <div className="w-full h-full flex items-center justify-center">
                               <span className="text-gray-500">No Image</span>
                             </div>
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-black to-red-900/30"></div>
                           )}
                           {/* Overlay on hover or Not Available */}
                           {isReleased ? (
@@ -1307,7 +1299,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                               </span>
                             )}
                             {!isReleased && (
-                              <span className="text-gray-500 text-xs flex-shrink-0 ml-2 italic">Not yet released</span>
+                              <span className="text-red-500 text-sm font-bold flex-shrink-0 ml-2 uppercase tracking-wide">Not yet released</span>
                             )}
                           </div>
 
@@ -1380,7 +1372,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
         </>
       )}
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-16">
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-2">
         {view !== 'info' && (
           <>
           {/* Player Section - Appears at top when watching */}
@@ -1534,7 +1526,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 1 {videoSource === 'videasy' && '✓'}
+                    Player 1 {videoSource === 'videasy' && '✓'}
                   </button>
                   <button
                     data-source-button="vidlink"
@@ -1545,7 +1537,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 2 {videoSource === 'vidlink' && '✓'}
+                    Player 2 {videoSource === 'vidlink' && '✓'}
                   </button>
                   <button
                     data-source-button="vidnest"
@@ -1556,7 +1548,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 3 {videoSource === 'vidnest' && '✓'}
+                    Player 3 {videoSource === 'vidnest' && '✓'}
                   </button>
                   <button
                     data-source-button="vidsrc"
@@ -1567,7 +1559,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 4 {videoSource === 'vidsrc' && '✓'}
+                    Player 4 {videoSource === 'vidsrc' && '✓'}
                   </button>
                   <button
                     data-source-button="vidrock"
@@ -1578,7 +1570,7 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         : 'text-gray-400 border border-gray-700 hover:border-gray-500 hover:text-gray-300'
                     }`}
                   >
-                    Source 5 {videoSource === 'vidrock' && '✓'}
+                    Player 5 {videoSource === 'vidrock' && '✓'}
                   </button>
                 </>
               ) : (
@@ -1704,13 +1696,17 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {/* Overview */}
                 <div>
-                  <h2 className={`text-xl font-bold mb-3 text-white ${currentEpisode === 1 ? 'cursor-pointer hover:text-gray-300' : ''}`}
-                      onClick={() => currentEpisode === 1 && setShowEpisodeSynopsis(!showEpisodeSynopsis)}
+                  <h2 className={`text-xl font-bold mb-3 text-white ${currentSeason === 1 && currentEpisode === 1 ? 'cursor-pointer hover:text-gray-300' : ''}`}
+                      onClick={() => currentSeason === 1 && currentEpisode === 1 && setShowEpisodeSynopsis(!showEpisodeSynopsis)}
                   >
-                    {currentEpisode === 1 ? '📺 SYNOPSIS (Click to toggle episode info)' : `📺 SYNOPSIS FOR EPISODE ${currentEpisode}`}
+                    {currentSeason === 1 && currentEpisode === 1 ? '📺 SYNOPSIS (Click to toggle episode info)' : '📺 EPISODE SYNOPSIS'}
                   </h2>
-                  {/* Show episode synopsis if viewing episode 1 and synopsis is toggled on, or for any other episode */}
-                  {(currentEpisode === 1 && showEpisodeSynopsis) || currentEpisode !== 1 ? (
+                  {/* Show series synopsis for Season 1 Episode 1 only when not toggled */}
+                  {currentSeason === 1 && currentEpisode === 1 && !showEpisodeSynopsis && (
+                    <p className="text-gray-400 leading-relaxed">{tvShow.overview}</p>
+                  )}
+                  {/* Show episode synopsis if viewing S1E1 and synopsis is toggled on, or for any other episode */}
+                  {(currentSeason === 1 && currentEpisode === 1 && showEpisodeSynopsis) || (currentSeason !== 1 || currentEpisode !== 1) ? (
                     <>
                       {episodeData && (
                         <div className="mb-4 p-4 border border-gray-700 rounded bg-gray-900/50">
@@ -1720,16 +1716,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                       )}
                     </>
                   ) : null}
-                  {/* Show show synopsis for episode 1 when not toggled */}
-                  {currentEpisode === 1 && !showEpisodeSynopsis && (
-                    <p className="text-gray-400 leading-relaxed">{tvShow.overview}</p>
-                  )}
-                  {/* For other episodes, also show the show synopsis below */}
-                  {currentEpisode !== 1 && (
-                    <>
-                      <p className="text-gray-400 leading-relaxed mb-4">{tvShow.overview}</p>
-                    </>
-                  )}
                 </div>
 
                 {/* Reviews Section */}
@@ -1862,6 +1848,8 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           castMemberCharacter={selectedCastMember.character}
         />
       )}
+      
+      <Footer />
       </div>
     </div>
   );
