@@ -6,8 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import UserWatchHistory from '@/components/UserWatchHistory';
 import Header from '@/components/Header';
-import ProfileImageEditor from '@/components/ProfileImageEditor';
-import { Plus, X, Folder, Camera } from 'lucide-react';
+import { Plus, X, Folder } from 'lucide-react';
 
 // Force recompile
 
@@ -75,16 +74,7 @@ const DashboardPage = () => {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
   const [deletingFolder, setDeletingFolder] = useState(false);
-  const [showProfileImageEditor, setShowProfileImageEditor] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | undefined>(session?.user?.image || undefined);
   const user = session?.user as UserProfile | undefined;
-
-  // Sync profileImage with session when session updates
-  useEffect(() => {
-    if (session?.user?.image) {
-      setProfileImage(session.user.image);
-    }
-  }, [session?.user?.image]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -393,26 +383,20 @@ const DashboardPage = () => {
           {/* User Profile Section */}
           <div className="mb-16 flex items-center gap-8 rounded-xl bg-gradient-to-r from-[#E50914]/20 to-[#1A1A1A] p-8 shadow-2xl border border-[#E50914]/30">
             <div 
-              className="group relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-full border-4 border-[#E50914] shadow-lg shadow-[#E50914]/50 cursor-pointer"
-              onClick={() => setShowProfileImageEditor(true)}
+              className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-full border-4 border-[#E50914] shadow-lg shadow-[#E50914]/50"
             >
-              {profileImage || user?.image ? (
+              {user?.image ? (
                 <Image
-                  src={profileImage || user?.image || ''}
+                  src={user.image}
                   alt={user?.name || 'User'}
                   fill
                   className="object-cover object-center"
-                  key={profileImage || user?.image}
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-[#E50914] text-4xl font-bold">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Camera size={40} className="text-white" />
-              </div>
             </div>
             <div className="flex-1">
               <h1 className="text-4xl font-bold mb-2 font-orbitron uppercase tracking-wider">{user?.name || 'Welcome'}</h1>
@@ -772,18 +756,7 @@ const DashboardPage = () => {
         </main>
       </div>
       
-      {/* Profile Image Editor Modal */}
-      <ProfileImageEditor
-        isOpen={showProfileImageEditor}
-        onClose={() => setShowProfileImageEditor(false)}
-        onSave={async (imageUrl) => {
-          // Update local state to show new image immediately
-          setProfileImage(imageUrl);
-          setShowProfileImageEditor(false);
-        }}
-        currentImage={profileImage || user?.image}
-        userName={user?.name}
-      />
+
     </>
   );
 };

@@ -47,8 +47,10 @@ export const authOptions: NextAuthOptions = {
             id: user._id.toString(),
             email: user.email,
             name: user.name,
-            image: user.image,
-            role: user.role, // Add the user's role
+            // DO NOT include image here — it can be a huge base64 string
+            // that bloats the JWT cookie past HTTP header limits (HTTP 431).
+            // Images are fetched from DB in the session callback instead.
+            role: user.role,
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -93,14 +95,21 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        token.image = user.image; // Add image to token on sign in
       }
+      // Always strip image/picture from token to keep cookies small.
+      // NextAuth auto-populates these from the user object.
+      delete token.image;
+      delete token.picture;
+      delete (token as any).photo;
       if (trigger === 'update' && session?.user) {
         token.name = session.user.name;
         token.email = session.user.email;
-        token.image = session.user.image;
         token.role = session.user.role;
       }
+      // Always strip image/picture from token
+      delete token.image;
+      delete token.picture;
+      delete (token as any).photo;
       return token;
     },
     async session({ session, token }: { session: any; token: JWT }) {
@@ -109,17 +118,18 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string;
         
         // Fetch fresh user data from database to get latest image
+        // Image is NOT stored in the JWT token to keep cookies small
         try {
           await connectToDatabase();
           const dbUser = await User.findById(token.id);
           if (dbUser) {
-            session.user.image = dbUser.image; // Always use the latest image from DB
+            session.user.image = dbUser.image || null;
           } else {
-            session.user.image = token.image as string;
+            session.user.image = null;
           }
         } catch (error) {
           console.error('Error fetching user in session callback:', error);
-          session.user.image = token.image as string;
+          session.user.image = null;
         }
       }
       return session;

@@ -118,7 +118,7 @@ const _prepareInterval = setInterval(() => {
 app.prepare().then(() => {
   clearInterval(_prepareInterval);
   console.log('Next.js app prepared successfully. Starting HTTP server...');
-  const server = createServer((req, res) => {
+  const server = createServer({ maxHeaderSize: 32768 }, (req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
   }).listen(process.env.PORT || 3000, (err) => {

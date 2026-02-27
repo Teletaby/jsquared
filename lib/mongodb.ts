@@ -27,6 +27,8 @@ export async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      family: 4, // Force IPv4
+      serverSelectionTimeoutMS: 5000, // 5 second timeout
     };
 
     cached.promise = mongoose
