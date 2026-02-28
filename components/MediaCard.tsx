@@ -178,7 +178,6 @@ const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, initialIsInWatchl
               rating={media.vote_average}
               hideTooltip={true}
               initialIsInWatchlist={initialIsInWatchlist}
-              onToggle={() => router.push(`/${mediaTypeForPath}/${media.id}?view=info`)}
             />
           </div>
         </div>

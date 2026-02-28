@@ -124,7 +124,7 @@ const Chatbot = () => {
       const botResponse: Message = { text: data.response, sender: 'bot' };
       setMessages(prev => [...prev, botResponse]);
     } catch (error) {
-      console.error("Error fetching from Gemini API:", error);
+      console.error("Error fetching from Groq API:", error);
       const errorMessage: Message = { text: "I'm sorry, I encountered an error and cannot respond right now. Please try again later.", sender: 'bot' };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -189,7 +189,7 @@ const Chatbot = () => {
           <div className="p-2 border-t border-gray-700 flex">
             <input
               type="text"
-              placeholder={isChatbotUnderMaintenance && !isAdmin ? "Chatbot is under maintenance..." : isLoading ? "Gemini is thinking..." : "Type your message..."}
+              placeholder={isChatbotUnderMaintenance && !isAdmin ? "Chatbot is under maintenance..." : isLoading ? "J is thinking..." : "Type your message..."}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}

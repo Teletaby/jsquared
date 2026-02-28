@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { startNewChat, sendChatMessage } from '@/lib/gemini';
+import { startNewChat, sendChatMessage } from '@/lib/groq';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
@@ -23,19 +23,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Current message is required' }, { status: 400 });
     }
 
-    // Convert messages to the format expected by startChat history
+    // Convert messages to the format expected by DeepSeek chat history
     const history = messages.map((msg: any) => ({
-      role: msg.sender === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.text }],
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.text,
     }));
 
     const chat = startNewChat(history);
 
     // Prepend conciseness instruction to the current message
     const concisePrompt = currentMessage;
-    const geminiResponse = await sendChatMessage(chat, concisePrompt);
+    const deepseekResponse = await sendChatMessage(chat, concisePrompt);
 
-    return NextResponse.json({ response: geminiResponse });
+    return NextResponse.json({ response: deepseekResponse });
   } catch (error) {
     console.error('Error in chat API route:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

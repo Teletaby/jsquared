@@ -6,8 +6,8 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
 import React, { useCallback, useEffect, useState, useRef, useMemo } from 'react';
-import { formatDuration, getVideoSourceSetting, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play, Film, Info, Search as SearchIcon } from 'lucide-react';
+import { formatDuration, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
+import { Download, Play, Film, Info, Search as SearchIcon, Sparkles, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
@@ -27,6 +27,7 @@ import { useAdvancedPlaytime } from '@/lib/hooks/useAdvancedPlaytime';
 import MoreInfoModal from '@/components/MoreInfoModal';
 import TrailerPopup from '@/components/TrailerPopup';
 import CastMemberModal from '@/components/CastMemberModal';
+import VideoAIChat from '@/components/VideoAIChat';
 import Footer from '@/components/Footer';
 
 interface MovieDetailPageProps {
@@ -89,17 +90,8 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const { checkWatchlistStatus } = useWatchlist();
   const { queueUpdate } = useAdvancedPlaytime();
   const hasFetchedRef = useRef(false); // Track if initial fetch has completed
-  // videoSource starts from localStorage when available, otherwise defaults to videasy
-  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>(() => {
-    try {
-      const local = typeof window !== 'undefined' ? localStorage.getItem('lastUsedSource') : null;
-      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
-      if (local && allowed.includes(local)) return local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock';
-    } catch (e) {
-      // ignore storage errors
-    }
-    return 'videasy'; // Default to videasy for new users
-  });
+  // videoSource defaults to videasy (Player 1) for new/unwatched content; per-title history overrides later
+  const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'>('videasy');
   const [userLastSourceInfo, setUserLastSourceInfo] = useState<{ source?: string; at?: string | null } | null>(null);
 
   // Search state
@@ -130,6 +122,23 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   const [showMoreInfoModal, setShowMoreInfoModal] = useState(false);
   const [showTrailerPopup, setShowTrailerPopup] = useState(false);
   const [showInfoResumePrompt, setShowInfoResumePrompt] = useState(false); // Resume prompt for info view
+  const [showInfoAIChat, setShowInfoAIChat] = useState(false); // AI chat panel in info view
+
+  // Lock body scroll when AI chat modal is open
+  useEffect(() => {
+    if (showInfoAIChat) {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+      document.documentElement.style.overflow = 'unset';
+    };
+  }, [showInfoAIChat]);
+
   const [similarMovies, setSimilarMovies] = useState<any[]>([]);
   const similarSectionRef = useRef<HTMLDivElement>(null);
   const overviewTabRef = useRef<HTMLButtonElement>(null);
@@ -195,32 +204,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     router.push(path);
   };
 
-  // Immediately restore source from storage on client mount (runs once, synchronously reads storage)
-  useEffect(() => {
-    try {
-      // Priority 1: Per-media explicit source from sessionStorage (persists on refresh)
-      const perMediaSource = sessionStorage.getItem(`jsc_explicit_source_${tmdbId}`);
-      const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
-      if (perMediaSource && allowed.includes(perMediaSource)) {
-        console.log('[Client] Restoring per-media source from sessionStorage:', perMediaSource);
-        setVideoSource(perMediaSource as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
-        const at = sessionStorage.getItem(`jsc_explicit_source_at_${tmdbId}`);
-        setUserLastSourceInfo({ source: perMediaSource, at: at || null });
-        return; // Don't check other sources if per-media is set
-      }
-      // Priority 2: Global localStorage (persists across sessions)
-      const local = localStorage.getItem('lastUsedSource');
-      console.log('[Client] Checking localStorage for lastUsedSource:', local);
-      if (local && allowed.includes(local)) {
-        console.log('[Client] Restoring source from localStorage:', local);
-        setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
-        setUserLastSourceInfo({ source: local, at: null });
-      }
-    } catch (e) {
-      // ignore storage errors
-    }
-  }, [tmdbId]); // Only run when mediaId changes, not on every render
-
   // Auto-hide notification after 5 seconds
   useEffect(() => {
     if (showResumePrompt && notificationVisible) {
@@ -230,18 +213,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       return () => clearTimeout(timer);
     }
   }, [showResumePrompt, notificationVisible]);
-
-  // Persist videoSource to localStorage whenever it changes (so it becomes the default next time)
-  useEffect(() => {
-    if (videoSource && videoSource !== 'videasy') {
-      try {
-        localStorage.setItem('lastUsedSource', videoSource);
-        console.log('[Client] Persisted lastUsedSource to localStorage:', videoSource);
-      } catch (e) {
-        console.warn('[Client] Failed to persist source to localStorage', e);
-      }
-    }
-  }, [videoSource]);
 
   // Effect to reset player state when content changes - no longer needed here
   useEffect(() => {
@@ -377,24 +348,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
     const fetchWatchProgress = async () => {
       try {
         console.log('🔍 Fetching watch progress for user:', session.user?.email);
-        // Ensure we know the user's saved server preference before reading history
-        let serverSource: string | undefined = userLastSourceInfo?.source;
-        if (session?.user && !serverSource) {
-          try {
-            const srcRes = await fetch('/api/user/source');
-            if (srcRes.ok) {
-              const sdata = await srcRes.json();
-              if (sdata?.source) {
-                serverSource = sdata.source;
-                setUserLastSourceInfo({ source: sdata.source, at: sdata.lastUsedSourceAt || null });
-                console.log('[Client] Pre-fetched server user source before watch-history:', serverSource);
-              }
-            }
-          } catch (e) {
-            console.warn('[Client] Failed to pre-fetch server user source before watch-history', e);
-          }
-        }
-
         const response = await fetch('/api/watch-history');
         if (response.ok) {
           const data = await response.json();
@@ -405,64 +358,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
             setSavedProgress(movieHistory.currentTime); // Keep full precision, no rounding
             setSavedDuration(movieHistory.totalDuration || 0);
             setCurrentPlaybackTime(movieHistory.currentTime);
-
-            // Prefer the user's stored profile source over a watch-history item's recorded source.
-            // Only fall back to the history item's source when no per-user preference exists and no explicit local selection is present.
-            const qsSource = searchParams.get('source');
-            if (!qsSource && movieHistory.source) {
-              // If we already pre-fetched the server preference above, `serverSource`
-              // will be set. If not, try localStorage as a fallback.
-              if (!serverSource) {
-                try {
-                  const local = localStorage.getItem('lastUsedSource');
-                  const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
-                  if (local && allowed.includes(local)) {
-                    serverSource = local;
-                    console.log('[Client] Using localStorage lastUsedSource as fallback while applying history:', serverSource);
-                  }
-                } catch (e) {
-                  // ignore storage errors
-                }
-              }
-
-              // If server has a stored source, use it (prefer user's last used source)
-              if (serverSource) {
-                const allowedSources = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
-                if (allowedSources.includes(serverSource)) {
-                  console.log('[Client] Using server preferred source:', serverSource);
-                  setVideoSource(serverSource as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
-                  setUserLastSourceInfo({ source: serverSource, at: userLastSourceInfo?.at || null });
-                }
-              } else {
-                const _id = sourceNameToId(movieHistory.source);
-                console.log('[Client] No server/user profile source; using source from watch-history:', _id ? `Source ${_id}` : 'unknown', { movieHistorySource: movieHistory.source, userLastSourceInfo });
-
-                // Only use watch-history source if the user hasn't explicitly selected a source for THIS media in this tab
-                let explicit = false;
-                try { 
-                  explicit = !!getExplicitSourceForMedia(tmdbId, false);
-                } catch (e) { explicit = false; }
-                if (!explicit) {
-                  console.log('[Client][DEBUG] Setting video source from history', { setTo: movieHistory.source, movieId: movieHistory.mediaId, movieTitle: movieHistory.title });
-                  setVideoSource(movieHistory.source);
-                  setUserLastSourceInfo({ source: movieHistory.source, at: movieHistory.lastWatchedAt || null });
-
-                  // Best-effort persist so future navigations pick this up in the user profile
-                  try {
-                    fetch('/api/user/source', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      /* intentionally not persisting automatic watch-history source to avoid overwriting explicit user preferences */
-                      keepalive: true,
-                    }).catch(() => {});
-                  } catch (e) {
-                    // ignore persistence failures (server-side retry/fallback exists)
-                  }
-                } else {
-                  console.log('[Client] Skipping applying/persisting watch-history source because explicit local selection exists');
-                }
-              }
-            }
+            // Source is now resolved in fetchVideoSource via per-title watch history — no source logic here
           } else {
             console.log('❌ NOT FOUND! Looking for movie:', tmdbId);
             console.log('Available movies:', data.filter((h: any) => h.mediaType === 'movie').map((h: any) => h.mediaId));
@@ -494,10 +390,10 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
   //   }
   // }, [videoSource]);
 
-  // Fetch video source setting (but honor `?source=` query param if present)
+  // Fetch video source setting — per-title memory: use the source saved in watch history for this title
   useEffect(() => {
     const fetchVideoSource = async () => {
-      // If we've already got an explicit selection (per-media), use it and do not overwrite it
+      // Priority 1: If we've already got an explicit selection in this tab (sessionStorage), use it
       try {
         const explicit = getExplicitSourceForMedia(tmdbId, false);
         if (explicit) {
@@ -511,66 +407,47 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         // ignore storage errors
       }
 
-      // If the URL includes a source override, trust it and do not fetch/overwrite from server
+      // Priority 2: URL query param override
       const qsSource = searchParams.get('source');
       if (qsSource) {
-        // Accept either numeric ids (1,2,3,4) or names ('videasy','vidlink','vidnest','vidsrc') for backward compatibility
         const name = sourceIdToName(qsSource) || (['videasy','vidlink','vidnest','vidsrc','vidrock'].includes(qsSource) ? qsSource : undefined);
         if (name) {
           const qsId = sourceNameToId(name);
-          console.log('[Client] Source query param detected; skipping server fetch and setting source to:', qsId ? `Source ${qsId}` : 'unknown');
+          console.log('[Client] Source query param detected; setting source to:', qsId ? `Source ${qsId}` : 'unknown');
           setVideoSource(name as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
           setUserLastSourceInfo({ source: name, at: new Date().toISOString() });
           return;
         }
       }
 
-      // Prefer per-user saved source if available, otherwise fall back to global setting
-      try {
-        const res = await fetch('/api/user/source');
-        if (res.ok) {
-          const data = await res.json();
-          console.log('[Client] /api/user/source returned:', data);
-          if (data?.source) {
-            try {
-              // Synchronously check per-media explicit selection (do NOT fall back to global here)
-              const explicit = getExplicitSourceForMedia(tmdbId, false);
-              if (!explicit) {
-                setVideoSource(data.source);
-                setUserLastSourceInfo({ source: data.source, at: data.lastUsedSourceAt || null });
-              } else {
-                console.log('[Client] Skipping server source because explicit local selection exists for this media', { mediaId: tmdbId, explicit });
+      // Priority 3: Per-title watch history source (logged-in users)
+      if (session?.user) {
+        try {
+          const res = await fetch('/api/watch-history');
+          if (res.ok) {
+            const data = await res.json();
+            const movieHistory = data.find((item: any) => item.mediaId === tmdbId && item.mediaType === 'movie' && item.source);
+            if (movieHistory?.source) {
+              const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
+              if (allowed.includes(movieHistory.source)) {
+                const srcId = sourceNameToId(movieHistory.source);
+                console.log('[Client] Per-title source from watch history (movie):', srcId ? `Source ${srcId}` : movieHistory.source);
+                setVideoSource(movieHistory.source as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
+                setUserLastSourceInfo({ source: movieHistory.source, at: movieHistory.lastWatchedAt || null });
+                return;
               }
-            } catch (e) {
-              setVideoSource(data.source);
-              setUserLastSourceInfo({ source: data.source, at: data.lastUsedSourceAt || null });
             }
-            return;
           }
+        } catch (e) {
+          console.warn('[Client] Error fetching watch history for per-title source (movie):', e);
         }
-      } catch (e) {
-        console.warn('Error fetching user source:', e);
-        // ignore and fall back
-      }
-      // If server didn't provide a user preference, prefer a client-local saved preference
-      try {
-        const local = localStorage.getItem('lastUsedSource');
-        const allowed = ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock'];
-        if (local && allowed.includes(local)) {
-          setVideoSource(local as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock');
-          setUserLastSourceInfo({ source: local, at: null });
-          return;
-        }
-      } catch (e) {
-        // ignore storage errors
       }
 
-      // Default to videasy for logged-out users or when no other source is found
-      console.log('[Client] No saved source found, defaulting to videasy (Source 1)');
+      // Priority 4: Default to videasy (Player 1) for new/unwatched content
+      console.log('[Client] No per-title source found, defaulting to videasy (Player 1)');
       setVideoSource('videasy');
       setUserLastSourceInfo({ source: 'videasy', at: null });
     };
-    // Re-run when session changes or query params change (so a resume link can override)
     fetchVideoSource();
   }, [session?.user?.email, searchParams]);
 
@@ -683,9 +560,6 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
         } catch (e) {
           console.warn('Failed to persist user source selection', e);
         }
-
-        // Also save to localStorage for faster initial load
-        try { localStorage.setItem('lastUsedSource', source); } catch (e) {}
 
         // Update the watch history item's source so "Continue Watching" works correctly
         try {
@@ -1139,6 +1013,13 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         <span className="hidden sm:inline">View Similar</span>
                       </button>
                     )}
+                    <button
+                      onClick={() => setShowInfoAIChat(true)}
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center gap-2 transform hover:scale-105 text-sm"
+                    >
+                      <Sparkles size={16} />
+                      <span className="hidden sm:inline">Ask AI</span>
+                    </button>
                     <WatchlistButton
                       mediaId={tmdbId}
                       mediaType={mediaType}
@@ -1152,6 +1033,34 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
               </div>
             </div>
           </div>
+
+          {/* AI Chat Modal in Info View */}
+          {showInfoAIChat && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowInfoAIChat(false)}>
+              <div className="relative w-full max-w-lg mx-4 max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+                <button
+                  onClick={() => setShowInfoAIChat(false)}
+                  className="absolute top-3 right-3 z-10 p-1.5 rounded-full bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+                <VideoAIChat
+                  mediaContext={{
+                    title: mediaTitle,
+                    mediaType: 'movie',
+                    overview: movie.overview,
+                    genres: movie.genres?.map(g => g.name),
+                    releaseDate: movie.release_date,
+                    rating: movie.vote_average,
+                    runtime: movie.runtime,
+                    cast: movie.cast?.slice(0, 10).map(c => c.name),
+                    tagline: movie.tagline,
+                  }}
+                  defaultOpen
+                />
+              </div>
+            </div>
+          )}
 
           {/* Details Section Below Hero */}
           <div className="max-w-7xl mx-auto px-6 py-16 space-y-12">
@@ -1613,6 +1522,21 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                   </div>
                 )}
 
+                {/* AI Chat - Ask about this video */}
+                <VideoAIChat
+                  mediaContext={{
+                    title: mediaTitle,
+                    mediaType: 'movie',
+                    overview: movie.overview,
+                    genres: movie.genres?.map(g => g.name),
+                    releaseDate: movie.release_date,
+                    rating: movie.vote_average,
+                    runtime: movie.runtime,
+                    cast: movie.cast?.slice(0, 10).map(c => c.name),
+                    tagline: movie.tagline,
+                  }}
+                />
+
                 {/* Rating and Quick Info */}
                 <div className="text-gray-400">
                   <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-base">
@@ -1650,7 +1574,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                         : 'text-gray-400 hover:text-white border border-gray-700'
                     }`}
                   >
-                    Cast
+                    Cast & Crew
                   </button>
                 </div>
 
@@ -1727,7 +1651,7 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
                 {/* Cast Tab */}
                 {activeTab === 'cast' && movie.cast && movie.cast.length > 0 && (
                   <div>
-                    <h2 className="text-lg font-bold mb-3 text-white">CAST</h2>
+                    <h2 className="text-lg font-bold mb-3 text-white">CAST & CREW</h2>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-3">
                       {movie.cast.slice(0, 21).map((member) => (
                         <button
