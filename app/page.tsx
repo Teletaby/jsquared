@@ -2,7 +2,7 @@ import RootLayoutContent from '../components/RootLayoutContent';
 
 import HeroCarousel from '../components/HeroCarousel';
 import UserWatchHistory from '../components/UserWatchHistory';
-import Top20Week from '../components/Top20Week';
+import Top10Today from '../components/Top20Week';
 import MediaFetcherList from '../components/MediaFetcherList';
 import LastWatchedSummary from '../components/LastWatchedSummary';
 import { getPopularMovies, getTrendingDay, getPopularTvShows, discoverMovies, discoverTvShows } from '../lib/tmdb';
@@ -51,7 +51,7 @@ const [trendingData, popularMoviesData, popularTvData, actionMoviesData, actionT
     <RootLayoutContent>
       <HeroCarousel items={trendingItems} />
       <UserWatchHistory />
-      <Top20Week />
+      <Top10Today />
 
       {/* One-line carousel "Since you watched" placed below Top 20 */}
       <div className="px-4 md:px-0">
