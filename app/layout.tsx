@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "./providers"; // Import Providers
 import "./globals.css"; // Import global CSS
 
@@ -47,6 +48,7 @@ export default function RootLayout({
         <Providers> {/* Wrap children with Providers */}
           {children}
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
