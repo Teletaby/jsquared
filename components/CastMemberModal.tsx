@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { getPersonDetails } from '@/lib/tmdb';
+import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
 interface PersonDetails {
   id: number;
@@ -41,6 +42,8 @@ export default function CastMemberModal({
   const router = useRouter();
   const [personDetails, setPersonDetails] = useState<PersonDetails | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useDisableScroll(isOpen);
 
   useEffect(() => {
     if (isOpen && castMemberId) {

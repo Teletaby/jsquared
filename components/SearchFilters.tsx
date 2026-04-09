@@ -2,85 +2,91 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { phobiaKeywords } from '@/lib/tmdb';
 
 const SearchFilters = () => {
-  const [hours, setHours] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [selectedPhobias, setSelectedPhobias] = useState<string[]>([]);
+  const [mediaType, setMediaType] = useState<'media' | 'person'>('media');
+  const [artistQuery, setArtistQuery] = useState('');
   const router = useRouter();
 
   const handleSearch = () => {
-    const totalMinutes = parseInt(hours || '0') * 60 + parseInt(minutes || '0');
-    const phobiaKeywordIds = selectedPhobias.map(phobia => phobiaKeywords[phobia]).join(',');
-
+    if (!artistQuery.trim()) return;
+    
     const query = new URLSearchParams();
-    if (totalMinutes > 0) {
-      query.append('runtimeLte', totalMinutes.toString());
-    }
-    if (phobiaKeywordIds) {
-      query.append('withoutKeywords', phobiaKeywordIds);
+    query.append('query', artistQuery);
+    if (mediaType === 'person') {
+      query.append('type', 'person');
     }
     
     router.push(`/search?${query.toString()}`);
   };
 
-  const handlePhobiaChange = (phobia: string) => {
-    setSelectedPhobias(prev => 
-      prev.includes(phobia) ? prev.filter(p => p !== phobia) : [...prev, phobia]
-    );
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   return (
     <div className="backdrop-blur-2xl bg-white/20 border border-white/20 p-6 rounded-lg shadow-lg my-8">
-      <h2 className="text-2xl mb-4">Find Your Perfect Movie</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Time to Kill */}
-        <div>
-          <h3 className="text-xl mb-2">Time to Kill</h3>
-          <p className="text-gray-400 mb-2 text-sm">Have a specific amount of time? Find a movie that fits.</p>
-          <div className="flex items-center gap-2">
-            <input 
-              type="number" 
-              placeholder="Hours" 
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              className="bg-background p-2 rounded w-24"
-            />
-            <span className="text-xl">:</span>
-            <input 
-              type="number" 
-              placeholder="Mins" 
-              value={minutes}
-              onChange={(e) => setMinutes(e.target.value)}
-              className="bg-background p-2 rounded w-24"
-            />
-          </div>
+      <h2 className="text-2xl mb-6">Advanced Search</h2>
+      
+      {/* Media Type Selection */}
+      <div className="mb-6">
+        <label className="text-lg font-medium text-gray-300 block mb-3">What are you looking for?</label>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setMediaType('media')}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
+              mediaType === 'media'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/50'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Movies & TV Shows
+          </button>
+          <button
+            onClick={() => setMediaType('person')}
+            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
+              mediaType === 'person'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/50'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            Artists / Cast Members
+          </button>
         </div>
-        
-        {/* Phobia Filter */}
-        <div>
-          <h3 className="text-xl mb-2">Trigger / Phobia Filter</h3>
-          <p className="text-gray-400 mb-2 text-sm">Exclude content you don&apos;t want to see.</p>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(phobiaKeywords).map(phobia => (
-              <button
-                key={phobia}
-                onClick={() => handlePhobiaChange(phobia)}
-                className={`p-2 rounded ${selectedPhobias.includes(phobia) ? 'bg-accent' : 'bg-background'}`}
-              >
-                {phobia.replace('-', ' ')}
-              </button>
-            ))}
-          </div>
-        </div>
+      </div>
+
+      {/* Search Input */}
+      <div className="mb-6">
+        <h3 className="text-xl mb-2">
+          {mediaType === 'person' ? 'Search by Artist / Actor' : 'Search by Title'}
+        </h3>
+        <p className="text-gray-400 mb-3 text-sm">
+          {mediaType === 'person' 
+            ? 'Find all shows and movies featuring an actor, director, or crew member'
+            : 'Find movies and TV shows by title'}
+        </p>
+        <input 
+          type="text" 
+          placeholder={mediaType === 'person' ? 'Enter actor or artist name...' : 'Enter title...'}
+          value={artistQuery}
+          onChange={(e) => setArtistQuery(e.target.value)}
+          onKeyPress={handleKeyPress}
+          className="bg-background p-3 rounded w-full text-white placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        />
       </div>
       
       {/* Search Button */}
-      <div className="mt-6 text-center">
+      <div className="text-center">
         <button 
           onClick={handleSearch}
-          className="bg-accent text-white font-bold py-2 px-8 rounded-full hover:bg-accent-darker transition-colors duration-300"
+          disabled={!artistQuery.trim()}
+          className={`${
+            artistQuery.trim() 
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/50' 
+              : 'bg-gray-500 cursor-not-allowed text-gray-300'
+          } font-bold py-2 px-8 rounded-full transition-all duration-200`}
         >
           Search
         </button>

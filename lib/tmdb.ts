@@ -289,6 +289,16 @@ export async function searchMulti(query: string, withGenres: string = '', page: 
   return fetchFromTMDB('/search/multi', params);
 }
 
+// Search for persons/artists
+export async function searchPerson(query: string, page: string = '1') {
+  const params: Record<string, string> = {
+    query: encodeURIComponent(query),
+    page,
+  };
+
+  return fetchFromTMDB('/search/person', params);
+}
+
 // Discover movies with filters
 export async function discoverMovies(filters: Record<string, string> = {}) {
   return fetchFromTMDB('/discover/movie', filters);

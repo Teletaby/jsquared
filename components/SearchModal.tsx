@@ -4,7 +4,6 @@ import { Dialog, Transition } from '@headlessui/react';
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, X } from 'lucide-react';
-import { GENRE_MAP } from '@/lib/genreMap';
 import { useDisableScroll } from '@/lib/hooks/useDisableScroll';
 
 interface SearchModalProps {
@@ -18,20 +17,8 @@ interface Suggestion {
   name: string;
   poster_path: string;
   media_type: string;
+  known_for_department?: string;
 }
-
-const COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'CN', name: 'China' },
-  { code: 'KR', name: 'South Korea' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'VN', name: 'Vietnam' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'SG', name: 'Singapore' },
-];
 
 const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const router = useRouter();
@@ -39,24 +26,22 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
-  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'media' | 'person'>('media');
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLUListElement>(null);
   useDisableScroll(isOpen);
 
-  const handleGenreChange = (genreId: number) => {
-    setSelectedGenres(prev => 
-      prev.includes(genreId) ? prev.filter(id => id !== genreId) : [...prev, genreId]
-    );
-  };
-
   const handleSuggestionClick = (suggestion: Suggestion) => {
     setShowSuggestions(false);
-    // Navigate directly to the movie/TV show VIEW INFO page
-    const path = suggestion.media_type === 'tv' ? `/tv/${suggestion.id}?view=info` : `/movie/${suggestion.id}?view=info`;
-    router.push(path);
+    
+    if (suggestion.media_type === 'person') {
+      // For person/artist, go to search results with person type
+      router.push(`/search?query=${encodeURIComponent(suggestion.name)}&type=person`);
+    } else {
+      // Navigate directly to the movie/TV show VIEW INFO page
+      const path = suggestion.media_type === 'tv' ? `/tv/${suggestion.id}?view=info` : `/movie/${suggestion.id}?view=info`;
+      router.push(path);
+    }
     onClose();
   };
 
@@ -69,7 +54,10 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
 
       setIsLoading(true);
       try {
-        const response = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+        const url = mediaType === 'person' 
+          ? `/api/search?query=${encodeURIComponent(query)}&type=person`
+          : `/api/search?query=${encodeURIComponent(query)}`;
+        const response = await fetch(url);
         const data = await response.json();
         if (data.results) {
           setSuggestions(data.results.slice(0, 5)); // Limit to 5 suggestions
@@ -87,11 +75,17 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
     }, 300); // 300ms debounce
 
     return () => clearTimeout(debounceTimer);
-  }, [searchTerm]);
+  }, [searchTerm, mediaType]);
 
   useEffect(() => {
     setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2);
   }, [suggestions, searchTerm]);
+
+  useEffect(() => {
+    // Clear suggestions when media type changes
+    setSuggestions([]);
+    setShowSuggestions(false);
+  }, [mediaType]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -113,39 +107,15 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
   }, [isOpen]);
 
   const handleSearch = () => {
-    if (!searchTerm.trim() && selectedGenres.length === 0 && !selectedCountry) {
-      return;
-    }
-
-    // If only country is selected, navigate to country page
-    if (selectedCountry && !searchTerm.trim() && selectedGenres.length === 0) {
-      router.push(`/browse/country/${selectedCountry.toLowerCase()}`);
-      onClose();
-      return;
-    }
-
-    // If both country and genres are selected, navigate to country page with genre filter
-    if (selectedCountry && selectedGenres.length > 0 && !searchTerm.trim()) {
-      router.push(`/browse/country/${selectedCountry.toLowerCase()}?genres=${selectedGenres.join(',')}`);
-      onClose();
+    if (!searchTerm.trim()) {
       return;
     }
 
     const queryParams = new URLSearchParams();
-    if (searchTerm.trim()) {
-      queryParams.append('query', searchTerm.trim());
-    }
+    queryParams.append('query', searchTerm.trim());
     
-    if (selectedGenres.length > 0) {
-      queryParams.append('with_genres', selectedGenres.join(','));
-    }
-    
-    if (rating > 0 && rating !== 5) {
-      queryParams.append('minRating', rating.toString());
-    }
-
-    if (selectedCountry) {
-      queryParams.append('country', selectedCountry);
+    if (mediaType === 'person') {
+      queryParams.append('type', 'person');
     }
 
     router.push(`/search?${queryParams.toString()}`);
@@ -157,9 +127,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
       setSearchTerm('');
       setSuggestions([]);
       setShowSuggestions(false);
-      setRating(5);
-      setSelectedGenres([]);
-      setSelectedCountry(null);
+      setMediaType('media');
     }
   }, [isOpen]);
 
@@ -201,7 +169,7 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                   <input
                     ref={inputRef}
                     type="text"
-                    placeholder="Search for movies or TV shows..."
+                    placeholder={mediaType === 'person' ? 'Search for an actor or artist...' : 'Search for movies or TV shows...'}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onFocus={() => setShowSuggestions(suggestions.length > 0 && searchTerm.length >= 2)}
@@ -251,7 +219,9 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                               {suggestion.title || suggestion.name}
                             </div>
                             <div className="text-gray-400 text-xs capitalize">
-                              {suggestion.media_type}
+                              {suggestion.media_type === 'person' 
+                                ? (suggestion.known_for_department || 'Actor')
+                                : suggestion.media_type}
                             </div>
                           </div>
                         </li>
@@ -260,39 +230,30 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                   )}
                 </div>
 
+                {/* Media Type Selection */}
                 <div className="mt-6">
-                  {/* Genre Filter */}
-                  <div>
-                    <label className="text-lg font-medium text-gray-300">Genres</label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {Object.entries(GENRE_MAP).map(([genreName, genreId]) => (
-                        <button
-                          key={genreId}
-                          onClick={() => handleGenreChange(Number(genreId))}
-                          className={`p-2 rounded-md transition-colors text-sm
-                            ${selectedGenres.includes(Number(genreId)) ? 'bg-blue-500 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
-                        >
-                          {genreName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Country Filter */}
-                <div className="mt-6 pb-4">
-                  <label className="text-lg font-medium text-gray-300 block mb-3">Browse by Country</label>
-                  <div className="flex flex-wrap gap-2">
-                    {COUNTRIES.map((country) => (
-                      <button
-                        key={country.code}
-                        onClick={() => setSelectedCountry(selectedCountry === country.code ? null : country.code)}
-                        className={`px-4 py-2 rounded-md transition-colors text-sm font-medium
-                          ${selectedCountry === country.code ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-200 hover:bg-gray-600'}`}
-                      >
-                        {country.name}
-                      </button>
-                    ))}
+                  <label className="text-lg font-medium text-gray-300 block mb-3">What are you looking for?</label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setMediaType('media')}
+                      className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
+                        mediaType === 'media'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/50'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Movies & TV Shows
+                    </button>
+                    <button
+                      onClick={() => setMediaType('person')}
+                      className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 ${
+                        mediaType === 'person'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/50'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      Artists / Cast Members
+                    </button>
                   </div>
                 </div>
 
@@ -301,9 +262,9 @@ const SearchModal = ({ isOpen, onClose }: SearchModalProps) => {
                     type="button"
                     className="inline-flex justify-center rounded-md border border-transparent bg-blue-500 px-6 py-2 text-base font-medium text-white hover:bg-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleSearch}
-                    disabled={!searchTerm.trim() && selectedGenres.length === 0 && !selectedCountry}
+                    disabled={!searchTerm.trim()}
                   >
-                    {selectedCountry ? `Explore ${COUNTRIES.find(c => c.code === selectedCountry)?.name}` : 'Search'}
+                    Search
                   </button>
                 </div>
               </Dialog.Panel>
