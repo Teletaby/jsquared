@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import LoadingSpinner from '@/components/LoadingSpinner'; // Assuming you have a LoadingSpinner component
 import Header from '@/components/Header';
 import UserManagement from '@/components/UserManagement';
+import AdminMessages from '@/components/AdminMessages';
 
 // Typed visitor log entry to avoid use of `any`
 type VisitorLog = {
@@ -361,6 +362,12 @@ export default function AdminPage() {
           <h2 className="text-2xl font-semibold mb-4 text-white">User Management</h2>
           <p className="text-gray-400 mb-4">View and manage user accounts.</p>
           <UserManagement />
+        </section>
+
+        <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold mb-4 text-white">User Feedback</h2>
+          <p className="text-gray-400 mb-4">View messages and feedback from users.</p>
+          <AdminMessages />
         </section>
 
         <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-lg">

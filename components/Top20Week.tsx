@@ -43,13 +43,17 @@ const Top10Today = () => {
   // Auto-scroll — pauses when user hovers
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container || isHovering) return;
+    if (!container || isHovering || trending.length === 0) return;
 
     const interval = setInterval(() => {
-      if (container.scrollLeft >= container.scrollWidth - container.clientWidth - 1) {
-        container.scrollTo({ left: 0, behavior: 'smooth' });
-      } else {
-        container.scrollLeft += 1;
+      const itemWidth = container.scrollWidth / (trending.length * 2); // Account for duplicate items
+      const maxScrollLeft = container.scrollWidth / 2; // Only scroll through first set
+      
+      container.scrollLeft += 1;
+      
+      // Loop back when reaching middle of duplicated set
+      if (container.scrollLeft >= maxScrollLeft - 1) {
+        container.scrollLeft = 0;
       }
     }, 30);
 
@@ -137,8 +141,9 @@ const Top10Today = () => {
           className="flex overflow-x-auto gap-1 sm:gap-2 pb-4 hide-scrollbar scroll-smooth"
           onScroll={checkScrollability}
         >
-          {trending.map((media: any, index: number) => {
-            const rank = index + 1;
+          {/* Render items twice for infinite loop effect */}
+          {[...trending, ...trending].map((media: any, index: number) => {
+            const rank = (index % trending.length) + 1;
             const title = media.title || media.name || '';
             const poster = media.poster_path
               ? `${TMDB_IMAGE_BASE}${media.poster_path}`

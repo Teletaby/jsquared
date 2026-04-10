@@ -247,9 +247,34 @@ userSchema.post('save', function(doc: any) {
   } catch (e) { console.error('[User Hook] error in save hook', e); }
 });
 
+// Message Schema
+const messageSchema = new Schema(
+  {
+    message: {
+      type: String,
+      required: true,
+      maxlength: 5000,
+    },
+    userEmail: {
+      type: String,
+      sparse: true,
+    },
+    userName: {
+      type: String,
+      sparse: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
 // Models
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
 export const WatchHistory = mongoose.models.WatchHistory || mongoose.model('WatchHistory', watchHistorySchema);
 export const Watchlist = mongoose.models.Watchlist || mongoose.model('Watchlist', watchlistSchema);
 export const WatchlistFolder = mongoose.models.WatchlistFolder || mongoose.model('WatchlistFolder', watchlistFolderSchema);
 export const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema);
+export const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "./providers"; // Import Providers
-import "./globals.css"; // Import global CSS
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "J-Squared Cinema",

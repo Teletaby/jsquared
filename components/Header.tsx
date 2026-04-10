@@ -1,18 +1,18 @@
-"use client";
-
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation'; // Import useRouter
 import { Menu, Transition } from '@headlessui/react';
 import { Bars3Icon } from '@heroicons/react/24/solid';
-import { Search, UserCircle2, Settings, Tv } from 'lucide-react'; // Added Settings icon and Tv icon
+import { Search, UserCircle2, Settings, Tv, MessageCircle } from 'lucide-react'; // Added MessageCircle icon
 import SearchModal from './SearchModal';
+import MessagingModal from './MessagingModal';
 import { useAuth } from '@/lib/hooks/useAuth'; // Import the useAuth hook
 
 const navItems = [
   { name: 'Movies', href: '/movies' },
   { name: 'TV Shows', href: '/tv' },
+  { name: 'Anime', href: '/anime' },
   { name: 'Upcoming', href: '/upcoming' },
 ];
 
@@ -20,6 +20,7 @@ const Header = () => {
   const pathname = usePathname();
   const router = useRouter(); // Initialize useRouter
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMessagingOpen, setIsMessagingOpen] = useState(false);
   const { user, loading, logout } = useAuth(); // Use the auth hook
 
   const handleAuthClick = () => {
@@ -184,6 +185,7 @@ const Header = () => {
                       </div>
                     </div>
                   )}
+                  <button onClick={() => setIsMessagingOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Send Message"><MessageCircle size={24} /></button>
                   <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
                 </div>
               </>
@@ -191,6 +193,13 @@ const Header = () => {
 
             {/* Mobile Menu Button and Dropdown */}
             <div className="md:hidden flex items-center gap-2">
+              {/* Mobile Message Icon */}
+              <button 
+                onClick={() => setIsMessagingOpen(true)} 
+                className="text-gray-300 hover:text-blue-500 transition-colors duration-200 p-2 md:hidden"
+              >
+                <MessageCircle size={24} />
+              </button>
               {/* Mobile Search Icon */}
               <button 
                 onClick={() => setIsSearchOpen(true)} 
@@ -338,6 +347,7 @@ const Header = () => {
           </div>
         </div>
       </header>
+      <MessagingModal isOpen={isMessagingOpen} onClose={() => setIsMessagingOpen(false)} />
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );

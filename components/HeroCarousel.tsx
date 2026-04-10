@@ -122,6 +122,7 @@ export default function HeroCarousel({ items }: HeroCarouselProps) {
   };
 
   useEffect(() => {
+    if (!items || items.length === 0) return;
     startAutoPlay();
     return () => {
       if (autoPlayRef.current) {

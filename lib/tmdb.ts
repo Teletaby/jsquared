@@ -299,6 +299,58 @@ export async function searchPerson(query: string, page: string = '1') {
   return fetchFromTMDB('/search/person', params);
 }
 
+// Get anime shows using animation genre (Japanese animated series)
+export async function getPopularAnime(page: string = '1') {
+  return fetchFromTMDB('/discover/tv', {
+    'with_genres': '16', // Animation genre
+    'with_original_language': 'ja', // Japanese language
+    'sort_by': 'popularity.desc',
+    'page': page,
+  });
+}
+
+// Get top rated anime shows
+export async function getTopRatedAnime(page: string = '1') {
+  return fetchFromTMDB('/discover/tv', {
+    'with_genres': '16', // Animation genre
+    'with_original_language': 'ja', // Japanese language
+    'sort_by': 'vote_average.desc',
+    'vote_count.gte': '100',
+    'page': page,
+  });
+}
+
+// Get currently airing anime
+export async function getAiringAnime(page: string = '1') {
+  return fetchFromTMDB('/discover/tv', {
+    'with_genres': '16', // Animation genre
+    'with_original_language': 'ja', // Japanese language
+    'sort_by': 'first_air_date.desc',
+    'page': page,
+  });
+}
+
+// Get popular anime movies
+export async function getPopularAnimeMovies(page: string = '1') {
+  return fetchFromTMDB('/discover/movie', {
+    'with_genres': '16', // Animation genre
+    'with_original_language': 'ja', // Japanese language
+    'sort_by': 'popularity.desc',
+    'page': page,
+  });
+}
+
+// Get top rated anime movies
+export async function getTopRatedAnimeMovies(page: string = '1') {
+  return fetchFromTMDB('/discover/movie', {
+    'with_genres': '16', // Animation genre
+    'with_original_language': 'ja', // Japanese language
+    'sort_by': 'vote_average.desc',
+    'vote_count.gte': '100',
+    'page': page,
+  });
+}
+
 // Discover movies with filters
 export async function discoverMovies(filters: Record<string, string> = {}) {
   return fetchFromTMDB('/discover/movie', filters);
