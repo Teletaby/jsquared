@@ -996,6 +996,15 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                       <Sparkles size={16} />
                       <span className="hidden sm:inline">Ask AI</span>
                     </button>
+                    <a
+                      href={`https://dl.vidsrc.vip/tv/${tmdbId}/${currentSeason}/${currentEpisode}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center gap-2 transform hover:scale-105 text-sm"
+                    >
+                      <Download size={16} />
+                      <span className="hidden sm:inline">Download</span>
+                    </a>
                     <WatchlistButton
                       mediaId={tmdbId}
                       mediaType={mediaType}
@@ -1572,15 +1581,6 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                   Watch Now
                 </button>
               )}
-              <a
-                href={`https://dl.vidsrc.vip/tv/${tmdbId}/${currentSeason}/${currentEpisode}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gray-600/60 text-white font-bold transition-all duration-200 hover:bg-gray-500/70 hover:shadow-lg flex items-center gap-2 transform hover:scale-105 text-sm"
-              >
-                <Download size={16} />
-                <span className="hidden sm:inline">Download</span>
-              </a>
               <WatchlistButton
                 mediaId={tmdbId}
                 mediaType={mediaType}
