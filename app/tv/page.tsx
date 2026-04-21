@@ -1,8 +1,9 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
+import GenreCarousel from '@/components/GenreCarousel';
 import HeroCarousel from '@/components/HeroCarousel';
 import RootLayoutContent from '@/components/RootLayoutContent';
 import { Suspense } from 'react';
-import { getPopularTvShows, getTopRatedTvShows, getAiringTodayTvShows } from '@/lib/tmdb';
+import { getPopularTvShows } from '@/lib/tmdb';
 
 const ListSkeleton = () => (
   <div className="my-8 animate-pulse">
@@ -17,8 +18,6 @@ const ListSkeleton = () => (
 
 const TvShowsPage = async () => {
   const popularTvShows = await getPopularTvShows();
-  const topRatedTvShows = await getTopRatedTvShows();
-  const airingTodayTvShows = await getAiringTodayTvShows();
 
   const heroItems = (popularTvShows?.results || []).slice(0, 10).map((show: any) => ({
     ...show,
@@ -28,17 +27,11 @@ const TvShowsPage = async () => {
   return (
     <RootLayoutContent>
       <HeroCarousel items={heroItems} />
+      <GenreCarousel mediaType="tv" />
       <div className="container mx-auto p-4 pt-0">
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer title="Popular TV Shows" items={popularTvShows?.results?.slice(0, 12) || []} />
         </Suspense>
-        <Suspense fallback={<ListSkeleton />}>
-          <MediaListWithTrailer title="Top Rated TV Shows" items={topRatedTvShows?.results?.slice(0, 12) || []} />
-        </Suspense>
-        <Suspense fallback={<ListSkeleton />}>
-          <MediaListWithTrailer title="Airing Today TV Shows" items={airingTodayTvShows?.results?.slice(0, 12) || []} />
-        </Suspense>
-        {/* Add more TV show categories as needed */}
       </div>
     </RootLayoutContent>
   );

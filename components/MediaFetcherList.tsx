@@ -62,8 +62,7 @@ const MediaFetcherList = ({ title, items }: MediaFetcherListProps) => {
         <div className="text-center text-gray-500 bg-ui-elements p-6 sm:p-8 rounded-lg mx-4">
           <h3 className="text-lg sm:text-xl mb-2">Could Not Load Content</h3>
           <p className="text-sm sm:text-base">
-            This might be because the TMDB API key is not set up correctly or
-            no movies were found for this category.
+            No content found for this category. Please contact us through the message button in the navbar.
           </p>
         </div>
       )}

@@ -1,9 +1,10 @@
 import MediaListWithTrailer from '@/components/MediaListWithTrailer';
+import GenreCarousel from '@/components/GenreCarousel';
 import MediaFetcherList from '@/components/MediaFetcherList';
 import HeroCarousel from '@/components/HeroCarousel';
 import RootLayoutContent from '@/components/RootLayoutContent';
 import { Suspense } from 'react';
-import { getPopularAnime, getTopRatedAnime, getPopularAnimeMovies, getTopRatedAnimeMovies } from '@/lib/tmdb';
+import { getPopularAnime, getPopularAnimeMovies } from '@/lib/tmdb';
 
 const ListSkeleton = () => (
   <div className="my-8 animate-pulse">
@@ -18,9 +19,7 @@ const ListSkeleton = () => (
 
 const AnimePage = async () => {
   const popularAnime = await getPopularAnime();
-  const topRatedAnime = await getTopRatedAnime();
   const popularAnimeMovies = await getPopularAnimeMovies();
-  const topRatedAnimeMovies = await getTopRatedAnimeMovies();
 
   const heroItems = (popularAnime?.results || []).slice(0, 10).map((show: any) => ({
     ...show,
@@ -30,16 +29,13 @@ const AnimePage = async () => {
   return (
     <RootLayoutContent>
       <HeroCarousel items={heroItems} />
+      <GenreCarousel mediaType="tv" />
       <div className="container mx-auto p-4 pt-0">
         <Suspense fallback={<ListSkeleton />}>
           <MediaListWithTrailer title="Popular Anime Series" items={popularAnime?.results?.slice(0, 12) || []} />
         </Suspense>
-        <Suspense fallback={<ListSkeleton />}>
-          <MediaListWithTrailer title="Top Rated Anime Series" items={topRatedAnime?.results?.slice(0, 12) || []} />
-        </Suspense>
       </div>
       <MediaFetcherList title="Popular Anime Movies" items={popularAnimeMovies?.results?.slice(0, 12) || []} />
-      <MediaFetcherList title="Top Rated Anime Movies" items={topRatedAnimeMovies?.results?.slice(0, 12) || []} />
     </RootLayoutContent>
   );
 };
