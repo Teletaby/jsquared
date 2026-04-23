@@ -5,10 +5,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const mediaType = searchParams.get('mediaType') || 'movie';
+    const sortBy = searchParams.get('sort_by') || 'popularity.desc';
     
     // Build filters from query params
     const filters: Record<string, string> = {
-      sort_by: 'popularity.desc', // Sort by popularity by default
+      sort_by: sortBy,
     };
     
     if (searchParams.has('with_genres')) {

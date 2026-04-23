@@ -9,7 +9,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
-import { Download, Play, Film, Info, Search as SearchIcon, Sparkles, X } from 'lucide-react';
+import { Download, Play, Film, Info, Search as SearchIcon, Sparkles, X, Tv } from 'lucide-react';
 import { useWatchlist } from '@/lib/hooks/useWatchlist';
 import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
@@ -244,6 +244,13 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
     setShowResumePrompt(false);
     lastMediaIdRef.current = tmdbId;
   }, [tmdbId, currentSeason, currentEpisode]);
+
+  // Reset activeTab to 'overview' when switching to player view (which doesn't have episodes tab)
+  useEffect(() => {
+    if (view !== 'info' && activeTab === 'episodes') {
+      setActiveTab('overview');
+    }
+  }, [view, activeTab]);
 
   // Effect for fetching data
   useEffect(() => {
@@ -1232,6 +1239,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
                         key={episode.episode_number}
                         className={`group bg-gray-900/50 rounded-lg overflow-hidden border transition-all duration-300 select-none ${isReleased ? 'cursor-pointer border-gray-700 hover:border-red-600 transform hover:scale-105 hover:shadow-lg' : 'cursor-not-allowed border-2 border-red-600/70 shadow-lg shadow-red-600/30'}`}
                         style={!isReleased ? { userSelect: 'none', WebkitUserSelect: 'none', pointerEvents: 'none' } : {}}
+                        onClick={() => {
+                          if (isReleased) {
+                            router.push(`/tv/${tmdbId}?season=${currentSeason}&episode=${episode.episode_number}`);
+                          }
+                        }}
                       >
                         {/* Episode Image */}
                         <div className="relative w-full aspect-video overflow-hidden bg-gray-800">
@@ -1690,10 +1702,11 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
 
                 {/* Overview */}
                 <div>
-                  <h2 className={`text-xl font-bold mb-3 text-white ${currentSeason === 1 && currentEpisode === 1 ? 'cursor-pointer hover:text-gray-300' : ''}`}
+                  <h2 className={`text-xl font-bold mb-3 text-white flex items-center gap-2 ${currentSeason === 1 && currentEpisode === 1 ? 'cursor-pointer hover:text-gray-300' : ''}`}
                       onClick={() => currentSeason === 1 && currentEpisode === 1 && setShowEpisodeSynopsis(!showEpisodeSynopsis)}
                   >
-                    {currentSeason === 1 && currentEpisode === 1 ? '📺 SYNOPSIS (Click to toggle episode info)' : '📺 EPISODE SYNOPSIS'}
+                    <Tv size={24} />
+                    {currentSeason === 1 && currentEpisode === 1 ? 'SYNOPSIS (Click to toggle episode info)' : 'EPISODE SYNOPSIS'}
                   </h2>
                   {/* Show series synopsis for Season 1 Episode 1 only when not toggled */}
                   {currentSeason === 1 && currentEpisode === 1 && !showEpisodeSynopsis && (

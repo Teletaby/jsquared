@@ -98,6 +98,21 @@ export default function EpisodeSelector({
     fetchSeasons();
   }, [tvShowId, currentSeason]);
 
+  // Scroll to current episode when episodes are loaded
+  useEffect(() => {
+    if (selectedSeason && currentEpisode && !loading) {
+      const currentEpisodeElement = document.querySelector(`[data-episode="${currentEpisode}"]`);
+      if (currentEpisodeElement) {
+        setTimeout(() => {
+          currentEpisodeElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+          });
+        }, 100); // Small delay to ensure DOM is fully rendered
+      }
+    }
+  }, [selectedSeason, currentEpisode, loading]);
+
   const handleSeasonChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const seasonNumber = parseInt(event.target.value, 10);
     const season = seasons.find(s => s.season_number === seasonNumber) || null;
@@ -172,6 +187,7 @@ export default function EpisodeSelector({
                           return (
                             <button
                               key={episode.episode_number}
+                              data-episode={episode.episode_number}
                               onClick={() => handleEpisodeClick(episode.episode_number)}
                               disabled={!isReleased}
                               className={`w-full rounded-xl transition-all duration-300 border-2 focus:outline-none focus:ring-2 focus:ring-red-600/50 overflow-hidden group ${

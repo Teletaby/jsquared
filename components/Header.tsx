@@ -129,13 +129,13 @@ const Header = () => {
                       <UserCircle2 size={24} />
                     </button>
                   )}
-                  {user?.role === 'admin' && (
+                  {user && user.role === 'admin' && (
                     <Link href="/admin" className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Admin Panel">
                       <Settings size={24} />
                     </Link>
                   )}
                   {/* TV Remote Dropdown - Admin Only */}
-                  {user?.role === 'admin' ? (
+                  {user && user.role === 'admin' && (
                     <Menu as="div" className="relative inline-block text-left">
                       <Menu.Button className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="TV Remote">
                         <Tv size={24} />
@@ -177,15 +177,6 @@ const Header = () => {
                         </Menu.Items>
                       </Transition>
                     </Menu>
-                  ) : (
-                    <div className="relative group">
-                      <button disabled className="text-lg text-gray-500 cursor-not-allowed opacity-50" title="TV Remote">
-                        <Tv size={24} />
-                      </button>
-                      <div className="absolute right-0 mt-2 w-32 bg-gray-800/90 backdrop-blur-lg shadow-lg ring-1 ring-white/20 rounded-md p-2 text-xs text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                        Coming Soon
-                      </div>
-                    </div>
                   )}
                   <button onClick={() => setIsMessagingOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200" title="Send Message"><MessageCircle size={24} /></button>
                   <button onClick={() => setIsSearchOpen(true)} className="text-lg text-gray-300 hover:text-blue-500 transition-colors duration-200"><Search size={24} /></button>
@@ -247,7 +238,7 @@ const Header = () => {
                       <div className="my-1 h-px bg-gray-600/50"></div>
 
                       {/* Admin Panel - Admin Only */}
-                      {user?.role === 'admin' && (
+                      {user && user.role === 'admin' && (
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -264,7 +255,7 @@ const Header = () => {
                       )}
 
                       {/* TV Remote - Admin Only */}
-                      {user?.role === 'admin' && (
+                      {user && user.role === 'admin' && (
                         <>
                           <Menu.Item>
                             {({ active }) => (

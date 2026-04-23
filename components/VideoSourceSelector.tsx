@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertCircle, CheckCircle, Zap, Sparkles } from 'lucide-react';
+import { AlertCircle, CheckCircle, Zap, Sparkles, Tv, Clapperboard, Target, Rocket } from 'lucide-react';
 
 interface SourceInfo {
   name: string;
@@ -21,6 +21,20 @@ interface VideoSourceSelectorProps {
   showWarning?: boolean;
 }
 
+/**
+ * Get icon component for source
+ */
+const getSourceIcon = (sourceKey: string): React.ReactNode => {
+  const iconMap: { [key: string]: React.ReactNode } = {
+    videasy: <Zap size={48} className="text-white" />,
+    vidlink: <Clapperboard size={48} className="text-white" />,
+    vidnest: <Target size={48} className="text-white" />,
+    vidsrc: <Tv size={48} className="text-white" />,
+    vidrock: <Rocket size={48} className="text-white" />,
+  };
+  return iconMap[sourceKey] || null;
+};
+
 const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
   currentSource,
   selectedSource = null,
@@ -37,7 +51,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsSubtitles: true,
       latency: 'low',
       description: 'Recommended source, full auto-resume support, fast loading',
-      icon: '⚡',
+      icon: 'videasy',
     } as SourceInfo & { description: string; icon: string },
     vidlink: {
       name: 'VidLink',
@@ -47,7 +61,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsSubtitles: true,
       latency: 'low',
       description: 'Premium source, auto-resume support, huge library',
-      icon: '🎬',
+      icon: 'vidlink',
     } as SourceInfo & { description: string; icon: string },
     vidnest: {
       name: 'VIDNEST',
@@ -57,7 +71,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsSubtitles: true,
       latency: 'low',
       description: 'Premium source with full progress tracking, auto-resume, and quality selection',
-      icon: '🎯',
+      icon: 'vidnest',
     } as SourceInfo & { description: string; icon: string },
     vidsrc: {
       name: 'VidSrc',
@@ -67,7 +81,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsSubtitles: true,
       latency: 'medium',
       description: 'Minimal ads, seamless streaming. When logged in, watch history is recorded but timestamps are not tracked.',
-      icon: '📺',
+      icon: 'vidsrc',
     } as SourceInfo & { description: string; icon: string },
     vidrock: {
       name: 'VidRock',
@@ -77,7 +91,7 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
       supportsSubtitles: true,
       latency: 'low',
       description: 'Enterprise-ready streaming with seamless quality playback and full progress tracking',
-      icon: '🚀',
+      icon: 'vidrock',
     } as SourceInfo & { description: string; icon: string },
   };
 
@@ -139,8 +153,8 @@ const VideoSourceSelector: React.FC<VideoSourceSelectorProps> = ({
                 )}
 
                 <div className="relative z-10">
-                  <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform duration-300">
-                    {source.icon}
+                  <div className="mb-3 transform group-hover:scale-110 transition-transform duration-300">
+                    {getSourceIcon(source.icon)}
                   </div>
                   <h4 className="text-lg font-bold text-white mb-1 font-orbitron uppercase tracking-wide">
                     {source.name}

@@ -8,6 +8,26 @@ import LastWatchedSummary from '../components/LastWatchedSummary';
 import { getPopularMovies, getTrendingDay, getPopularTvShows, discoverMovies, discoverTvShows } from '../lib/tmdb';
 import { GENRE_MAP } from '../lib/genreMap';
 
+/**
+ * Filter items to only include those with release dates within 1 month from today
+ */
+function filterByReleaseDate(items: any[]): any[] {
+  const today = new Date();
+  const oneMonthFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+  
+  return items.filter(item => {
+    const releaseDate = new Date(item.release_date || item.first_air_date);
+    
+    // Skip items without a release date
+    if (!item.release_date && !item.first_air_date) {
+      return false;
+    }
+    
+    // Only include items released within 1 month from today
+    return releaseDate <= oneMonthFromNow;
+  });
+}
+
 export default async function HomePage() {
   let trendingItems: any[] = [];
   let popularMovies = [];
@@ -34,14 +54,16 @@ const [trendingData, popularMoviesData, popularTvData, actionMoviesData, actionT
 
     // Use the top 10 trending items for the day in the hero carousel
     trendingItems = (trendingData?.results || []).slice(0, 10);
-    popularMovies = popularMoviesData?.results || [];
-    popularTvShows = popularTvData?.results || [];
-    actionMovies = actionMoviesData?.results || [];
-    actionTvShows = actionTvData?.results || [];
-    comedyMovies = comedyMoviesData?.results || [];
-    comedyTvShows = comedyTvData?.results || [];
-    dramaMovies = dramaMoviesData?.results || [];
-    dramaTvShows = dramaTvData?.results || [];
+    
+    // Filter all items to only include those with release dates within 1 month from today
+    popularMovies = filterByReleaseDate(popularMoviesData?.results || []);
+    popularTvShows = filterByReleaseDate(popularTvData?.results || []);
+    actionMovies = filterByReleaseDate(actionMoviesData?.results || []);
+    actionTvShows = filterByReleaseDate(actionTvData?.results || []);
+    comedyMovies = filterByReleaseDate(comedyMoviesData?.results || []);
+    comedyTvShows = filterByReleaseDate(comedyTvData?.results || []);
+    dramaMovies = filterByReleaseDate(dramaMoviesData?.results || []);
+    dramaTvShows = filterByReleaseDate(dramaTvData?.results || []);
 
   } catch (err: unknown) {
     console.error("Failed to fetch content:", err);
