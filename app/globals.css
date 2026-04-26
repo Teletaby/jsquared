@@ -1,5 +1,42 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
 
+/* Netflix Sans Font */
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans-Regular.woff2') format('woff2'),
+       url('/fonts/NetflixSans-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans-Medium.woff2') format('woff2'),
+       url('/fonts/NetflixSans-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans-Bold.woff2') format('woff2'),
+       url('/fonts/NetflixSans-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans-Light.woff2') format('woff2'),
+       url('/fonts/NetflixSans-Light.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

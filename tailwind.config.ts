@@ -15,8 +15,8 @@ const config: Config = {
         'accent-darker': '#CC0712',
       },
       fontFamily: {
-        heading: ['var(--font-bebas-neue)'],
-        body: ['var(--font-roboto)'],
+        heading: ['Netflix Sans', 'sans-serif'],
+        body: ['Netflix Sans', 'sans-serif'],
         orbitron: ['Orbitron', 'sans-serif'],
       },
       keyframes: {
