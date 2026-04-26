@@ -38,7 +38,8 @@ async function ensureSettingsDocument() {
       key: 'app_settings', 
       isMaintenanceMode: false,
       isChatbotMaintenanceMode: false,
-      videoSource: 'videasy'
+      videoSource: 'videasy',
+      isInlineBoxToolEnabled: true,
     });
   } else {
     // Ensure existing documents have all fields
@@ -49,6 +50,10 @@ async function ensureSettingsDocument() {
     }
     if (settings.videoSource === undefined || !validSources.includes(settings.videoSource)) {
       settings.videoSource = 'videasy';
+      needsSave = true;
+    }
+    if (settings.isInlineBoxToolEnabled === undefined) {
+      settings.isInlineBoxToolEnabled = true;
       needsSave = true;
     }
     if (needsSave) {
@@ -66,13 +71,15 @@ export async function GET() {
     console.log('Fetched settings:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
-      videoSource: settings.videoSource
+      videoSource: settings.videoSource,
+      isInlineBoxToolEnabled: settings.isInlineBoxToolEnabled,
     });
 
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
-      videoSource: settings.videoSource || 'videasy'
+      videoSource: settings.videoSource || 'videasy',
+      isInlineBoxToolEnabled: settings.isInlineBoxToolEnabled ?? true,
     }, { status: 200 });
   } catch (error) {
     console.error('Error fetching maintenance mode:', error);
@@ -88,7 +95,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const { isMaintenanceMode, isChatbotMaintenanceMode, videoSource } = await req.json();
+    const { isMaintenanceMode, isChatbotMaintenanceMode, videoSource, isInlineBoxToolEnabled } = await req.json();
 
     if (isMaintenanceMode !== undefined && typeof isMaintenanceMode !== 'boolean') {
       return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
@@ -102,6 +109,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Invalid video source' }, { status: 400 });
     }
 
+    if (isInlineBoxToolEnabled !== undefined && typeof isInlineBoxToolEnabled !== 'boolean') {
+      return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
+    }
+
     const settings = await ensureSettingsDocument();
     if (isMaintenanceMode !== undefined) {
       settings.isMaintenanceMode = isMaintenanceMode;
@@ -112,11 +123,15 @@ export async function POST(req: NextRequest) {
     if (videoSource !== undefined) {
       settings.videoSource = videoSource;
     }
+    if (isInlineBoxToolEnabled !== undefined) {
+      settings.isInlineBoxToolEnabled = isInlineBoxToolEnabled;
+    }
     
     console.log('Saving settings:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
-      videoSource: settings.videoSource
+      videoSource: settings.videoSource,
+      isInlineBoxToolEnabled: settings.isInlineBoxToolEnabled,
     });
     
     await settings.save();
@@ -124,13 +139,15 @@ export async function POST(req: NextRequest) {
     console.log('Settings saved:', { 
       isMaintenanceMode: settings.isMaintenanceMode, 
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode,
-      videoSource: settings.videoSource
+      videoSource: settings.videoSource,
+      isInlineBoxToolEnabled: settings.isInlineBoxToolEnabled,
     });
 
     return NextResponse.json({ 
       isMaintenanceMode: settings.isMaintenanceMode,
       isChatbotMaintenanceMode: settings.isChatbotMaintenanceMode || false,
-      videoSource: settings.videoSource || 'videasy'
+      videoSource: settings.videoSource || 'videasy',
+      isInlineBoxToolEnabled: settings.isInlineBoxToolEnabled ?? true,
     });
   } catch (error) {
     console.error('Error updating maintenance mode:', error);

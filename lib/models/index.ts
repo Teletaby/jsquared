@@ -203,6 +203,10 @@ const settingsSchema = new Schema(
       enum: ['videasy', 'vidlink', 'vidsrc'],
       default: 'videasy',
     },
+    isInlineBoxToolEnabled: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );
@@ -271,6 +275,85 @@ const messageSchema = new Schema(
   { timestamps: true }
 );
 
+// Invisible Box Schema
+const invisibleBoxSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    pageType: {
+      type: String,
+      enum: ['movie', 'tv', 'all'],
+      required: true,
+    },
+    playerSource: {
+      type: String,
+      enum: ['videasy', 'vidlink', 'vidnest', 'vidsrc', 'vidrock', 'all'],
+      default: 'all',
+      required: true,
+    },
+    mediaIds: [Number], // Array of TMDB IDs (empty if pageType is 'all')
+    x: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    y: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    width: {
+      type: Number,
+      required: true,
+      default: 100,
+    },
+    height: {
+      type: Number,
+      required: true,
+      default: 100,
+    },
+    action: {
+      type: String,
+      enum: ['nextEpisode', 'previousEpisode', 'fullscreen', 'exitFullscreen', 'playPause', 'mute', 'skip10s', 'rewind10s', 'nextChapter', 'previousChapter', 'showSubtitles', 'showSettings', 'click', 'custom'],
+      required: true,
+    },
+    customAction: {
+      type: String,
+      sparse: true,
+    },
+    cursorStyle: {
+      type: String,
+      enum: ['auto', 'pointer', 'crosshair', 'help', 'wait', 'text', 'move', 'grab', 'not-allowed', 'zoom-in', 'zoom-out'],
+      default: 'auto',
+    },
+    clickCount: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    triggerOnLoad: {
+      type: Boolean,
+      default: false,
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
 // Models
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
 export const WatchHistory = mongoose.models.WatchHistory || mongoose.model('WatchHistory', watchHistorySchema);
@@ -278,3 +361,17 @@ export const Watchlist = mongoose.models.Watchlist || mongoose.model('Watchlist'
 export const WatchlistFolder = mongoose.models.WatchlistFolder || mongoose.model('WatchlistFolder', watchlistFolderSchema);
 export const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema);
 export const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
+const existingInvisibleBoxModel = (mongoose.models as any).InvisibleBox;
+if (existingInvisibleBoxModel) {
+  const actionPath = existingInvisibleBoxModel.schema?.path?.('action');
+  const enumValues: string[] = actionPath?.enumValues || [];
+  const hasTriggerOnLoadPath = Boolean(existingInvisibleBoxModel.schema?.path?.('triggerOnLoad'));
+  const hasClickCountPath = Boolean(existingInvisibleBoxModel.schema?.path?.('clickCount'));
+
+  // In dev hot-reload, Mongoose can keep an old compiled model after schema edits.
+  // Recreate the model when required enum values/fields are missing.
+  if (!enumValues.includes('click') || !hasTriggerOnLoadPath || !hasClickCountPath) {
+    delete (mongoose.models as any).InvisibleBox;
+  }
+}
+export const InvisibleBox = mongoose.models.InvisibleBox || mongoose.model('InvisibleBox', invisibleBoxSchema);

@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner'; // Assuming you have a
 import Header from '@/components/Header';
 import UserManagement from '@/components/UserManagement';
 import AdminMessages from '@/components/AdminMessages';
+import AdminInvisibleBoxes from '@/components/AdminInvisibleBoxes';
 
 // Typed visitor log entry to avoid use of `any`
 type VisitorLog = {
@@ -28,6 +29,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(null);
   const [isChatbotMaintenanceMode, setIsChatbotMaintenanceMode] = useState<boolean | null>(null);
+  const [isInlineBoxToolEnabled, setIsInlineBoxToolEnabled] = useState<boolean | null>(null);
   const [isLoggingEnabled, setIsLoggingEnabled] = useState<boolean | null>(null);
   const [videoSource, setVideoSource] = useState<'videasy' | 'vidlink' | 'vidnest' | null>(null);
   const [loadingMaintenance, setLoadingMaintenance] = useState(true);
@@ -36,6 +38,7 @@ export default function AdminPage() {
   const [errorMaintenance, setErrorMaintenance] = useState<string | null>(null);
   const [togglingMaintenance, setTogglingMaintenance] = useState(false);
   const [togglingChatbotMaintenance, setTogglingChatbotMaintenance] = useState(false);
+  const [togglingInlineBoxTool, setTogglingInlineBoxTool] = useState(false);
   const [togglingLogging, setTogglingLogging] = useState(false);
   const [togglingVideoSource, setTogglingVideoSource] = useState(false);
   const [visitorLogs, setVisitorLogs] = useState<VisitorLog[]>([]);
@@ -66,6 +69,7 @@ export default function AdminPage() {
       setIsMaintenanceMode(data.isMaintenanceMode);
       setIsChatbotMaintenanceMode(data.isChatbotMaintenanceMode || false);
       setVideoSource(data.videoSource || 'videasy');
+      setIsInlineBoxToolEnabled(data.isInlineBoxToolEnabled ?? true);
     } catch (err: unknown) {
       const msg = getErrorMessage(err);
       setErrorMaintenance(msg);
@@ -163,6 +167,35 @@ export default function AdminPage() {
       console.error('Failed to toggle video source:', err);
     } finally {
       setTogglingVideoSource(false);
+    }
+  };
+
+  const toggleInlineBoxTool = async () => {
+    if (isInlineBoxToolEnabled === null) return;
+
+    setTogglingInlineBoxTool(true);
+    setErrorMaintenance(null);
+    try {
+      const res = await fetch('/api/admin/maintenance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isInlineBoxToolEnabled: !isInlineBoxToolEnabled }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setIsInlineBoxToolEnabled(data.isInlineBoxToolEnabled ?? true);
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err);
+      setErrorMaintenance(msg);
+      console.error('Failed to toggle inline box tool:', err);
+    } finally {
+      setTogglingInlineBoxTool(false);
     }
   };
 
@@ -354,6 +387,29 @@ export default function AdminPage() {
                   Switch to {videoSource === 'videasy' ? 'VIDLINK' : videoSource === 'vidlink' ? 'VIDNEST' : 'VIDEASY'}
                 </button>
               </div>
+
+              <div className="border-t border-gray-700 pt-6">
+                <p className="text-gray-300 mb-4">
+                  Inline Player Box Tool: <span className={`font-bold ${isInlineBoxToolEnabled ? 'text-green-500' : 'text-red-500'}`}>
+                    {isInlineBoxToolEnabled ? 'VISIBLE TO ADMINS' : 'HIDDEN'}
+                  </span>
+                </p>
+                <p className="text-gray-400 text-sm mb-4">
+                  Controls whether admin users can see the floating Box Tools button on movie and TV player pages.
+                </p>
+                <button
+                  onClick={toggleInlineBoxTool}
+                  disabled={togglingInlineBoxTool}
+                  className={`px-6 py-3 rounded-lg text-white font-semibold transition-colors duration-200 flex items-center gap-2
+                    ${isInlineBoxToolEnabled
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-green-600 hover:bg-green-700'}
+                    ${togglingInlineBoxTool ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {togglingInlineBoxTool && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                  {isInlineBoxToolEnabled ? 'Hide Box Tool For Admins' : 'Show Box Tool For Admins'}
+                </button>
+              </div>
             </div>
           )}
         </section>
@@ -484,6 +540,12 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+        </section>
+
+        <section className="mt-8 p-6 bg-gray-800 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold mb-4 text-white">Invisible Boxes Management</h2>
+          <p className="text-gray-400 mb-4">Manage clickable invisible boxes on player pages. Users can click these boxes to trigger actions like next episode, fullscreen, etc.</p>
+          <AdminInvisibleBoxes />
         </section>
       </div>
     </>

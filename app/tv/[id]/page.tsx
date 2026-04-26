@@ -5,7 +5,7 @@ import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import WatchlistButton from '@/components/WatchlistButton';
 import Header from '@/components/Header';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import EpisodeSelector from '@/components/EpisodeSelector';
 import { formatDuration, sourceNameToId, sourceIdToName, getExplicitSourceForMedia, setExplicitSourceForMedia } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { useSession } from 'next-auth/react';
 import VideoInfoPopup from '@/components/VideoInfoPopup';
 import MarkdownBoldText from '@/components/MarkdownBoldText';
 import SourceWarningDialog from '@/components/SourceWarningDialog';
+import PlayerWithInvisibleBoxes from '@/components/PlayerWithInvisibleBoxes';
 import AdvancedVideoPlayer from '@/components/AdvancedVideoPlayer';
 import VideasyPlayer from '@/components/VideasyPlayer';
 import VidLinkPlayer from '@/components/VidLinkPlayer';
@@ -165,6 +166,16 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
   const mediaType = 'tv';
   const currentSeason = searchParams.get('season') ? parseInt(searchParams.get('season')!, 10) : 1;
   const currentEpisode = searchParams.get('episode') ? parseInt(searchParams.get('episode')!, 10) : 1;
+  const handleInvisibleBoxAction = useCallback((action: string) => {
+    if (action === 'nextEpisode') {
+      router.push(`/tv/${tmdbId}?season=${currentSeason}&episode=${currentEpisode + 1}`);
+      return;
+    }
+
+    if (action === 'previousEpisode' && currentEpisode > 1) {
+      router.push(`/tv/${tmdbId}?season=${currentSeason}&episode=${currentEpisode - 1}`);
+    }
+  }, [router, tmdbId, currentSeason, currentEpisode]);
 
   // Search functionality
   useEffect(() => {
@@ -1365,107 +1376,115 @@ const TvDetailPage = ({ params }: TvDetailPageProps) => {
           <>
           {/* Player Section - Appears at top when watching */}
           <div className="space-y-8 mb-8">
-            {/* Video Player - embedded players used directly */}
-            {videoSource === 'videasy' ? (
-              <VideasyPlayer
-                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-videasy`}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
-                posterPath={tvShow?.poster_path}
-                seasonNumber={currentSeason}
-                episodeNumber={currentEpisode}
-                initialTime={currentPlaybackTime || savedProgress}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: tvShow?.poster_path,
-                    seasonNumber: currentSeason,
-                    episodeNumber: currentEpisode,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : videoSource === 'vidlink' ? (
-              <VidLinkPlayer
-                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-vidlink`}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
-                posterPath={tvShow?.poster_path}
-                seasonNumber={currentSeason}
-                episodeNumber={currentEpisode}
-                initialTime={currentPlaybackTime || savedProgress}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: tvShow?.poster_path,
-                    seasonNumber: currentSeason,
-                    episodeNumber: currentEpisode,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : videoSrc ? (
-              <AdvancedVideoPlayer
-                key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
-                embedUrl={videoSrc}
-                title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                posterPath={tvShow?.poster_path}
-                seasonNumber={currentSeason}
-                episodeNumber={currentEpisode}
-                initialTime={currentPlaybackTime || savedProgress}
-                videoSource={videoSource}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
-                  const totalSeconds = Math.max(episodeRuntime * 60, 1);
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: tvShow?.poster_path,
-                    seasonNumber: currentSeason,
-                    episodeNumber: currentEpisode,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : (
-              <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
-                <div>
-                  <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
-                  <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
+            <PlayerWithInvisibleBoxes
+              mediaId={tmdbId}
+              mediaType={mediaType}
+              playerSource={(videoSource || 'videasy') as 'videasy' | 'vidlink' | 'vidnest' | 'vidsrc' | 'vidrock'}
+              adminEditorEnabled={session?.user?.role === 'admin'}
+              onInvisibleBoxAction={handleInvisibleBoxAction}
+            >
+              {/* Video Player - embedded players used directly */}
+              {videoSource === 'videasy' ? (
+                <VideasyPlayer
+                  key={`${tmdbId}-S${currentSeason}E${currentEpisode}-videasy`}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
+                  posterPath={tvShow?.poster_path}
+                  seasonNumber={currentSeason}
+                  episodeNumber={currentEpisode}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                    const totalSeconds = Math.max(episodeRuntime * 60, 1);
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: tvShow?.poster_path,
+                      seasonNumber: currentSeason,
+                      episodeNumber: currentEpisode,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : videoSource === 'vidlink' ? (
+                <VidLinkPlayer
+                  key={`${tmdbId}-S${currentSeason}E${currentEpisode}-vidlink`}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
+                  posterPath={tvShow?.poster_path}
+                  seasonNumber={currentSeason}
+                  episodeNumber={currentEpisode}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                    const totalSeconds = Math.max(episodeRuntime * 60, 1);
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: tvShow?.poster_path,
+                      seasonNumber: currentSeason,
+                      episodeNumber: currentEpisode,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : videoSrc ? (
+                <AdvancedVideoPlayer
+                  key={`${tmdbId}-S${currentSeason}E${currentEpisode}-${resumeChoice}`}
+                  embedUrl={videoSrc}
+                  title={`${mediaTitle} - Season ${currentSeason} Episode ${currentEpisode}`}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  posterPath={tvShow?.poster_path}
+                  seasonNumber={currentSeason}
+                  episodeNumber={currentEpisode}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  videoSource={videoSource}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    const episodeRuntime = tvShow?.episode_run_time?.[0] || 45;
+                    const totalSeconds = Math.max(episodeRuntime * 60, 1);
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    console.log(`📺 TV Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: tvShow?.poster_path,
+                      seasonNumber: currentSeason,
+                      episodeNumber: currentEpisode,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : (
+                <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
+                  <div>
+                    <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
+                    <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </PlayerWithInvisibleBoxes>
           </div>
           </>
         )}

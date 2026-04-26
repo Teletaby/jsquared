@@ -28,6 +28,7 @@ import MoreInfoModal from '@/components/MoreInfoModal';
 import TrailerPopup from '@/components/TrailerPopup';
 import CastMemberModal from '@/components/CastMemberModal';
 import VideoAIChat from '@/components/VideoAIChat';
+import PlayerWithInvisibleBoxes from '@/components/PlayerWithInvisibleBoxes';
 import Footer from '@/components/Footer';
 
 interface MovieDetailPageProps {
@@ -1300,105 +1301,119 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
       {view !== 'info' && (
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-8 mt-2 space-y-8">
             {/* Video Player */}
-            {videoSource === 'videasy' ? (
-              // Use VIDEASY player for source 1
-              <VideasyPlayer
-                key={`${tmdbId}-videasy`}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                title={mediaTitle}
-                posterPath={movie.poster_path}
-                initialTime={currentPlaybackTime || savedProgress}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
-                  const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
-                  
-                  // Cap progress at 100% even if user watched past movie end
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  
-                  console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: movie.poster_path,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : videoSource === 'vidlink' ? (
-              // Use VidLink player for source 2
-              <VidLinkPlayer
-                key={`${tmdbId}-vidlink`}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                title={mediaTitle}
-                posterPath={movie.poster_path}
-                initialTime={currentPlaybackTime || savedProgress}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
-                  const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
-                  
-                  // Cap progress at 100% even if user watched past movie end
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  
-                  console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: movie.poster_path,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : videoSrc || (videoSource === 'vidrock' && vidrockUrl) ? (
-              // Use AdvancedVideoPlayer for sources that support embed URLs
-              <AdvancedVideoPlayer
-                key={`${tmdbId}-${resumeChoice}`}
-                embedUrl={videoSource === 'vidrock' && vidrockUrl ? vidrockUrl : (videoSrc as string)}
-                title={mediaTitle}
-                mediaId={tmdbId}
-                mediaType={mediaType}
-                posterPath={movie.poster_path}
-                initialTime={currentPlaybackTime || savedProgress}
-                videoSource={videoSource}
-                onTimeUpdate={(time) => {
-                  setCurrentPlaybackTime(time);
-                  // VIDNEST supports progress tracking via message events
-                  const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
-                  const progress = Math.min((time / totalSeconds) * 100, 100);
-                  console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
-                  queueUpdate({
-                    mediaId: tmdbId,
-                    mediaType,
-                    title: mediaTitle,
-                    currentTime: time,
-                    totalDuration: totalSeconds,
-                    progress: progress,
-                    posterPath: movie.poster_path,
-                    source: videoSource,
-                  });
-                }}
-              />
-            ) : (
-              <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
-                <div>
-                  <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
-                  <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
+            <PlayerWithInvisibleBoxes
+              mediaId={tmdbId}
+              mediaType={mediaType}
+              playerSource={videoSource}
+              adminEditorEnabled={session?.user?.role === 'admin'}
+              onInvisibleBoxAction={(action, customAction) => {
+                console.log('Invisible box action:', action, customAction);
+                // Handle next/previous episode actions if needed
+                if (action === 'nextEpisode' || action === 'previousEpisode') {
+                  console.log('TV-specific action:', action);
+                }
+              }}
+            >
+              {videoSource === 'videasy' ? (
+                // Use VIDEASY player for source 1
+                <VideasyPlayer
+                  key={`${tmdbId}-videasy`}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  title={mediaTitle}
+                  posterPath={movie.poster_path}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
+                    const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
+                    
+                    // Cap progress at 100% even if user watched past movie end
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    
+                    console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: movie.poster_path,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : videoSource === 'vidlink' ? (
+                // Use VidLink player for source 2
+                <VidLinkPlayer
+                  key={`${tmdbId}-vidlink`}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  title={mediaTitle}
+                  posterPath={movie.poster_path}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    // Always use a valid totalDuration - either from movie.runtime or default to 2 hours
+                    const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
+                    
+                    // Cap progress at 100% even if user watched past movie end
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    
+                    console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: movie.poster_path,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : videoSrc || (videoSource === 'vidrock' && vidrockUrl) ? (
+                // Use AdvancedVideoPlayer for sources that support embed URLs
+                <AdvancedVideoPlayer
+                  key={`${tmdbId}-${resumeChoice}`}
+                  embedUrl={videoSource === 'vidrock' && vidrockUrl ? vidrockUrl : (videoSrc as string)}
+                  title={mediaTitle}
+                  mediaId={tmdbId}
+                  mediaType={mediaType}
+                  posterPath={movie.poster_path}
+                  initialTime={currentPlaybackTime || savedProgress}
+                  videoSource={videoSource}
+                  onTimeUpdate={(time) => {
+                    setCurrentPlaybackTime(time);
+                    // VIDNEST supports progress tracking via message events
+                    const totalSeconds = Math.max((movie?.runtime && movie.runtime > 0) ? (movie.runtime * 60) : 7200, 1);
+                    const progress = Math.min((time / totalSeconds) * 100, 100);
+                    console.log(`🎬 Movie Progress Update: ${time}s / ${totalSeconds}s = ${progress.toFixed(1)}%`);
+                    queueUpdate({
+                      mediaId: tmdbId,
+                      mediaType,
+                      title: mediaTitle,
+                      currentTime: time,
+                      totalDuration: totalSeconds,
+                      progress: progress,
+                      posterPath: movie.poster_path,
+                      source: videoSource,
+                    });
+                  }}
+                />
+              ) : (
+                <div className="w-full h-[600px] bg-black flex justify-center items-center text-center p-4 rounded-lg shadow-2xl">
+                  <div>
+                    <h2 className="text-2xl text-gray-400 font-bold mb-4">Video Not Available</h2>
+                    <p className="text-gray-500">We couldn&apos;t find a playable source for this title.</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </PlayerWithInvisibleBoxes>
 
             {/* Optionally show resume prompt */}
             {showResumePrompt && (
