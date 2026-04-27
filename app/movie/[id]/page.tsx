@@ -127,16 +127,22 @@ const MovieDetailPage = ({ params }: MovieDetailPageProps) => {
 
   // Lock body scroll when AI chat modal is open
   useEffect(() => {
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+
     if (showInfoAIChat) {
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflowY = 'hidden';
+      document.documentElement.style.overflowY = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
     }
+
     return () => {
-      document.body.style.overflow = 'unset';
-      document.documentElement.style.overflow = 'unset';
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+      document.body.style.overflowX = 'hidden';
+      document.documentElement.style.overflowX = 'hidden';
     };
   }, [showInfoAIChat]);
 

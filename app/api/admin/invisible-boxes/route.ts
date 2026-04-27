@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
       cursorStyle,
       clickCount,
       triggerOnLoad,
+      fullscreenVisibility,
     } = await req.json();
 
     if (!name || !pageType || !action || x === undefined || y === undefined || !width || !height) {
@@ -110,6 +111,7 @@ export async function POST(req: NextRequest) {
       cursorStyle: cursorStyle || 'auto',
       clickCount: Math.max(1, Number(clickCount) || 1),
       triggerOnLoad: Boolean(triggerOnLoad),
+      fullscreenVisibility: fullscreenVisibility || 'always',
       isActive: true,
       createdBy: session.user?.id,
     });

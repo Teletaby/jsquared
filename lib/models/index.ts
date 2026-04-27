@@ -337,6 +337,11 @@ const invisibleBoxSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    fullscreenVisibility: {
+      type: String,
+      enum: ['always', 'fullscreenOnly', 'windowedOnly'],
+      default: 'always',
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -367,10 +372,11 @@ if (existingInvisibleBoxModel) {
   const enumValues: string[] = actionPath?.enumValues || [];
   const hasTriggerOnLoadPath = Boolean(existingInvisibleBoxModel.schema?.path?.('triggerOnLoad'));
   const hasClickCountPath = Boolean(existingInvisibleBoxModel.schema?.path?.('clickCount'));
+  const hasFullscreenVisibilityPath = Boolean(existingInvisibleBoxModel.schema?.path?.('fullscreenVisibility'));
 
   // In dev hot-reload, Mongoose can keep an old compiled model after schema edits.
   // Recreate the model when required enum values/fields are missing.
-  if (!enumValues.includes('click') || !hasTriggerOnLoadPath || !hasClickCountPath) {
+  if (!enumValues.includes('click') || !hasTriggerOnLoadPath || !hasClickCountPath || !hasFullscreenVisibilityPath) {
     delete (mongoose.models as any).InvisibleBox;
   }
 }

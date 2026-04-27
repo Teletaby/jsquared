@@ -15,6 +15,7 @@ interface Box {
   cursorStyle?: string;
   clickCount?: number;
   triggerOnLoad?: boolean;
+  fullscreenVisibility?: 'always' | 'fullscreenOnly' | 'windowedOnly';
   pageType: string;
   playerSource?: string;
   isActive: boolean;
@@ -39,7 +40,28 @@ export default function InvisibleBoxesManager({
 }: InvisibleBoxesManagerProps) {
   const [boxes, setBoxes] = useState<Box[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const loadTriggeredRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    updateFullscreenState();
+    document.addEventListener('fullscreenchange', updateFullscreenState);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', updateFullscreenState);
+    };
+  }, []);
+
+  const shouldShowForFullscreen = useCallback((box: Box) => {
+    const mode = box.fullscreenVisibility || 'always';
+    if (mode === 'fullscreenOnly') return isFullscreen;
+    if (mode === 'windowedOnly') return !isFullscreen;
+    return true;
+  }, [isFullscreen]);
 
   useEffect(() => {
     const fetchBoxes = async () => {
@@ -96,7 +118,7 @@ export default function InvisibleBoxesManager({
     const mediaKey = `${mediaType || 'all'}-${mediaId || 'all'}-${playerSource || 'all'}`;
 
     boxes.forEach((box) => {
-      if (!box.triggerOnLoad) return;
+      if (!box.triggerOnLoad || !shouldShowForFullscreen(box)) return;
 
       const boxKey = `${mediaKey}-${box._id}`;
       if (loadTriggeredRef.current.has(boxKey)) {
@@ -108,7 +130,7 @@ export default function InvisibleBoxesManager({
       loadTriggeredRef.current.add(boxKey);
       handleBoxAction(box, 'load');
     });
-  }, [boxes, loading, mediaId, mediaType, playerSource, handleBoxAction]);
+  }, [boxes, loading, mediaId, mediaType, playerSource, handleBoxAction, shouldShowForFullscreen]);
 
   if (loading || boxes.length === 0) {
     return null;
@@ -120,11 +142,13 @@ export default function InvisibleBoxesManager({
         style={{
           position: 'absolute',
           inset: 0,
+          overflow: 'hidden',
           pointerEvents: 'none',
           zIndex: 40,
         }}
       >
         {boxes
+          .filter((box) => shouldShowForFullscreen(box))
           .filter((box) => box.action !== 'click')
           .map((box) => (
             <InvisibleBox
@@ -151,11 +175,13 @@ export default function InvisibleBoxesManager({
         style={{
           position: 'fixed',
           inset: 0,
+          overflow: 'hidden',
           pointerEvents: 'none',
-          zIndex: 39,
+          zIndex: 41,
         }}
       >
         {boxes
+          .filter((box) => shouldShowForFullscreen(box))
           .filter((box) => box.action === 'click')
           .map((box) => (
             <InvisibleBox

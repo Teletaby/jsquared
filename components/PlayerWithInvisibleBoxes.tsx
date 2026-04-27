@@ -172,8 +172,29 @@ export default function PlayerWithInvisibleBoxes({
               const clickableTarget =
                 playerContainerRef.current?.querySelector('video, iframe, button') ||
                 playerContainerRef.current;
+
+              const dispatchClickSequence = (target: HTMLElement) => {
+                try {
+                  target.focus?.();
+                } catch {}
+
+                try {
+                  target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                  target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                  target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                } catch (e) {
+                  console.warn('Failed dispatching mouse event sequence:', e);
+                }
+
+                try {
+                  target.click();
+                } catch (e) {
+                  console.warn('Failed calling target.click():', e);
+                }
+              };
+
               if (clickableTarget instanceof HTMLElement) {
-                clickableTarget.click();
+                dispatchClickSequence(clickableTarget);
               }
             }
             break;
@@ -206,7 +227,7 @@ export default function PlayerWithInvisibleBoxes({
   );
 
   return (
-    <div ref={playerContainerRef} style={{ position: 'relative' }}>
+    <div ref={playerContainerRef} style={{ position: 'relative', overflow: 'hidden', maxWidth: '100%' }}>
       <div style={{ pointerEvents: 'auto' }}>
         {children}
       </div>
@@ -216,8 +237,8 @@ export default function PlayerWithInvisibleBoxes({
         playerSource={playerSource}
         onAction={handleInvisibleBoxAction}
         onBoxTriggered={(box, triggerSource) => {
-          // Only show notification for click action boxes
-          if (box.action === 'click') {
+          // Only show the admin notification for click boxes that auto-trigger on load.
+          if (adminEditorEnabled && isInlineToolEnabled && box.action === 'click' && triggerSource === 'load') {
             setTriggeredBox({ name: box.name, action: box.action, triggerSource });
             setTimeout(() => setTriggeredBox(null), 2000);
           }

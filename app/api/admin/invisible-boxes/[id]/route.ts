@@ -41,6 +41,7 @@ export async function PUT(
       cursorStyle,
       clickCount,
       triggerOnLoad,
+      fullscreenVisibility,
       isActive,
     } = await req.json();
 
@@ -59,6 +60,7 @@ export async function PUT(
     if (cursorStyle !== undefined) updateData.cursorStyle = cursorStyle;
     if (clickCount !== undefined) updateData.clickCount = Math.max(1, Number(clickCount) || 1);
     if (triggerOnLoad !== undefined) updateData.triggerOnLoad = Boolean(triggerOnLoad);
+    if (fullscreenVisibility !== undefined) updateData.fullscreenVisibility = fullscreenVisibility;
     if (isActive !== undefined) updateData.isActive = isActive;
 
     const box = await InvisibleBox.findByIdAndUpdate(

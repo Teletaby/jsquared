@@ -21,6 +21,7 @@ type EditorBox = {
   customAction?: string;
   clickCount?: number;
   triggerOnLoad?: boolean;
+  fullscreenVisibility?: 'always' | 'fullscreenOnly' | 'windowedOnly';
   isActive: boolean;
   isNew?: boolean;
 };
@@ -59,6 +60,7 @@ export default function InlineInvisibleBoxEditor({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [boxes, setBoxes] = useState<EditorBox[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fullscreenHost, setFullscreenHost] = useState<HTMLElement | null>(null);
   const [buttonPos, setButtonPos] = useState({ x: 0, y: 0 });
@@ -104,6 +106,7 @@ export default function InlineInvisibleBoxEditor({
     const syncFullscreenHost = () => {
       const fsEl = document.fullscreenElement;
       const root = containerRef.current;
+      setIsFullscreen(Boolean(fsEl));
 
       if (fsEl && root && root.contains(fsEl) && fsEl instanceof HTMLElement) {
         setFullscreenHost(fsEl);
@@ -123,6 +126,13 @@ export default function InlineInvisibleBoxEditor({
       document.removeEventListener('fullscreenchange', syncFullscreenHost);
     };
   }, [clampButtonPos, containerRef]);
+
+  const shouldShowForFullscreen = useCallback((box: EditorBox) => {
+    const mode = box.fullscreenVisibility || 'always';
+    if (mode === 'fullscreenOnly') return isFullscreen;
+    if (mode === 'windowedOnly') return !isFullscreen;
+    return true;
+  }, [isFullscreen]);
 
   const selectedBox = useMemo(
     () => boxes.find((box) => box._id === selectedId) || null,
@@ -147,6 +157,7 @@ export default function InlineInvisibleBoxEditor({
         mediaIds: Array.isArray(box.mediaIds) ? box.mediaIds : [],
         clickCount: Math.max(1, Number(box.clickCount) || 1),
         triggerOnLoad: Boolean(box.triggerOnLoad),
+        fullscreenVisibility: box.fullscreenVisibility || 'always',
       }));
       setBoxes(loaded);
       setSelectedId(loaded[0]?._id || null);
@@ -182,6 +193,7 @@ export default function InlineInvisibleBoxEditor({
       action: 'fullscreen',
       clickCount: 1,
       triggerOnLoad: false,
+      fullscreenVisibility: 'always',
       isActive: true,
       isNew: true,
     };
@@ -224,6 +236,7 @@ export default function InlineInvisibleBoxEditor({
           customAction: box.action === 'custom' ? box.customAction : undefined,
           clickCount: Math.max(1, Math.round(box.clickCount || 1)),
           triggerOnLoad: Boolean(box.triggerOnLoad),
+          fullscreenVisibility: box.fullscreenVisibility || 'always',
           isActive: box.isActive,
         };
 
@@ -315,7 +328,9 @@ export default function InlineInvisibleBoxEditor({
       {open && (
         <>
           <div className="absolute inset-0 z-[70] pointer-events-none">
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {boxes
+              .filter((box) => shouldShowForFullscreen(box))
               .filter((box) => box.action !== 'click')
               .map((box) => (
                 <InvisibleBox
@@ -337,10 +352,12 @@ export default function InlineInvisibleBoxEditor({
                   onSizeChange={(width, height) => updateBox(box._id, { width, height })}
                 />
               ))}
+            </div>
           </div>
 
-          <div className="fixed inset-0 z-[69] pointer-events-none">
+          <div className="absolute inset-0 z-[69] pointer-events-none overflow-hidden">
             {boxes
+              .filter((box) => shouldShowForFullscreen(box))
               .filter((box) => box.action === 'click')
               .map((box) => (
                 <InvisibleBox
@@ -506,6 +523,20 @@ export default function InlineInvisibleBoxEditor({
                   />
                   Trigger on player load
                 </label>
+
+                <select
+                  value={selectedBox.fullscreenVisibility || 'always'}
+                  onChange={(e) =>
+                    updateBox(selectedBox._id, {
+                      fullscreenVisibility: e.target.value as 'always' | 'fullscreenOnly' | 'windowedOnly',
+                    })
+                  }
+                  className="w-full rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs"
+                >
+                  <option value="always">Show always</option>
+                  <option value="fullscreenOnly">Show only in fullscreen</option>
+                  <option value="windowedOnly">Show only when fullscreen is exited</option>
+                </select>
 
                 <button
                   onClick={() => removeBox(selectedBox)}
