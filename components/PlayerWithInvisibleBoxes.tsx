@@ -3,6 +3,7 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import InvisibleBoxesManager from './InvisibleBoxesManager';
 import InlineInvisibleBoxEditor from './InlineInvisibleBoxEditor';
+import SacrificialClickOverlay from './SacrificialClickOverlay';
 
 interface PlayerWithInvisibleBoxesProps {
   children: React.ReactNode;
@@ -227,33 +228,40 @@ export default function PlayerWithInvisibleBoxes({
   );
 
   return (
-    <div ref={playerContainerRef} style={{ position: 'relative', overflow: 'hidden', maxWidth: '100%' }}>
-      <div style={{ pointerEvents: 'auto' }}>
-        {children}
-      </div>
-      <InvisibleBoxesManager
-        mediaId={mediaId}
-        mediaType={mediaType}
-        playerSource={playerSource}
-        onAction={handleInvisibleBoxAction}
-        onBoxTriggered={(box, triggerSource) => {
-          // Only show the admin notification for click boxes that auto-trigger on load.
-          if (adminEditorEnabled && isInlineToolEnabled && box.action === 'click' && triggerSource === 'load') {
-            setTriggeredBox({ name: box.name, action: box.action, triggerSource });
-            setTimeout(() => setTriggeredBox(null), 2000);
-          }
-        }}
-        containerRef={playerContainerRef}
-      />
-      {adminEditorEnabled && isInlineToolEnabled && (
-        <InlineInvisibleBoxEditor
+    <SacrificialClickOverlay
+      onOverlayHidden={() => {
+        console.log('SacrificialClickOverlay hidden');
+      }}
+      debug={false}
+    >
+      <div ref={playerContainerRef} style={{ position: 'relative', overflow: 'hidden', maxWidth: '100%' }}>
+        <div style={{ pointerEvents: 'auto' }}>
+          {children}
+        </div>
+        <InvisibleBoxesManager
           mediaId={mediaId}
           mediaType={mediaType}
           playerSource={playerSource}
+          onAction={handleInvisibleBoxAction}
+          onBoxTriggered={(box, triggerSource) => {
+            // Only show the admin notification for click boxes that auto-trigger on load.
+            if (adminEditorEnabled && isInlineToolEnabled && box.action === 'click' && triggerSource === 'load') {
+              setTriggeredBox({ name: box.name, action: box.action, triggerSource });
+              setTimeout(() => setTriggeredBox(null), 2000);
+            }
+          }}
           containerRef={playerContainerRef}
-          triggeredBox={triggeredBox}
         />
-      )}
-    </div>
+        {adminEditorEnabled && isInlineToolEnabled && (
+          <InlineInvisibleBoxEditor
+            mediaId={mediaId}
+            mediaType={mediaType}
+            playerSource={playerSource}
+            containerRef={playerContainerRef}
+            triggeredBox={triggeredBox}
+          />
+        )}
+      </div>
+    </SacrificialClickOverlay>
   );
 }
